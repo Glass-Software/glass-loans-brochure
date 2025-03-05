@@ -12,12 +12,16 @@ const Contact = () => {
               "
             >
               <h2 className="mb-3 text-2xl font-bold text-black dark:text-white sm:text-3xl lg:text-2xl xl:text-3xl">
-                Need Help? Open a Ticket
+                Contact Us
               </h2>
+
               <p className="mb-12 text-base font-medium text-body-color">
-                Our support team will get back to you ASAP via email.
+              Please fill out the form to the right and someone from our team will follow up shortly! 
               </p>
-              <form>
+
+              
+              
+              {/* <form>
                 <div className="-mx-4 flex flex-wrap">
                   <div className="w-full px-4 md:w-1/2">
                     <div className="mb-8">
@@ -67,11 +71,11 @@ const Contact = () => {
                   </div>
                   <div className="w-full px-4">
                     <button className="rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 dark:shadow-submit-dark">
-                      Submit Ticket
+                      Submit
                     </button>
                   </div>
                 </div>
-              </form>
+              </form> */}
             </div>
           </div>
           <div className="w-full px-4 lg:w-5/12 xl:w-4/12">

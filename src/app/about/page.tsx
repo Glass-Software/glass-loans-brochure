@@ -14,10 +14,12 @@ const AboutPage = () => {
   return (
     <>
       <Breadcrumb
-        pageName="About Page"
-        description="Lorem ipsum dolor sit amet, consectetur adipiscing elit. In varius eros eget sapien consectetur ultrices. Ut quis dapibus libero."
+        pageName="About Us"
+        description="After years of running a private lending business, we found existing loan management software to 
+        be inefficient and lacking the features we needed. 
+        So, we built our own—designed for lenders, by lenders. Now, we're offering that same powerful solution to you."
       />
-      <AboutSectionOne />
+      {/* <AboutSectionOne /> */}
       <AboutSectionTwo />
     </>
   );
