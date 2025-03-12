@@ -1,3 +1,5 @@
+import { useModal } from "@/context/ModalContext";
+
 const PricingBox = (props: {
   price: string;
   duration: string;
@@ -6,6 +8,7 @@ const PricingBox = (props: {
   children: React.ReactNode;
 }) => {
   const { price, duration, packageName, subtitle, children } = props;
+  const { openContactModal } = useModal();
 
   return (
     <div className="w-full">
@@ -23,13 +26,13 @@ const PricingBox = (props: {
         </div>
         <p className="mb-7 text-base text-body-color">{subtitle}</p>
         <div className="mb-8 border-b border-body-color border-opacity-10 pb-8 dark:border-white dark:border-opacity-10">
-          <a 
-            href="https://urbangatecapital.activehosted.com/f/7" 
+          <button
+            onClick={openContactModal}
             className="flex w-full items-center justify-center rounded-sm bg-primary p-3 text-base font-semibold text-white transition duration-300 ease-in-out hover:bg-opacity-80 hover:shadow-signUp"
           >
             Get Started
-          </a>
-          </div>
+          </button>
+        </div>
         <div>{children}</div>
         <div className="absolute bottom-0 right-0 z-[-1]">
           <svg
