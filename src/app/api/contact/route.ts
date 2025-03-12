@@ -214,7 +214,7 @@ Thank you for joining the Glass Loans waitlist! We're excited to have you on boa
 
 We'll keep you updated on our progress and let you know as soon as we're ready to launch.
 
-Best regards,
+Best Regards,
 The Glass Loans Team
           `,
           html: `
@@ -222,7 +222,7 @@ The Glass Loans Team
 <p>Hi ${name},</p>
 <p>Thank you for joining the Glass Loans waitlist! We're excited to have you on board.</p>
 <p>We'll keep you updated on our progress and let you know as soon as we're ready to launch.</p>
-<p>Best regards,<br>The Glass Loans Team</p>
+<p>Best Regards,<br>The Glass Loans Team</p>
           `,
         };
         await sgMail.send(regularMsg);
