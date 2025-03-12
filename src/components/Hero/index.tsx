@@ -21,7 +21,7 @@ const Hero = () => {
                   That Works
                 </h1>
                 <p className="mb-12 text-base !leading-relaxed text-body-color dark:text-body-color-dark sm:text-lg md:text-xl">
-                  Glass makes private and hard money lending Simple with an
+                  Glass makes private and hard money lending simple with an
                   intuitive platform. Manage loan origination, servicing, and
                   payoffs with ease—no complex systems or unnecessary steps.
                   With a clean, user-friendly interface Glass helps you stay

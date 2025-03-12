@@ -66,8 +66,10 @@ const Pricing = () => {
           >
             <OfferList text="All UI Components" status="active" />
             <OfferList text="Up to 50 Loans" status="active" />
-            <OfferList text="Unlimited Email and Phone Support" status="active" />
-
+            <OfferList
+              text="Unlimited Email and Phone Support"
+              status="active"
+            />
           </PricingBox>
           <PricingBox
             packageName="Basic"
@@ -77,8 +79,10 @@ const Pricing = () => {
           >
             <OfferList text="All UI Components" status="active" />
             <OfferList text="Up to 500 Loans" status="active" />
-            <OfferList text="Unlimited Email and Phone Support" status="active" />
-
+            <OfferList
+              text="Unlimited Email and Phone Support"
+              status="active"
+            />
           </PricingBox>
           <PricingBox
             packageName="Plus"
@@ -88,9 +92,11 @@ const Pricing = () => {
           >
             <OfferList text="All UI Components" status="active" />
             <OfferList text="Unlimited Amout of Loans" status="active" />
-            <OfferList text="Unlimited Email and Phone Support" status="active" />
+            <OfferList
+              text="Unlimited Email and Phone Support"
+              status="active"
+            />
             <OfferList text="Payments (Coming Soon)" status="active" />
-
           </PricingBox>
         </div>
       </div>
