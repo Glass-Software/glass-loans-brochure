@@ -10,6 +10,16 @@
   }
 }
 
+/* Prevent layout shift when modal opens */
+html {
+  scrollbar-gutter: stable;
+}
+
+body.modal-open {
+  overflow: hidden;
+  padding-right: 2px; /* Width of a typical scrollbar */
+}
+
 @layer components {
   input[type="checkbox"]:checked ~ label span svg {
     @apply inline-flex;

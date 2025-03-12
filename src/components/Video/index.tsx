@@ -3,11 +3,12 @@
 import Image from "next/image";
 import { useState } from "react";
 import SectionTitle from "../Common/SectionTitle";
-
 import ModalVideo from "react-modal-video";
+import { useModal } from "@/context/ModalContext";
 
 const Video = () => {
   const [isOpen, setOpen] = useState(false);
+  const { openContactModal } = useModal();
 
   return (
     <section className="relative z-10 py-16 md:py-20 lg:py-28">
@@ -46,6 +47,15 @@ const Video = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mt-10 flex justify-center">
+          <button
+            onClick={openContactModal}
+            className="ease-in-up hover:shadow-submit-hover rounded-sm bg-primary px-8 py-3 text-base font-medium text-white shadow-submit transition duration-300 hover:bg-opacity-90 dark:shadow-submit-dark"
+          >
+            Join Our Waitlist
+          </button>
         </div>
       </div>
 

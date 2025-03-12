@@ -1,6 +1,9 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useModal } from "@/context/ModalContext";
 const Hero = () => {
+  const { openContactModal } = useModal();
   return (
     <>
       <section
@@ -18,18 +21,20 @@ const Hero = () => {
                   That Works
                 </h1>
                 <p className="mb-12 text-base !leading-relaxed text-body-color dark:text-body-color-dark sm:text-lg md:text-xl">
-                Glass makes private and hard money lending Simple with an intuitive platform. 
-                Manage loan origination, servicing, and payoffs with ease—no complex systems or unnecessary steps. 
-                With a clean, user-friendly interface Glass helps you stay focused on growing your business while handling the details seamlessly.
+                  Glass makes private and hard money lending Simple with an
+                  intuitive platform. Manage loan origination, servicing, and
+                  payoffs with ease—no complex systems or unnecessary steps.
+                  With a clean, user-friendly interface Glass helps you stay
+                  focused on growing your business while handling the details
+                  seamlessly.
                 </p>
                 <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
-                  <Link
-                    href="https://urbangatecapital.activehosted.com/f/7"
+                  <button
+                    onClick={openContactModal}
                     className="rounded-sm bg-primary px-8 py-4 text-base font-semibold text-white duration-300 ease-in-out hover:bg-primary/80"
                   >
                     🔥 Join Our Waitlist
-                  </Link>
-
+                  </button>
                 </div>
               </div>
             </div>
