@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Image configuration
   images: {
     remotePatterns: [
       {
@@ -11,19 +12,15 @@ const nextConfig = {
         hostname: "localhost",
       },
     ],
+    minimumCacheTTL: 60,
+    formats: ["image/avif", "image/webp"],
   },
+
   // Enable static exports
   output: "standalone",
 
   // Optimize builds
   swcMinify: true,
-
-  // Enable aggressive image optimization
-  images: {
-    ...nextConfig.images,
-    minimumCacheTTL: 60,
-    formats: ["image/avif", "image/webp"],
-  },
 
   // Enable HTTP/2 Server Push
   experimental: {
