@@ -60,14 +60,14 @@ const Pricing = () => {
         <div className="grid grid-cols-1 gap-x-8 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
           <PricingBox
             packageName="Lite"
-            price={isMonthly ? "400" : "4,800"}
+            price={isMonthly ? "395" : "4,740"}
             duration={isMonthly ? "mo" : "yr"}
             subtitle="For lenders starting out."
           >
             <OfferList text="All UI Components" status="active" />
-            <OfferList text="Up to 50 Loans" status="active" />
+            <OfferList text="Up to 20 Active Loans at a Time" status="active" />
             <OfferList
-              text="Unlimited Email and Phone Support"
+              text="Automated Reports and Statements"
               status="active"
             />
           </PricingBox>
@@ -78,9 +78,9 @@ const Pricing = () => {
             subtitle="For small to medium sized established lenders."
           >
             <OfferList text="All UI Components" status="active" />
-            <OfferList text="Up to 500 Loans" status="active" />
+            <OfferList text="Up to 60 Active Loans at a Time" status="active" />
             <OfferList
-              text="Unlimited Email and Phone Support"
+              text="Automated Reports and Statements"
               status="active"
             />
           </PricingBox>
@@ -91,9 +91,12 @@ const Pricing = () => {
             subtitle="For larger Privatae Equity lenders."
           >
             <OfferList text="All UI Components" status="active" />
-            <OfferList text="Unlimited Amout of Loans" status="active" />
             <OfferList
-              text="Unlimited Email and Phone Support"
+              text="Up to 200 Active Loans at a Time"
+              status="active"
+            />
+            <OfferList
+              text="Automated Reports and Statements"
               status="active"
             />
             <OfferList text="Payments (Coming Soon)" status="active" />

@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import ThemeToggler from "./ThemeToggler";
 import menuData from "./menuData";
 import { useModal } from "@/context/ModalContext";
@@ -26,7 +26,11 @@ const Header = () => {
   };
   useEffect(() => {
     window.addEventListener("scroll", handleStickyNavbar);
-  });
+    // Return cleanup function
+    return () => {
+      window.removeEventListener("scroll", handleStickyNavbar);
+    };
+  }, []); // Add empty dependency array
 
   // submenu handler
   const [openIndex, setOpenIndex] = useState(-1);
@@ -39,6 +43,34 @@ const Header = () => {
   };
 
   const usePathName = usePathname();
+
+  // Refs for click outside detection
+  const navRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Close navbar when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        navRef.current &&
+        !navRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setNavbarOpen(false);
+      }
+    };
+
+    if (navbarOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [navbarOpen]);
 
   return (
     <>
@@ -77,6 +109,7 @@ const Header = () => {
             <div className="flex w-full items-center justify-between px-4">
               <div>
                 <button
+                  ref={buttonRef}
                   onClick={navbarToggleHandler}
                   id="navbarToggler"
                   aria-label="Mobile Menu"
@@ -99,6 +132,7 @@ const Header = () => {
                   />
                 </button>
                 <nav
+                  ref={navRef}
                   id="navbarCollapse"
                   className={`navbar absolute right-0 z-30 w-[250px] rounded border-[.5px] border-body-color/50 bg-white px-6 py-4 duration-300 dark:border-body-color/20 dark:bg-dark lg:visible lg:static lg:w-auto lg:border-none lg:!bg-transparent lg:p-0 lg:opacity-100 ${
                     navbarOpen

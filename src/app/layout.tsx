@@ -12,6 +12,7 @@ import ContactModal from "@/components/ContactModal";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// Metadata needs to be in a separate file since this is a client component
 export default function RootLayout({
   children,
 }: {
@@ -23,8 +24,9 @@ export default function RootLayout({
         <head /> will contain the components returned by the nearest parent
         head.js. Find out more at https://beta.nextjs.org/docs/api-reference/file-conventions/head
       */}
-      <head />
-
+      <head>
+        <link rel="icon" href="/favicon.svg" />
+      </head>
       <body className={`bg-[#FCFCFC] dark:bg-black ${inter.className}`}>
         <Providers>
           <ModalProvider>
