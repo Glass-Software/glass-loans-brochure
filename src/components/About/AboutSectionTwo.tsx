@@ -38,8 +38,8 @@ const AboutSectionTwo = () => {
                   Tyler Hervey | Chief Technology Officer
                 </h3>
                 <p className="text-base font-medium leading-relaxed text-body-color sm:text-lg sm:leading-relaxed">
-                  Responsible for overseeing the technology strategy,
-                  development, and implementation within a company.
+                  Responsible for overseeing the product development, design,
+                  and implementation.
                 </p>
               </div>
               <div className="mb-9">

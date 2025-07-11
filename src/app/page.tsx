@@ -14,6 +14,27 @@ import { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Glass Loan Management Software",
   description: "Simple, easy to use loan management software",
+  openGraph: {
+    title: "Glass Loan Management Software",
+    description: "Simple, easy to use loan management software",
+    url: "https://glassloans.com",
+    siteName: "Glass Loans",
+    images: [
+      {
+        url: "/images/logo/glass_logo_2--light.png",
+        width: 304,
+        height: 92,
+        alt: "Glass Loans Logo",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Glass Loan Management Software",
+    description: "Simple, easy to use loan management software",
+    images: ["/images/logo/glass_logo_2--light.png"],
+  },
   // other metadata
 };
 
