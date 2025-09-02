@@ -21,21 +21,29 @@ export const metadata: Metadata = {
     siteName: "Glass Loans",
     images: [
       {
-        url: "/images/logo/glass_logo_2--light.png",
-        width: 304,
-        height: 92,
+        url: "/images/logo/glass_logo_2.svg",
+        width: 1200,
+        height: 630,
         alt: "Glass Loans Logo",
       },
     ],
     type: "website",
+    locale: "en_US",
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "Glass Loan Management Software",
-    description: "Simple, easy to use loan management software",
-    images: ["/images/logo/glass_logo_2--light.png"],
+  // twitter: {
+  //   card: "summary_large_image",
+  //   title: "Glass Loan Management Software",
+  //   description: "Simple, easy to use loan management software",
+  //   images: ["/images/logo/glass_logo_2.svg"],
+  //   creator: "@glassloans",
+  // },
+  robots: {
+    index: true,
+    follow: true,
   },
-  // other metadata
+  alternates: {
+    canonical: "https://glassloans.com",
+  },
 };
 
 export default function Home() {
