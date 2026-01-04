@@ -19,12 +19,11 @@ const nextConfig = {
   // Enable static exports
   output: "standalone",
 
-  // Optimize builds
-  swcMinify: true,
-
   // Enable HTTP/2 Server Push
   experimental: {
-    serverActions: true,
+    serverActions: {
+      bodySizeLimit: "2mb",
+    },
   },
 
   // Configure headers

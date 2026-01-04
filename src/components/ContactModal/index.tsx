@@ -180,7 +180,7 @@ const ContactModal = () => {
                   </div>
                   {submitStatus === "success" && (
                     <p className="mt-3 text-center text-green-600 dark:text-green-400">
-                      Thank you for your message! We'll be in touch soon.
+                      Thank you for your message! We&apos;ll be in touch soon.
                     </p>
                   )}
                   {submitStatus === "error" && (
