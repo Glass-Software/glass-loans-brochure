@@ -1,12 +1,9 @@
 "use client";
-import { useState } from "react";
 import SectionTitle from "../Common/SectionTitle";
-import OfferList from "./OfferList";
 import PricingBox from "./PricingBox";
+import Link from "next/link";
 
 const Pricing = () => {
-  const [isMonthly, setIsMonthly] = useState(true);
-
   return (
     <section id="pricing" className="relative z-10 py-16 md:py-20 lg:py-28">
       <div className="container">
@@ -17,90 +14,38 @@ const Pricing = () => {
           width="665px"
         />
 
-        <div className="w-full">
-          <div className="mb-8 flex justify-center md:mb-12 lg:mb-16">
-            <span
-              onClick={() => setIsMonthly(true)}
-              className={`${
-                isMonthly
-                  ? "pointer-events-none text-primary"
-                  : "text-dark dark:text-white"
-              } mr-4 cursor-pointer text-base font-semibold`}
-            >
-              Monthly
-            </span>
-            <div
-              onClick={() => setIsMonthly(!isMonthly)}
-              className="flex cursor-pointer items-center"
-            >
-              <div className="relative">
-                <div className="h-5 w-14 rounded-full bg-[#1D2144] shadow-inner"></div>
-                <div
-                  className={`${
-                    isMonthly ? "" : "translate-x-full"
-                  } shadow-switch-1 absolute left-0 top-[-4px] flex h-7 w-7 items-center justify-center rounded-full bg-primary transition`}
-                >
-                  <span className="active h-4 w-4 rounded-full bg-white"></span>
-                </div>
-              </div>
-            </div>
-            <span
-              onClick={() => setIsMonthly(false)}
-              className={`${
-                isMonthly
-                  ? "text-dark dark:text-white"
-                  : "pointer-events-none text-primary"
-              } ml-4 cursor-pointer text-base font-semibold`}
-            >
-              Yearly
-            </span>
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 gap-x-8 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
           <PricingBox
             packageName="Lite"
-            price={isMonthly ? "395" : "4,740"}
-            duration={isMonthly ? "mo" : "yr"}
-            subtitle="For lenders starting out."
-          >
-            <OfferList text="All UI Components" status="active" />
-            <OfferList text="Up to 20 Active Loans at a Time" status="active" />
-            <OfferList
-              text="Automated Reports and Statements"
-              status="active"
-            />
-          </PricingBox>
+            price="395"
+            duration="mo"
+            subtitle="0-25 Loans"
+          />
           <PricingBox
             packageName="Basic"
-            price={isMonthly ? "695" : "8,340"}
-            duration={isMonthly ? "mo" : "yr"}
-            subtitle="For small to medium sized established lenders."
-          >
-            <OfferList text="All UI Components" status="active" />
-            <OfferList text="Up to 60 Active Loans at a Time" status="active" />
-            <OfferList
-              text="Automated Reports and Statements"
-              status="active"
-            />
-          </PricingBox>
+            price="695"
+            duration="mo"
+            subtitle="25-75 Loans"
+          />
           <PricingBox
             packageName="Plus"
-            price={isMonthly ? "1,500" : "18,000"}
-            duration={isMonthly ? "mo" : "yr"}
-            subtitle="For larger Privatae Equity lenders."
-          >
-            <OfferList text="All UI Components" status="active" />
-            <OfferList
-              text="Up to 200 Active Loans at a Time"
-              status="active"
-            />
-            <OfferList
-              text="Automated Reports and Statements"
-              status="active"
-            />
-            <OfferList text="Payments (Coming Soon)" status="active" />
-          </PricingBox>
+            price="1,295"
+            duration="mo"
+            subtitle="75-150 Loans"
+          />
+        </div>
+
+        <div className="mt-8 text-center">
+          <p className="text-base text-body-color dark:text-body-color-dark">
+            <span className="font-semibold">Enterprise:</span>{" "}
+            <Link
+              href="https://calendly.com/willcoleman202/30min"
+              className="text-primary hover:underline"
+            >
+              Schedule a call
+            </Link>{" "}
+            to discuss pricing for 150+ Loans
+          </p>
         </div>
       </div>
 

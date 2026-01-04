@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useModal } from "@/context/ModalContext";
+
 const Hero = () => {
-  const { openContactModal } = useModal();
   return (
     <>
       <section
@@ -28,13 +27,19 @@ const Hero = () => {
                   focused on growing your business while handling the details
                   seamlessly.
                 </p>
-                <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
-                  <button
-                    onClick={openContactModal}
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <Link
+                    href="https://calendly.com/willcoleman202/30min"
                     className="rounded-sm bg-primary px-8 py-4 text-base font-semibold text-white duration-300 ease-in-out hover:bg-primary/80"
                   >
-                    🔥 Join Our Waitlist
-                  </button>
+                    Book a Call
+                  </Link>
+                  <Link
+                    href="https://app.glassloans.io/admin/login"
+                    className="text-base font-medium text-body-color duration-300 ease-in-out hover:text-primary dark:text-body-color-dark dark:hover:text-primary"
+                  >
+                    Already have an account? Login
+                  </Link>
                 </div>
               </div>
             </div>

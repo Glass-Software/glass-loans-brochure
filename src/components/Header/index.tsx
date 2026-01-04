@@ -5,10 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import ThemeToggler from "./ThemeToggler";
 import menuData from "./menuData";
-import { useModal } from "@/context/ModalContext";
 
 const Header = () => {
-  const { openContactModal } = useModal();
   // Navbar toggle
   const [navbarOpen, setNavbarOpen] = useState(false);
   const navbarToggleHandler = () => {
@@ -142,7 +140,7 @@ const Header = () => {
                 >
                   <ul className="block lg:flex lg:space-x-12">
                     {menuData.map((menuItem, index) => (
-                      <li key={index} className="group relative">
+                      <li key={menuItem.id} className="group relative">
                         {menuItem.path ? (
                           <Link
                             href={menuItem.path}
@@ -177,10 +175,10 @@ const Header = () => {
                                 openIndex === index ? "block" : "hidden"
                               }`}
                             >
-                              {menuItem.submenu.map((submenuItem, index) => (
+                              {menuItem.submenu.map((submenuItem) => (
                                 <Link
                                   href={submenuItem.path}
-                                  key={index}
+                                  key={submenuItem.id}
                                   className="block rounded py-2.5 text-sm text-dark hover:text-primary dark:text-white/70 dark:hover:text-white lg:px-3"
                                 >
                                   {submenuItem.title}
@@ -194,13 +192,19 @@ const Header = () => {
                   </ul>
                 </nav>
               </div>
-              <div className="flex items-center justify-end pr-16 lg:pr-0">
-                <button
-                  onClick={openContactModal}
+              <div className="flex items-center justify-end gap-4 pr-16 lg:pr-0">
+                <Link
+                  href="https://app.glassloans.io/admin/login"
+                  className="ease-in-up hidden text-base font-medium text-dark transition duration-300 hover:text-primary dark:text-white dark:hover:text-primary md:block"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="https://calendly.com/willcoleman202/30min"
                   className="ease-in-up hidden rounded-sm bg-primary px-8 py-3 text-base font-medium text-white shadow-btn transition duration-300 hover:bg-opacity-90 hover:shadow-btn-hover md:block md:px-9 lg:px-6 xl:px-9"
                 >
-                  Join Our Waitlist
-                </button>
+                  Book a Call
+                </Link>
 
                 <div>
                   <ThemeToggler />

@@ -21,7 +21,7 @@ const sheets = google.sheets({ version: "v4", auth });
 const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
 
 // Headers for the spreadsheet
-const HEADERS = ["Timestamp", "Name", "Email", "Company", "Message"];
+const HEADERS = ["Timestamp", "Name", "Email", "Company", "Plan", "Message"];
 
 async function ensureSheetExists() {
   if (!SPREADSHEET_ID) return;
@@ -57,14 +57,14 @@ async function ensureSheetExists() {
     // Check if headers exist
     const headerResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: "Waitlist!A1:E1",
+      range: "Waitlist!A1:F1",
     });
 
     if (!headerResponse.data.values?.[0]?.length) {
       // Add headers if they don't exist
       await sheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: "Waitlist!A1:E1",
+        range: "Waitlist!A1:F1",
         valueInputOption: "RAW",
         requestBody: {
           values: [HEADERS],
@@ -82,7 +82,7 @@ async function ensureSheetExists() {
                   startRowIndex: 0,
                   endRowIndex: 1,
                   startColumnIndex: 0,
-                  endColumnIndex: 5,
+                  endColumnIndex: 6,
                   sheetId: waitlistSheet?.properties?.sheetId,
                 },
                 cell: {
@@ -121,28 +121,34 @@ async function ensureSheetExists() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, company, message } = body;
+    const { name, email, company, message, plan } = body;
     const timestamp = new Date().toISOString();
 
     console.log("Processing form submission for:", email);
 
     // Send email via SendGrid
+    const subjectLine = plan
+      ? `New ${plan} Plan Inquiry: ${company || name}`
+      : `New Contact Form Submission: ${company || "Individual"}`;
+
     const msg = {
       to: process.env.CONTACT_EMAIL || "info@glassloans.io",
       from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
-      subject: `New Waitlist Signup: ${company || "Individual"}`,
+      subject: subjectLine,
       text: `
 Name: ${name}
 Email: ${email}
 Company: ${company}
+${plan ? `Plan: ${plan}` : ''}
 Message: ${message}
 Timestamp: ${timestamp}
       `,
       html: `
-<h2>New Waitlist Signup</h2>
+<h2>${plan ? `New ${plan} Plan Inquiry` : 'New Contact Form Submission'}</h2>
 <p><strong>Name:</strong> ${name}</p>
 <p><strong>Email:</strong> ${email}</p>
 <p><strong>Company:</strong> ${company}</p>
+${plan ? `<p><strong>Plan:</strong> ${plan}</p>` : ''}
 <p><strong>Message:</strong> ${message}</p>
 <p><strong>Timestamp:</strong> ${timestamp}</p>
       `,
@@ -170,10 +176,10 @@ Timestamp: ${timestamp}
         // Append the new row
         await sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
-          range: "Waitlist!A:E",
+          range: "Waitlist!A:F",
           valueInputOption: "USER_ENTERED",
           requestBody: {
-            values: [[timestamp, name, email, company, message]],
+            values: [[timestamp, name, email, company, plan || "", message]],
           },
         });
         console.log("Data appended to sheet successfully");
@@ -206,22 +212,28 @@ Timestamp: ${timestamp}
         const regularMsg = {
           to: email,
           from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
-          subject: "Welcome to the Glass Loans Waitlist!",
+          subject: "Thank You for Reaching Out to Glass Loans!",
           text: `
 Hi ${name},
 
-Thank you for joining the Glass Loans waitlist! We're excited to have you on board.
+Thank you for reaching out! We're excited to connect with you.
 
-We'll keep you updated on our progress and let you know as soon as we're ready to launch.
+To schedule a call with Will, please book a time that works for you at: https://calendly.com/willcoleman202/30min
+
+Alternatively, feel free to respond to this email with your phone number and we will reach out to you as soon as we can.
+
+Looking forward to working together!
 
 Best Regards,
 The Glass Loans Team
           `,
           html: `
-<h2>Welcome to Glass Loans!</h2>
+<h2>Thank You for Reaching Out!</h2>
 <p>Hi ${name},</p>
-<p>Thank you for joining the Glass Loans waitlist! We're excited to have you on board.</p>
-<p>We'll keep you updated on our progress and let you know as soon as we're ready to launch.</p>
+<p>Thank you for reaching out! We're excited to connect with you.</p>
+<p>To schedule a call with Will, please <a href="https://calendly.com/willcoleman202/30min" style="color: #4A6CF7; text-decoration: underline;">book a time that works for you</a>.</p>
+<p>Alternatively, feel free to respond to this email with your phone number and we will reach out to you as soon as we can.</p>
+<p><strong>Looking forward to working together!</strong></p>
 <p>Best Regards,<br>The Glass Loans Team</p>
           `,
         };

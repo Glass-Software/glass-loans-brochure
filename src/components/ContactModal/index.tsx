@@ -1,21 +1,29 @@
 "use client";
 
 import { Dialog, Transition } from "@headlessui/react";
-import { Fragment, useState } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { useModal } from "@/context/ModalContext";
 
 const ContactModal = () => {
-  const { isContactOpen, closeContactModal } = useModal();
+  const { isContactOpen, closeContactModal, selectedPlan } = useModal();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     company: "",
     message: "",
+    plan: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "success" | "error"
   >("idle");
+
+  // Update form data when selectedPlan changes
+  useEffect(() => {
+    if (selectedPlan) {
+      setFormData((prev) => ({ ...prev, plan: selectedPlan }));
+    }
+  }, [selectedPlan]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +40,7 @@ const ContactModal = () => {
 
       if (response.ok) {
         setSubmitStatus("success");
-        setFormData({ name: "", email: "", company: "", message: "" });
+        setFormData({ name: "", email: "", company: "", message: "", plan: "" });
         setTimeout(() => {
           closeContactModal();
           setSubmitStatus("idle");
@@ -82,7 +90,12 @@ const ContactModal = () => {
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900 dark:text-white"
                 >
-                  Join Our Waitlist
+                  Get in Touch
+                  {selectedPlan && (
+                    <span className="ml-2 text-sm font-normal text-primary">
+                      - {selectedPlan} Plan
+                    </span>
+                  )}
                 </Dialog.Title>
                 <form onSubmit={handleSubmit} className="mt-4">
                   <div className="mb-4">
@@ -162,17 +175,17 @@ const ContactModal = () => {
                       disabled={isSubmitting}
                       className="ease-in-up hover:shadow-submit-hover w-full rounded-sm bg-primary px-8 py-3 text-base font-medium text-white shadow-submit transition duration-300 hover:bg-opacity-90 disabled:opacity-50 dark:shadow-submit-dark"
                     >
-                      {isSubmitting ? "Sending..." : "Join Waitlist"}
+                      {isSubmitting ? "Sending..." : "Send Message"}
                     </button>
                   </div>
                   {submitStatus === "success" && (
                     <p className="mt-3 text-center text-green-600 dark:text-green-400">
-                      Thank you for joining our waitlist!
+                      Thank you for your message! We'll be in touch soon.
                     </p>
                   )}
                   {submitStatus === "error" && (
                     <p className="mt-3 text-center text-red-600 dark:text-red-400">
-                      Failed to join waitlist. Please try again.
+                      Failed to send message. Please try again.
                     </p>
                   )}
                 </form>
