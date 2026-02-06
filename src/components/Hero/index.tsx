@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { useState } from "react";
+import ModalVideo from "react-modal-video";
 
 const Hero = () => {
+  const [isOpen, setOpen] = useState(false);
+
   return (
     <>
       <section
@@ -27,7 +32,7 @@ const Hero = () => {
                   focused on growing your business while handling the details
                   seamlessly.
                 </p>
-                <div className="flex flex-col items-center justify-center space-y-4">
+                <div className="flex flex-col items-center justify-center space-y-4 mb-12">
                   <Link
                     href="https://calendly.com/willcoleman202/30min"
                     className="rounded-sm bg-primary px-8 py-4 text-base font-semibold text-white duration-300 ease-in-out hover:bg-primary/80"
@@ -41,10 +46,46 @@ const Hero = () => {
                     Already have an account? Login
                   </Link>
                 </div>
+
+                {/* Video Demo Section */}
+                <div className="mx-auto max-w-[770px] overflow-hidden rounded-md">
+                  <div className="relative aspect-[16/9] items-center justify-center">
+                    <Image
+                      src="/images/video/dashboard-demo.png"
+                      alt="Glass Loans Software Demo"
+                      fill
+                      className="object-cover"
+                    />
+                    <div className="absolute right-0 top-0 flex h-full w-full items-center justify-center">
+                      <button
+                        aria-label="Play software demo video"
+                        onClick={() => setOpen(true)}
+                        className="flex h-[70px] w-[70px] items-center justify-center rounded-full bg-white bg-opacity-75 text-primary transition hover:bg-opacity-100"
+                      >
+                        <svg
+                          width="16"
+                          height="18"
+                          viewBox="0 0 16 18"
+                          className="fill-current"
+                        >
+                          <path d="M15.5 8.13397C16.1667 8.51888 16.1667 9.48112 15.5 9.86602L2 17.6603C1.33333 18.0452 0.499999 17.564 0.499999 16.7942L0.5 1.20577C0.5 0.43597 1.33333 -0.0451549 2 0.339745L15.5 8.13397Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <ModalVideo
+          channel="youtube"
+          isOpen={isOpen}
+          videoId="fpN_YmkW9QQ"
+          onClose={() => setOpen(false)}
+          youtube={{ autoplay: 1 }}
+        />
         <div className="absolute right-0 top-0 z-[-1] opacity-30 lg:opacity-100">
           <svg
             width="450"

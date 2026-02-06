@@ -51,7 +51,7 @@ const Video = () => {
 
         <div className="mt-10 flex justify-center">
           <button
-            onClick={openContactModal}
+            onClick={() => openContactModal()}
             className="ease-in-up hover:shadow-submit-hover rounded-sm bg-primary px-8 py-3 text-base font-medium text-white shadow-submit transition duration-300 hover:bg-opacity-90 dark:shadow-submit-dark"
           >
             Join Our Waitlist
@@ -61,11 +61,10 @@ const Video = () => {
 
       <ModalVideo
         channel="youtube"
-        autoplay={true}
-        start={true}
         isOpen={isOpen}
         videoId="L61p2uyiMSo"
         onClose={() => setOpen(false)}
+        youtube={{ autoplay: 1 }}
       />
 
       <div className="absolute bottom-0 left-0 right-0 z-[-1] h-full w-full bg-[url(/images/video/shape.svg)] bg-cover bg-center bg-no-repeat"></div>

@@ -15,7 +15,7 @@ const NewsLatterBox = () => {
       <p className="mb-11 border-b border-body-color border-opacity-25 pb-11 text-base leading-relaxed text-body-color dark:border-white dark:border-opacity-25"></p>
       <div>
         <button
-          onClick={openContactModal}
+          onClick={() => openContactModal()}
           className="mb-5 flex w-full cursor-pointer items-center justify-center rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 dark:shadow-submit-dark"
         >
           Join
