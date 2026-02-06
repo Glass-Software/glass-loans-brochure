@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import NewsLatterBox from "./NewsLatterBox";
 import Link from "next/link";
 
 const Contact = () => {
@@ -49,7 +48,7 @@ const Contact = () => {
     <section id="contact" className="overflow-hidden py-16 md:py-20 lg:py-28">
       <div className="container">
         <div className="-mx-4 flex flex-wrap">
-          <div className="w-full px-4 lg:w-7/12 xl:w-8/12">
+          <div className="w-full px-4">
             <div
               className="mb-12 rounded-sm bg-white px-8 py-11 shadow-three dark:bg-gray-dark sm:p-[55px] lg:mb-5 lg:px-8 xl:p-[55px]"
               data-wow-delay=".15s"
@@ -171,9 +170,6 @@ const Contact = () => {
                 </div>
               </form>
             </div>
-          </div>
-          <div className="w-full px-4 lg:w-5/12 xl:w-4/12">
-            <NewsLatterBox />
           </div>
         </div>
       </div>
