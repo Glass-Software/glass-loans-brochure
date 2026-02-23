@@ -9,6 +9,7 @@ import "../styles/index.css";
 import { Providers } from "./providers";
 import { ModalProvider } from "@/context/ModalContext";
 import ContactModal from "@/components/ContactModal";
+import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,13 +30,22 @@ export default function RootLayout({
       </head>
       <body className={`bg-[#FCFCFC] dark:bg-black ${inter.className}`}>
         <Providers>
-          <ModalProvider>
-            <Header />
-            {children}
-            <Footer />
-            <ScrollToTop />
-            <ContactModal />
-          </ModalProvider>
+          <GoogleReCaptchaProvider
+            reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
+            scriptProps={{
+              async: true,
+              defer: true,
+              appendTo: "head",
+            }}
+          >
+            <ModalProvider>
+              <Header />
+              {children}
+              <Footer />
+              <ScrollToTop />
+              <ContactModal />
+            </ModalProvider>
+          </GoogleReCaptchaProvider>
         </Providers>
       </body>
     </html>

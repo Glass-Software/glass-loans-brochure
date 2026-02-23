@@ -1,0 +1,190 @@
+// ============================================================================
+// Form Input Types
+// ============================================================================
+
+export type PropertyCondition = "Good" | "Bad" | "Really Bad";
+export type RenovationLevel =
+  | "Light $30/SF"
+  | "Medium $50-60/SF"
+  | "Heavy $70-90/SF";
+export type MarketType = "Primary" | "Secondary" | "Tertiary";
+
+export interface UnderwritingFormData {
+  // Step 1: Property Details
+  propertyAddress: string;
+  purchasePrice: number;
+  rehab: number;
+  squareFeet: number;
+
+  // Step 2: Property Condition
+  propertyCondition: PropertyCondition;
+  renovationPerSf: RenovationLevel;
+
+  // Step 3: Loan Terms
+  interestRate: number; // percentage (e.g., 12 for 12%)
+  months: number;
+  loanAtPurchase: number;
+  renovationFunds: number; // defaults to 0
+  closingCostsPercent: number; // percentage (e.g., 6.5 for 6.5%)
+  points: number; // percentage (e.g., 3 for 3%)
+
+  // Step 4: Market Details
+  marketType: MarketType;
+  additionalDetails?: string;
+  compLinks?: string[]; // Optional: up to 3 comparable property URLs
+}
+
+// ============================================================================
+// AI Estimate Types
+// ============================================================================
+
+export interface PropertyComparable {
+  address: string;
+  price: number;
+  sqft: number;
+  distance?: string;
+  soldDate?: string;
+}
+
+export interface AIPropertyEstimates {
+  estimatedARV: number;
+  asIsValue: number;
+  monthlyRent: number;
+  compsUsed: PropertyComparable[];
+  marketAnalysis: string;
+  confidence?: "high" | "medium" | "low";
+}
+
+// ============================================================================
+// Calculated Results Types
+// ============================================================================
+
+export interface CalculatedResults {
+  // Basic calculations
+  renovationDollarPerSf: number;
+  days: number;
+  totalCost: number; // purchasePrice + rehab
+  totalLoanAmount: number; // loanAtPurchase + renovationFunds
+
+  // Financial calculations
+  closingCostsDollar: number;
+  pointsDollar: number;
+  perDiem: number;
+  totalInterest: number;
+  totalCosts: number; // closingCosts + interest + points
+  totalCostsOverall: number; // totalCost + totalCosts
+
+  // Profitability metrics
+  borrowerProfit: number;
+  borrowerProfitStressTested: number;
+  stressTestedLArv: number; // percentage
+
+  // Valuation metrics
+  breakEvenDay1: number;
+  debtYield: number; // percentage
+  loanToAsIsValue: number; // percentage
+  loanToArv: number; // percentage
+  loanToCost: number; // percentage
+  borrowerSpread: number;
+  breakEvenInForeclosure: boolean;
+}
+
+// ============================================================================
+// Final Results Types
+// ============================================================================
+
+export interface UnderwritingResults {
+  // User inputs (for display)
+  formData: UnderwritingFormData;
+
+  // AI estimates
+  aiEstimates: AIPropertyEstimates;
+
+  // Calculated metrics
+  calculations: CalculatedResults;
+
+  // AI opinion & score
+  garyOpinion: string;
+  finalScore: number; // 0-100
+
+  // Metadata
+  submittedAt: Date;
+  usageCount: number;
+  usageLimit: number;
+}
+
+// ============================================================================
+// API Request/Response Types
+// ============================================================================
+
+export interface VerifyEmailRequest {
+  email: string;
+}
+
+export interface VerifyEmailResponse {
+  success: boolean;
+  verified: boolean;
+  usageCount?: number;
+  limitReached?: boolean;
+  message?: string;
+}
+
+export interface SubmitUnderwritingRequest {
+  email: string;
+  recaptchaToken: string;
+  formData: UnderwritingFormData;
+}
+
+export interface SubmitUnderwritingResponse {
+  success: boolean;
+  results?: UnderwritingResults;
+  error?: string;
+  code?:
+    | "RATE_LIMIT"
+    | "INVALID_EMAIL"
+    | "USAGE_LIMIT"
+    | "RECAPTCHA_FAILED"
+    | "AI_ERROR"
+    | "SERVER_ERROR";
+  limitReached?: boolean;
+}
+
+// ============================================================================
+// Form State Types
+// ============================================================================
+
+export interface UnderwritingContextState {
+  currentStep: number; // 1-5
+  formData: Partial<UnderwritingFormData>;
+  results: UnderwritingResults | null;
+  isSubmitting: boolean;
+  error: string | null;
+  emailVerified: boolean;
+  email: string | null;
+  usageCount: number;
+  usageLimit: number;
+}
+
+export type UnderwritingAction =
+  | { type: "SET_STEP"; step: number }
+  | { type: "UPDATE_FORM_DATA"; data: Partial<UnderwritingFormData> }
+  | { type: "SET_EMAIL"; email: string }
+  | { type: "SET_EMAIL_VERIFIED"; verified: boolean; usageCount: number }
+  | { type: "SET_SUBMITTING"; submitting: boolean }
+  | { type: "SET_RESULTS"; results: UnderwritingResults }
+  | { type: "SET_ERROR"; error: string | null }
+  | { type: "RESET_FORM" };
+
+// ============================================================================
+// Validation Error Types
+// ============================================================================
+
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+}

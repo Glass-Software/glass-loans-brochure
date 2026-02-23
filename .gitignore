@@ -29,5 +29,19 @@ yarn-error.log*
 .env*.local
 .env
 
-# vercel
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+glass-loans.db
+
+# Vercel
 .vercel
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# Deployment scripts with secrets
+deploy-secrets.sh
