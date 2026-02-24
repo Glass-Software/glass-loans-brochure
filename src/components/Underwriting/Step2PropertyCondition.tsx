@@ -16,6 +16,7 @@ export default function Step2PropertyCondition() {
     const stepData = {
       propertyCondition: formData.propertyCondition,
       renovationPerSf: formData.renovationPerSf,
+      userEstimatedArv: formData.userEstimatedArv,
     };
 
     const validation = validateStep(2, stepData);
@@ -31,6 +32,8 @@ export default function Step2PropertyCondition() {
 
   const selectClass =
     "border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-dark outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white dark:shadow-two dark:focus:border-primary dark:focus:shadow-none";
+  const inputClass =
+    "border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-dark placeholder:text-body-color outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white dark:placeholder:text-body-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none";
   const labelClass = "mb-3 block text-sm font-medium text-dark dark:text-white";
   const errorClass = "mt-1 text-sm text-red-600 dark:text-red-400";
 
@@ -85,6 +88,35 @@ export default function Step2PropertyCondition() {
             </select>
             {errors.renovationPerSf && (
               <p className={errorClass}>{errors.renovationPerSf}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="w-full px-4">
+          <div className="mb-8">
+            <label htmlFor="userEstimatedArv" className={labelClass}>
+              Your Estimated ARV (After Repair Value) *
+            </label>
+            <input
+              type="number"
+              id="userEstimatedArv"
+              value={formData.userEstimatedArv || ""}
+              onChange={(e) =>
+                updateFormData({
+                  userEstimatedArv: e.target.value
+                    ? parseFloat(e.target.value)
+                    : undefined,
+                })
+              }
+              placeholder="210000"
+              className={inputClass}
+            />
+            <p className="mt-2 text-sm text-body-color dark:text-body-color-dark">
+              What do you think this property will be worth after repairs? Gary
+              will provide his own estimate and compare it to yours.
+            </p>
+            {errors.userEstimatedArv && (
+              <p className={errorClass}>{errors.userEstimatedArv}</p>
             )}
           </div>
         </div>

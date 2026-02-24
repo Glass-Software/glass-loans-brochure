@@ -12,13 +12,17 @@ export type MarketType = "Primary" | "Secondary" | "Tertiary";
 export interface UnderwritingFormData {
   // Step 1: Property Details
   propertyAddress: string;
+  propertyCity?: string;              // Extracted from Google Places (e.g., "Nashville")
+  propertyState?: string;             // 2-letter state code (e.g., "TN")
+  propertyZip?: string;               // ZIP code (e.g., "37201")
   purchasePrice: number;
   rehab: number;
   squareFeet: number;
 
-  // Step 2: Property Condition
+  // Step 2: Property Condition & ARV
   propertyCondition: PropertyCondition;
   renovationPerSf: RenovationLevel;
+  userEstimatedArv: number; // User's estimate of After Repair Value
 
   // Step 3: Loan Terms
   interestRate: number; // percentage (e.g., 12 for 12%)
@@ -47,9 +51,8 @@ export interface PropertyComparable {
 }
 
 export interface AIPropertyEstimates {
-  estimatedARV: number;
-  asIsValue: number;
-  monthlyRent: number;
+  estimatedARV: number; // Gary's ARV estimate
+  asIsValue: number; // For underwater day 1 check
   compsUsed: PropertyComparable[];
   marketAnalysis: string;
   confidence?: "high" | "medium" | "low";
@@ -80,13 +83,11 @@ export interface CalculatedResults {
   stressTestedLArv: number; // percentage
 
   // Valuation metrics
-  breakEvenDay1: number;
-  debtYield: number; // percentage
+  isLoanUnderwater: boolean; // Is loan amount > as-is value day 1?
   loanToAsIsValue: number; // percentage
   loanToArv: number; // percentage
   loanToCost: number; // percentage
   borrowerSpread: number;
-  breakEvenInForeclosure: boolean;
 }
 
 // ============================================================================

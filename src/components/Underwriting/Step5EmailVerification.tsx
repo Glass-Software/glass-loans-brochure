@@ -20,6 +20,10 @@ export default function Step5EmailVerification() {
     isSubmitting,
     setError,
     goToPreviousStep,
+    setProgressStep,
+    setProgressStatus,
+    setProgressPercent,
+    setIsProcessing,
   } = useUnderwriting();
 
   const { executeRecaptcha } = useGoogleReCaptcha();
@@ -64,15 +68,16 @@ export default function Step5EmailVerification() {
 
         if (data.limitReached) {
           setError(
-            "You've reached your limit of 3 free underwriting analyses. Please contact us for more.",
+            `You've reached your limit of ${data.usageLimit} free underwriting analyses. Please contact us for more.`,
           );
         } else {
           // Proceed to submit underwriting
           await submitUnderwriting(localEmail);
         }
       } else {
-        // Verification email sent
-        setVerificationSent(true);
+        // Email NOT verified - submit underwriting anyway
+        // User will get verification email with link to results
+        await submitUnderwriting(localEmail);
       }
     } catch (error: any) {
       setEmailError(error.message || "An error occurred");
@@ -83,6 +88,7 @@ export default function Step5EmailVerification() {
 
   const submitUnderwriting = async (userEmail: string) => {
     setIsSubmitting(true);
+    setIsProcessing(true);
     setError(null);
 
     try {
@@ -93,6 +99,7 @@ export default function Step5EmailVerification() {
 
       const recaptchaToken = await executeRecaptcha("underwriting_submit");
 
+      // Start streaming fetch
       const response = await fetch("/api/underwrite/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,26 +110,103 @@ export default function Step5EmailVerification() {
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || "Failed to process underwriting");
+        throw new Error("Failed to process underwriting");
       }
 
-      if (data.limitReached) {
-        setError(
-          "You've reached your limit of 3 free underwriting analyses.",
-        );
+      // Check if we got a streaming response
+      const contentType = response.headers.get("content-type");
+      if (!contentType?.includes("text/event-stream")) {
+        // Fallback: non-streaming response (shouldn't happen but handle it)
+        const data = await response.json();
+        if (data.limitReached) {
+          setError(data.error || "You've reached your usage limit.");
+          return;
+        }
+        if (data.emailSent) {
+          setVerificationSent(true);
+          return;
+        }
+        if (data.results) {
+          setResults(data.results);
+          setUsageCount(data.results.usageCount || 0);
+        }
         return;
       }
 
-      // Success! Set results
-      setResults(data.results);
-      setUsageCount((data.results?.usageCount || 0) + 1);
+      // Read the stream
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error("Stream reader not available");
+      }
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete lines (events are separated by \n\n)
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith("data: ")) {
+            continue;
+          }
+
+          try {
+            const jsonStr = line.substring(6); // Remove "data: " prefix
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === "progress") {
+              // Update progress state
+              setProgressStep(event.step);
+              setProgressStatus(event.status);
+              setProgressPercent(event.progress);
+            } else if (event.type === "complete") {
+              // Processing complete
+              setProgressPercent(100);
+              setProgressStatus("Complete!");
+
+              if (event.data?.emailSent) {
+                setVerificationSent(true);
+              } else if (event.data?.results) {
+                setResults(event.data.results);
+                setUsageCount(event.data.results.usageCount || 0);
+              }
+            } else if (event.type === "error") {
+              // Error occurred
+              setError(event.status || "An error occurred");
+
+              if (event.data?.code === "USAGE_LIMIT") {
+                // Special handling for usage limit
+                setUsageCount(usageLimit);
+              }
+            }
+          } catch (parseError) {
+            console.error("Failed to parse event:", parseError);
+          }
+        }
+      }
     } catch (error: any) {
       setError(error.message || "An error occurred while processing your request");
     } finally {
       setIsSubmitting(false);
+      setIsProcessing(false);
+      // Reset progress state
+      setTimeout(() => {
+        setProgressStep(0);
+        setProgressStatus("");
+        setProgressPercent(0);
+      }, 1000);
     }
   };
 

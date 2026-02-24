@@ -58,14 +58,9 @@ export default function ScoreCard({ score, calculations }: ScoreCardProps) {
           status={calculations.borrowerSpread >= 30000 ? "good" : calculations.borrowerSpread >= 20000 ? "fair" : "poor"}
         />
         <MetricCard
-          label="Break Even in Foreclosure"
-          value={calculations.breakEvenInForeclosure ? "Yes" : "No"}
-          status={calculations.breakEvenInForeclosure ? "good" : "poor"}
-        />
-        <MetricCard
-          label="Debt Yield"
-          value={formatPercentage(calculations.debtYield)}
-          status={calculations.debtYield >= 10 ? "good" : calculations.debtYield >= 7 ? "fair" : "poor"}
+          label="Loan Underwater"
+          value={calculations.isLoanUnderwater ? "Yes" : "No"}
+          status={calculations.isLoanUnderwater ? "poor" : "good"}
         />
         <MetricCard
           label="Stress Test L-ARV"

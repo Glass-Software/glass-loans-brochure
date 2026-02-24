@@ -106,10 +106,6 @@ export default function CalculationBreakdown({
               label="As-Is Value"
               value={formatCurrency(aiEstimates.asIsValue)}
             />
-            <Row
-              label="Monthly Rent (As-Is)"
-              value={formatCurrency(aiEstimates.monthlyRent)}
-            />
             {aiEstimates.marketAnalysis && (
               <div className="mt-2 rounded bg-blue-50 p-3 dark:bg-blue-900/20">
                 <p className="text-sm text-body-color">
@@ -164,8 +160,8 @@ export default function CalculationBreakdown({
               value={formatCurrency(calculations.borrowerProfitStressTested)}
             />
             <Row
-              label="Break Even Day 1"
-              value={formatCurrency(calculations.breakEvenDay1)}
+              label="Loan Underwater Day 1"
+              value={calculations.isLoanUnderwater ? "Yes" : "No"}
             />
           </Section>
 
@@ -188,12 +184,8 @@ export default function CalculationBreakdown({
               value={formatPercentage(calculations.stressTestedLArv)}
             />
             <Row
-              label="Debt Yield"
-              value={formatPercentage(calculations.debtYield)}
-            />
-            <Row
-              label="Break Even in Foreclosure"
-              value={calculations.breakEvenInForeclosure ? "Yes" : "No"}
+              label="Loan Underwater"
+              value={calculations.isLoanUnderwater ? "Yes" : "No"}
               highlight
             />
           </Section>

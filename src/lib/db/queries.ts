@@ -13,6 +13,7 @@ export interface User {
   verification_token: string | null;
   verification_token_expires: string | null; // SQLite stores dates as text
   usage_count: number;
+  usage_limit: number; // Configurable limit per user (default 3 for free tier)
   created_at: string;
   updated_at: string;
 }
@@ -164,11 +165,15 @@ export interface UnderwritingSubmission {
   id: number;
   user_id: number;
   property_address: string;
+  property_city: string | null;
+  property_state: string | null;
+  property_zip: string | null;
   purchase_price: number;
   rehab: number;
   square_feet: number;
   property_condition: string;
   renovation_per_sf: string;
+  user_estimated_arv: number | null;
   interest_rate: number;
   months: number;
   loan_at_purchase: number;
@@ -192,11 +197,15 @@ export interface UnderwritingSubmission {
 export interface CreateSubmissionData {
   userId: number;
   propertyAddress: string;
+  propertyCity?: string;
+  propertyState?: string;
+  propertyZip?: string;
   purchasePrice: number;
   rehab: number;
   squareFeet: number;
   propertyCondition: string;
   renovationPerSf: string;
+  userEstimatedArv: number; // User's ARV estimate
   interestRate: number;
   months: number;
   loanAtPurchase: number;
@@ -206,9 +215,8 @@ export interface CreateSubmissionData {
   marketType: string;
   additionalDetails?: string;
   compLinks?: string[];
-  estimatedArv: number;
+  estimatedArv: number; // Gary's ARV estimate
   asIsValue: number;
-  monthlyRent: number;
   finalScore: number;
   garyOpinion: string;
   propertyComps?: any;
@@ -225,24 +233,29 @@ export function createSubmission(
   const result = execute(
     `
       INSERT INTO underwriting_submissions (
-        user_id, property_address, purchase_price, rehab, square_feet,
-        property_condition, renovation_per_sf, interest_rate, months,
+        user_id, property_address, property_city, property_state, property_zip,
+        purchase_price, rehab, square_feet,
+        property_condition, renovation_per_sf, user_estimated_arv, interest_rate, months,
         loan_at_purchase, renovation_funds, closing_costs_percent, points,
         market_type, additional_details, comp_links, estimated_arv, as_is_value,
-        monthly_rent, final_score, gary_opinion, ai_property_comps,
+        final_score, gary_opinion, ai_property_comps,
         ip_address, recaptcha_score
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `,
     [
       data.userId,
       data.propertyAddress,
+      data.propertyCity || null,
+      data.propertyState || null,
+      data.propertyZip || null,
       data.purchasePrice,
       data.rehab,
       data.squareFeet,
       data.propertyCondition,
       data.renovationPerSf,
+      data.userEstimatedArv,
       data.interestRate,
       data.months,
       data.loanAtPurchase,
@@ -254,7 +267,6 @@ export function createSubmission(
       data.compLinks ? JSON.stringify(data.compLinks) : null,
       data.estimatedArv,
       data.asIsValue,
-      data.monthlyRent,
       data.finalScore,
       data.garyOpinion,
       data.propertyComps ? JSON.stringify(data.propertyComps) : null,
@@ -284,6 +296,35 @@ export function getUserSubmissions(
       LIMIT ?
     `,
     [userId, limit],
+  );
+}
+
+/**
+ * Get latest submission for a user
+ */
+export function getLatestSubmission(
+  userId: number,
+): UnderwritingSubmission | null {
+  return queryOne<UnderwritingSubmission>(
+    `
+      SELECT * FROM underwriting_submissions
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [userId],
+  );
+}
+
+/**
+ * Get submission by ID
+ */
+export function getSubmissionById(
+  submissionId: number,
+): UnderwritingSubmission | null {
+  return queryOne<UnderwritingSubmission>(
+    "SELECT * FROM underwriting_submissions WHERE id = ?",
+    [submissionId],
   );
 }
 

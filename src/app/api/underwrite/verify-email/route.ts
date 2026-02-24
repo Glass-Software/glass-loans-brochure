@@ -26,7 +26,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Step 1: Validate email with AbstractAPI
+    // Step 1: Validate email quality (optional AbstractAPI + basic checks)
+    // This checks format, deliverability, and blocks disposable emails
     const validation = await validateEmail(email);
 
     if (!validation.isValid) {
@@ -39,24 +40,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // Step 2: Normalize email to prevent +1 tricks
+    // Step 2: Normalize email to prevent abuse via +1 tricks
+    // This is the PRIMARY anti-abuse mechanism:
+    // user+1@gmail.com, user+2@gmail.com → user@gmail.com
+    // Ensures all variations map to the same database record
     const normalizedEmail = normalizeEmail(email);
 
-    // Step 3: Check if user exists
+    // Step 3: Check if user exists (by normalized email)
     let user = await findUserByNormalizedEmail(normalizedEmail);
 
     if (user) {
       // User exists - check verification status and usage
       if (user.email_verified) {
         // Already verified - check usage limit
-        if (user.usage_count >= 3) {
+        if (user.usage_count >= user.usage_limit) {
           return NextResponse.json({
             success: true,
             verified: true,
             usageCount: user.usage_count,
+            usageLimit: user.usage_limit,
             limitReached: true,
-            message:
-              "You've reached your limit of 3 free underwriting analyses.",
+            message: `You've reached your limit of ${user.usage_limit} free underwriting ${user.usage_limit === 1 ? "analysis" : "analyses"}.`,
           });
         }
 
@@ -65,6 +69,7 @@ export async function POST(request: Request) {
           success: true,
           verified: true,
           usageCount: user.usage_count,
+          usageLimit: user.usage_limit,
           limitReached: false,
         });
       } else {
@@ -123,7 +128,7 @@ ${verificationUrl}
 
 This link expires in 24 hours.
 
-Note: You can use this tool 3 times per verified email address.
+Note: Free tier includes limited uses per verified email address.
 
 Best,
 Glass Loans Team
@@ -156,7 +161,7 @@ Glass Loans Team
     </p>
 
     <p style="font-size: 14px; color: #666;">
-      <strong>Note:</strong> You can use this tool <strong>3 times</strong> per verified email address.
+      <strong>Note:</strong> Free tier includes limited uses per verified email address.
     </p>
 
     <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">

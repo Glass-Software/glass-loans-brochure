@@ -42,6 +42,10 @@ export const Step1Schema = z.object({
 export const Step2Schema = z.object({
   propertyCondition: PropertyConditionSchema,
   renovationPerSf: RenovationLevelSchema,
+  userEstimatedArv: z
+    .number()
+    .min(1000, "ARV must be at least $1,000")
+    .max(100000000, "ARV must be less than $100M"),
 });
 
 // Step 3: Loan Terms Schema
@@ -95,6 +99,10 @@ export const UnderwritingFormSchema = z
     squareFeet: z.number().min(100, "Square feet must be at least 100"),
     propertyCondition: PropertyConditionSchema,
     renovationPerSf: RenovationLevelSchema,
+    userEstimatedArv: z
+      .number()
+      .min(1000, "ARV must be at least $1,000")
+      .max(100000000, "ARV must be less than $100M"),
     interestRate: z.number().min(0.1, "Interest rate must be at least 0.1%"),
     months: z.number().int().min(1, "Loan term must be at least 1 month"),
     loanAtPurchase: z.number().min(1000, "Loan amount must be at least $1,000"),

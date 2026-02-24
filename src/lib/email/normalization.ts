@@ -1,4 +1,20 @@
 /**
+ * Email Normalization - PRIMARY ANTI-ABUSE MECHANISM
+ *
+ * This module handles the CORE functionality of preventing users from bypassing
+ * the 3-use limit via email variations like user+1@gmail.com, user+2@gmail.com, etc.
+ *
+ * Functions:
+ * 1. normalizeEmail() - Maps all email variations to a canonical form
+ * 2. isValidEmailFormat() - Basic regex validation
+ * 3. isDisposableEmail() - Blocks known throwaway email domains
+ *
+ * Note: AbstractAPI Email Reputation is OPTIONAL and provides additional
+ * validation (deliverability, risk scoring) but is NOT required for basic
+ * anti-abuse protection, which is fully handled by this module.
+ */
+
+/**
  * Normalize email to prevent +1 tricks and other variations
  * Examples:
  * - user+1@gmail.com -> user@gmail.com

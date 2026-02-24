@@ -5,12 +5,14 @@ import {
 } from "@/types/underwriting";
 
 /**
- * Calculate all underwriting metrics based on form inputs and AI estimates
+ * Calculate all underwriting metrics based on form inputs and ARV/as-is value
+ * Supports dual ARV calculation - can be run with user's ARV or Gary's ARV
  * All formulas are ported directly from the Excel template
  */
 export function calculateUnderwriting(
   formData: UnderwritingFormData,
-  aiEstimates: AIPropertyEstimates,
+  arv: number, // Can be user's ARV or Gary's ARV
+  asIsValue: number, // From Gary's estimate (for underwater check)
 ): CalculatedResults {
   const {
     purchasePrice,
@@ -23,8 +25,6 @@ export function calculateUnderwriting(
     closingCostsPercent,
     points,
   } = formData;
-
-  const { estimatedARV, asIsValue, monthlyRent } = aiEstimates;
 
   // Formula 1: Renovation $$/SF = rehab / squareFeet
   const renovationDollarPerSf = rehab / squareFeet;
@@ -56,37 +56,31 @@ export function calculateUnderwriting(
   // Formula 10: Total Costs (Overall) = totalCost + total
   const totalCostsOverall = totalCost + totalCosts;
 
-  // Formula 11: Borrower Profit = estimatedARV - totalCostsOverall
-  const borrowerProfit = estimatedARV - totalCostsOverall;
+  // Formula 11: Borrower Profit = ARV - totalCostsOverall
+  const borrowerProfit = arv - totalCostsOverall;
 
-  // Formula 12: Borrower Profit (Stress Tested) = (estimatedARV × 0.9) - totalCostsOverall
-  const borrowerProfitStressTested = estimatedARV * 0.9 - totalCostsOverall;
+  // Formula 12: Borrower Profit (Stress Tested) = (ARV × 0.9) - totalCostsOverall
+  const borrowerProfitStressTested = arv * 0.9 - totalCostsOverall;
 
-  // Formula 13: Stress Tested L-ARV = totalLoanAmount / (estimatedARV × 0.9)
-  const stressTestedLArv = (totalLoanAmount / (estimatedARV * 0.9)) * 100;
+  // Formula 13: Stress Tested L-ARV = totalLoanAmount / (ARV × 0.9)
+  const stressTestedLArv = (totalLoanAmount / (arv * 0.9)) * 100;
 
-  // Formula 14: Break Even Day 1 = asIsValue - (loanAtPurchase + totalInterest + points$ + (0.04 × totalLoanAmount))
-  const breakEvenDay1 =
-    asIsValue -
-    (loanAtPurchase + totalInterest + pointsDollar + 0.04 * totalLoanAmount);
+  // Formula 14: Is Loan Underwater Day 1? = total owed > as-is value
+  const underwaterAmount =
+    loanAtPurchase + totalInterest + pointsDollar + 0.04 * totalLoanAmount;
+  const isLoanUnderwater = underwaterAmount > asIsValue;
 
-  // Formula 15: Debt Yield = ((monthlyRent × 12) × 0.6) / totalLoanAmount
-  const debtYield = ((monthlyRent * 12 * 0.6) / totalLoanAmount) * 100;
-
-  // Formula 16: Loan to As-is Value = loanAtPurchase / asIsValue
+  // Formula 15: Loan to As-is Value = loanAtPurchase / asIsValue
   const loanToAsIsValue = (loanAtPurchase / asIsValue) * 100;
 
-  // Formula 17: Loan to ARV = totalLoanAmount / estimatedARV
-  const loanToArv = (totalLoanAmount / estimatedARV) * 100;
+  // Formula 16: Loan to ARV = totalLoanAmount / ARV
+  const loanToArv = (totalLoanAmount / arv) * 100;
 
-  // Formula 18: Loan to Cost = totalLoanAmount / totalCost
+  // Formula 17: Loan to Cost = totalLoanAmount / totalCost
   const loanToCost = (totalLoanAmount / totalCost) * 100;
 
-  // Formula 19: Borrower Spread = same as Borrower Profit (#11)
+  // Formula 18: Borrower Spread = same as Borrower Profit (#11)
   const borrowerSpread = borrowerProfit;
-
-  // Formula 20: Break Even in Foreclosure = IF(breakEvenDay1 < 0, "No", "Yes")
-  const breakEvenInForeclosure = breakEvenDay1 >= 0;
 
   return {
     renovationDollarPerSf,
@@ -102,13 +96,11 @@ export function calculateUnderwriting(
     borrowerProfit,
     borrowerProfitStressTested,
     stressTestedLArv,
-    breakEvenDay1,
-    debtYield,
+    isLoanUnderwater,
     loanToAsIsValue,
     loanToArv,
     loanToCost,
     borrowerSpread,
-    breakEvenInForeclosure,
   };
 }
 
@@ -135,13 +127,13 @@ export function calculateFinalScore(
   else if (calculated.borrowerSpread >= 30000) score += 15;
   else if (calculated.borrowerSpread >= 20000) score += 10;
 
-  // Break even in foreclosure (10 points)
-  if (calculated.breakEvenInForeclosure) score += 10;
+  // Loan not underwater day 1 (10 points)
+  if (!calculated.isLoanUnderwater) score += 10;
 
   // Market type (10 points max)
   if (formData.marketType === "Primary") score += 10;
-  else if (formData.marketType === "Secondary") score += 5;
-  // Tertiary = 0 points
+  else if (formData.marketType === "Secondary") score += 7;
+  else if (formData.marketType === "Tertiary") score += 5;
 
   // Property condition (10 points max)
   if (formData.propertyCondition === "Good") score += 10;

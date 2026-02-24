@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useUnderwriting } from "@/context/UnderwritingContext";
 import { validateStep } from "@/lib/underwriting/validation";
+import { parseGooglePlaceAddress } from "@/lib/utils/address-parser";
 
 // Extend Window interface for Google Maps callbacks
 declare global {
@@ -26,6 +27,7 @@ export default function Step1PropertyDetails() {
   const addressInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const isPlacesUpdating = useRef(false); // Track when Places API is updating
+  const lastPlaceAddress = useRef<string>(""); // Track last address set by Places API
 
   // Initialize Google Places Autocomplete
   useEffect(() => {
@@ -76,10 +78,23 @@ export default function Step1PropertyDetails() {
 
         autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
-          if (place.formatted_address) {
+
+          // Only process if we actually got a valid place with an address
+          if (place.formatted_address && place.address_components) {
+            // Extract structured location data from Google Places
+            const locationData = parseGooglePlaceAddress(place);
+
             // Set flag to prevent onChange interference
             isPlacesUpdating.current = true;
-            updateFormData({ propertyAddress: place.formatted_address });
+            lastPlaceAddress.current = place.formatted_address;
+
+            // Update form with address AND location fields
+            updateFormData({
+              propertyAddress: place.formatted_address,
+              propertyCity: locationData.city || undefined,
+              propertyState: locationData.state || undefined,
+              propertyZip: locationData.zip || undefined,
+            });
 
             // Clear flag after update completes
             setTimeout(() => {
@@ -158,17 +173,94 @@ export default function Step1PropertyDetails() {
               id="propertyAddress"
               value={formData.propertyAddress || ""}
               onChange={(e) => {
-                // Don't update if Places API is currently updating
+                // Only allow manual updates if:
+                // 1. Places API is not currently updating
+                // 2. User is actually typing (not a programmatic change)
                 if (!isPlacesUpdating.current) {
-                  updateFormData({ propertyAddress: e.target.value });
+                  const newValue = e.target.value;
+
+                  // If clearing the field, also clear location data
+                  if (!newValue) {
+                    updateFormData({
+                      propertyAddress: "",
+                      propertyCity: undefined,
+                      propertyState: undefined,
+                      propertyZip: undefined,
+                    });
+                  } else {
+                    // Just update the address for manual typing
+                    updateFormData({ propertyAddress: newValue });
+                  }
+                }
+              }}
+              onFocus={() => {
+                // When user focuses on address field, ensure autocomplete is active
+                if (addressInputRef.current && autocompleteRef.current) {
+                  // Trigger autocomplete suggestions
+                  google.maps.event.trigger(addressInputRef.current, 'focus');
                 }
               }}
               placeholder="Start typing an address..."
               className={inputClass}
+              autoComplete="off"
             />
             {errors.propertyAddress && (
               <p className={errorClass}>{errors.propertyAddress}</p>
             )}
+            <p className="text-xs text-body-color">
+              Start typing and select an address from the dropdown
+            </p>
+          </div>
+        </div>
+
+        {/* Location Fields - Auto-populated from Google Places */}
+        <div className="w-full px-4 md:w-1/3">
+          <div className="mb-8">
+            <label htmlFor="propertyCity" className={labelClass}>
+              City
+            </label>
+            <input
+              type="text"
+              id="propertyCity"
+              value={formData.propertyCity || ""}
+              onChange={(e) => updateFormData({ propertyCity: e.target.value })}
+              placeholder="Auto-filled"
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="w-full px-4 md:w-1/3">
+          <div className="mb-8">
+            <label htmlFor="propertyState" className={labelClass}>
+              State
+            </label>
+            <input
+              type="text"
+              id="propertyState"
+              value={formData.propertyState || ""}
+              onChange={(e) => updateFormData({ propertyState: e.target.value.toUpperCase().slice(0, 2) })}
+              placeholder="Auto-filled"
+              maxLength={2}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="w-full px-4 md:w-1/3">
+          <div className="mb-8">
+            <label htmlFor="propertyZip" className={labelClass}>
+              ZIP Code
+            </label>
+            <input
+              type="text"
+              id="propertyZip"
+              value={formData.propertyZip || ""}
+              onChange={(e) => updateFormData({ propertyZip: e.target.value.slice(0, 10) })}
+              placeholder="Auto-filled"
+              maxLength={10}
+              className={inputClass}
+            />
           </div>
         </div>
 

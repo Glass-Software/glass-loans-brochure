@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   verification_token TEXT,
   verification_token_expires TEXT,
   usage_count INTEGER DEFAULT 0,
+  usage_limit INTEGER DEFAULT 3,
   created_at TEXT DEFAULT (DATETIME('now')),
   updated_at TEXT DEFAULT (DATETIME('now'))
 );

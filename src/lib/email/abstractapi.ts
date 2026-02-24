@@ -1,7 +1,17 @@
 /**
- * AbstractAPI Email Reputation
+ * AbstractAPI Email Reputation (OPTIONAL)
  * https://www.abstractapi.com/api/email-reputation-api
+ *
+ * ONLY used for enhanced disposable email detection.
+ * We do NOT use risk scoring or quality scoring as they are too aggressive
+ * and block legitimate users.
+ *
+ * Falls back to basic validation (10 common disposable domains) if API key not configured.
+ * The core anti-abuse mechanism (preventing +1 email tricks) is handled
+ * by src/lib/email/normalization.ts and does NOT require this API.
  */
+
+import { isDisposableEmail, isValidEmailFormat } from "./normalization";
 
 interface EmailReputationResponse {
   email_address: string;
@@ -58,21 +68,47 @@ export interface EmailValidationResult {
 }
 
 /**
- * Validate email using AbstractAPI
+ * Basic email validation without external API
+ * Uses utilities from normalization.ts for consistency
+ */
+function basicEmailValidation(email: string): EmailValidationResult {
+  // Check format
+  if (!isValidEmailFormat(email)) {
+    return {
+      isValid: false,
+      email,
+      reason: "Invalid email format",
+    };
+  }
+
+  // Check for disposable email domains
+  if (isDisposableEmail(email)) {
+    return {
+      isValid: false,
+      email,
+      reason: "Disposable email addresses are not allowed",
+    };
+  }
+
+  return {
+    isValid: true,
+    email,
+  };
+}
+
+/**
+ * Validate email using AbstractAPI (optional)
+ * Falls back to basic validation if API key not configured
  */
 export async function validateEmail(
   email: string,
 ): Promise<EmailValidationResult> {
   const apiKey = process.env.ABSTRACT_API_KEY;
 
+  // If no API key, use basic validation only
   if (!apiKey) {
-    console.warn("ABSTRACT_API_KEY not set, skipping advanced validation");
-    // Fall back to basic validation
-    return {
-      isValid: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-      email,
-      reason: "API key not configured",
-    };
+    console.log("ABSTRACT_API_KEY not set, using basic validation");
+    return basicEmailValidation(email);
   }
 
   try {
@@ -84,58 +120,19 @@ export async function validateEmail(
     );
 
     if (!response.ok) {
-      throw new Error(`AbstractAPI returned ${response.status}`);
+      console.warn(`AbstractAPI returned ${response.status}, falling back to basic validation`);
+      return basicEmailValidation(email);
     }
 
     const data: EmailReputationResponse = await response.json();
 
-    // Check if email is disposable
+    // ONLY check if email is disposable (no risk/quality scoring)
+    // Risk and quality scores are too aggressive and block legitimate users
     if (data.email_quality.is_disposable) {
       return {
         isValid: false,
         email: data.email_address,
         reason: "Disposable email addresses are not allowed",
-        qualityScore: data.email_quality.score,
-      };
-    }
-
-    // Check if email format is valid
-    if (!data.email_deliverability.is_format_valid) {
-      return {
-        isValid: false,
-        email: data.email_address,
-        reason: "Invalid email format",
-        qualityScore: data.email_quality.score,
-      };
-    }
-
-    // Check deliverability
-    if (data.email_deliverability.status === "undeliverable") {
-      return {
-        isValid: false,
-        email: data.email_address,
-        reason: "Email address is not deliverable",
-        qualityScore: data.email_quality.score,
-      };
-    }
-
-    // Check quality score (lower than 0.5 is suspicious)
-    if (data.email_quality.score < 0.5) {
-      return {
-        isValid: false,
-        email: data.email_address,
-        reason: "Email quality score too low",
-        qualityScore: data.email_quality.score,
-      };
-    }
-
-    // Check risk status
-    if (data.email_risk.address_risk_status === "high" || data.email_risk.domain_risk_status === "high") {
-      return {
-        isValid: false,
-        email: data.email_address,
-        reason: "Email has high risk status",
-        qualityScore: data.email_quality.score,
       };
     }
 
@@ -143,16 +140,9 @@ export async function validateEmail(
     return {
       isValid: true,
       email: data.email_address,
-      qualityScore: data.email_quality.score,
     };
   } catch (error) {
-    console.error("AbstractAPI validation error:", error);
-
-    // Fall back to basic validation
-    return {
-      isValid: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-      email,
-      reason: "Validation service error, used basic check",
-    };
+    console.warn("AbstractAPI validation error, falling back to basic validation:", error);
+    return basicEmailValidation(email);
   }
 }

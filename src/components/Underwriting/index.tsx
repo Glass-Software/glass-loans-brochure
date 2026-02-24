@@ -8,6 +8,7 @@ import Step3LoanTerms from "./Step3LoanTerms";
 import Step4MarketDetails from "./Step4MarketDetails";
 import Step5EmailVerification from "./Step5EmailVerification";
 import ResultsPanel from "./ResultsPanel";
+import ProgressIndicator from "./ProgressIndicator";
 
 function UnderwritingContent() {
   const { currentStep, results, error, usageCount, usageLimit } =
@@ -26,7 +27,7 @@ function UnderwritingContent() {
                     Your Underwriting Results
                   </h2>
                   <p className="text-body-color">
-                    Here&apos;s Gary&apos;s analysis of your fix-and-flip loan
+                    Here&apos;s Gary&apos;s analysis of your loan
                   </p>
                 </div>
 
@@ -40,13 +41,17 @@ function UnderwritingContent() {
   }
 
   return (
-    <section className="overflow-hidden py-16 md:py-20 lg:py-28">
-      <div className="container">
-        <div className="-mx-4 flex flex-wrap">
-          <div className="w-full px-4">
-            <div className="mx-auto max-w-4xl">
-              {/* Header */}
-              <div className="mb-12 text-center">
+    <>
+      {/* Progress Indicator Modal */}
+      <ProgressIndicator />
+
+      <section className="overflow-hidden py-16 md:py-20 lg:py-28">
+        <div className="container">
+          <div className="-mx-4 flex flex-wrap">
+            <div className="w-full px-4">
+              <div className="mx-auto max-w-4xl">
+                {/* Header */}
+                <div className="mb-12 text-center">
                 <h1 className="mb-4 text-3xl font-bold text-dark dark:text-white sm:text-4xl md:text-5xl">
                   AI Loan Underwriting
                 </h1>
@@ -91,6 +96,7 @@ function UnderwritingContent() {
         </div>
       </div>
     </section>
+    </>
   );
 }
 

@@ -10,11 +10,12 @@ export const metadata: Metadata = {
 interface VerifyPageProps {
   searchParams: Promise<{
     token?: string;
+    submission?: string;
   }>;
 }
 
 export default async function VerifyPage({ searchParams }: VerifyPageProps) {
-  const { token } = await searchParams;
+  const { token, submission: submissionId } = await searchParams;
 
   if (!token) {
     return (
@@ -100,7 +101,11 @@ export default async function VerifyPage({ searchParams }: VerifyPageProps) {
     );
   }
 
-  // Success! Redirect to underwrite page
-  // In a production app, you'd set a cookie/session here
-  redirect(`/underwrite?email=${encodeURIComponent(user.email)}&verified=true`);
+  // Success! If there's a submission ID, redirect to results page
+  // Otherwise redirect to underwrite form
+  if (submissionId) {
+    redirect(`/underwrite/results/${submissionId}?verified=true`);
+  } else {
+    redirect(`/underwrite?email=${encodeURIComponent(user.email)}&verified=true`);
+  }
 }

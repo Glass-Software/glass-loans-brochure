@@ -1,0 +1,176 @@
+/**
+ * Master Migration Runner (TypeScript)
+ *
+ * Safely applies all pending database migrations in order.
+ * Can be run with: npx tsx scripts/migrate.ts
+ */
+
+import Database from "better-sqlite3";
+import fs from "fs";
+import path from "path";
+
+const dbPath = path.join(process.cwd(), "glass-loans.db");
+
+console.log("🚀 Starting migration process...");
+console.log(`📁 Database: ${dbPath}\n`);
+
+// Check if database exists
+if (!fs.existsSync(dbPath)) {
+  console.log("⚠️  Database file not found. Creating new database...");
+}
+
+const db = new Database(dbPath);
+
+// =============================================================================
+// Migration 001: Initial Schema (SQLite)
+// =============================================================================
+console.log("🔍 Checking Migration 001: Initial Schema");
+
+try {
+  // Check if users table exists
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>;
+  const hasUsersTable = tables.some(t => t.name === 'users');
+
+  if (!hasUsersTable) {
+    console.log("⏳ Applying Migration 001...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/001_initial_schema.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 001 completed: Initial schema created");
+  } else {
+    console.log("✅ Migration 001 already applied (tables exist)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 001 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
+// Migration 002: Add Usage Limit (SKIPPED - already in 001)
+// =============================================================================
+console.log("🔍 Checking Migration 002: Add Usage Limit");
+
+try {
+  const userColumns = db.pragma("table_info(users)") as Array<{ name: string; type: string }>;
+  const hasUsageLimit = userColumns.some(col => col.name === "usage_limit");
+
+  if (!hasUsageLimit) {
+    console.log("⏳ Applying Migration 002...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/002_add_usage_limit.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 002 completed: usage_limit column added");
+  } else {
+    console.log("✅ Migration 002 already applied (usage_limit exists)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 002 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
+// Migration 003: Add User ARV Estimate
+// =============================================================================
+console.log("🔍 Checking Migration 003: Add User ARV Estimate");
+
+try {
+  const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string; type: string }>;
+  const hasUserArv = submissionColumns.some(col => col.name === "user_estimated_arv");
+
+  if (!hasUserArv) {
+    console.log("⏳ Applying Migration 003...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/003_add_user_arv.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 003 completed: user_estimated_arv column added");
+  } else {
+    console.log("✅ Migration 003 already applied (user_estimated_arv exists)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 003 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
+// Migration 004: Add Location Fields
+// =============================================================================
+console.log("🔍 Checking Migration 004: Add Location Fields");
+
+try {
+  const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string; type: string }>;
+  const hasLocationFields = submissionColumns.some(col => col.name === "property_state");
+
+  if (!hasLocationFields) {
+    console.log("⏳ Applying Migration 004...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/004_add_location_fields.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 004 completed: property_city, property_state, property_zip columns added");
+  } else {
+    console.log("✅ Migration 004 already applied (location fields exist)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 004 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
+// Verification & Summary
+// =============================================================================
+console.log("🔍 Verifying final schema...\n");
+
+try {
+  // Verify users table
+  const userColumns = db.pragma("table_info(users)") as Array<{ name: string; type: string }>;
+  console.log("📊 Users table columns:");
+  userColumns.forEach(col => {
+    const mark = ["usage_limit", "user_estimated_arv"].includes(col.name) ? "🔹" : "  ";
+    console.log(`${mark} ${col.name} (${col.type})`);
+  });
+
+  console.log("\n📊 Underwriting submissions - key columns:");
+  const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string; type: string }>;
+  const keyColumns = ["user_estimated_arv", "estimated_arv", "as_is_value", "monthly_rent", "property_city", "property_state", "property_zip"];
+  submissionColumns
+    .filter(col => keyColumns.includes(col.name))
+    .forEach(col => {
+      const mark = ["user_estimated_arv", "property_state"].includes(col.name) ? "🔹" : "  ";
+      const note = col.name === "monthly_rent" ? " (deprecated)" : "";
+      console.log(`${mark} ${col.name} (${col.type})${note}`);
+    });
+
+  console.log("\n✨ All migrations completed successfully!");
+  console.log("\n📝 Migration Summary:");
+  console.log("   • Migration 001: Initial schema ✅");
+  console.log("   • Migration 002: Usage limit ✅");
+  console.log("   • Migration 003: User ARV ✅");
+  console.log("   • Migration 004: Location fields ✅");
+  console.log("\n🎉 Database is up to date and ready for use!");
+
+} catch (error: any) {
+  console.error("❌ Verification failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+db.close();

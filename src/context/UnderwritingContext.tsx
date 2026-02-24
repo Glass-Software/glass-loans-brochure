@@ -37,6 +37,16 @@ interface UnderwritingContextType {
   isSubmitting: boolean;
   setIsSubmitting: (submitting: boolean) => void;
 
+  // Progress state (for streaming)
+  progressStep: number;
+  setProgressStep: (step: number) => void;
+  progressStatus: string;
+  setProgressStatus: (status: string) => void;
+  progressPercent: number;
+  setProgressPercent: (percent: number) => void;
+  isProcessing: boolean;
+  setIsProcessing: (processing: boolean) => void;
+
   // Errors
   error: string | null;
   setError: (error: string | null) => void;
@@ -62,6 +72,12 @@ export function UnderwritingProvider({
   const [results, setResults] = useState<UnderwritingResults | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Progress state for streaming
+  const [progressStep, setProgressStep] = useState(0);
+  const [progressStatus, setProgressStatus] = useState("");
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const usageLimit = 3;
 
@@ -116,6 +132,14 @@ export function UnderwritingProvider({
         setResults,
         isSubmitting,
         setIsSubmitting,
+        progressStep,
+        setProgressStep,
+        progressStatus,
+        setProgressStatus,
+        progressPercent,
+        setProgressPercent,
+        isProcessing,
+        setIsProcessing,
         error,
         setError,
       }}
