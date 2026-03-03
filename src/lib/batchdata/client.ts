@@ -310,6 +310,27 @@ export class BatchDataClient {
       // Distance would be calculated by BatchData API based on compAddress
       const distance = 0; // TODO: Calculate if coordinates available
 
+      // NEW: Extract valuation data
+      const avmValue = prop.valuation?.estimatedValue || 0;
+      const avmConfidence = prop.valuation?.confidenceScore || 0;
+      const avmDate = prop.valuation?.asOfDate || new Date().toISOString();
+
+      const taxAssessedValue =
+        prop.assessment?.totalAssessedValue ||
+        prop.assessment?.totalMarketValue ||
+        0;
+
+      const preForeclosure = prop.foreclosure?.status ? true : false;
+
+      // NEW: Calculate derived metrics
+      const pricePerSqft =
+        squareFeet > 0 && lastSalePrice > 0 ? lastSalePrice / squareFeet : 0;
+
+      const taxAssessmentRatio =
+        taxAssessedValue > 0 && lastSalePrice > 0
+          ? lastSalePrice / taxAssessedValue
+          : 0;
+
       return {
         address: addressStr,
         propertyType: prop.general?.propertyTypeDetail || 'Single Family',
@@ -319,7 +340,21 @@ export class BatchDataClient {
         lastSaleDate,
         lastSalePrice,
         distance,
-        daysOnMarket: 0
+        daysOnMarket: 0,
+        // NEW: Include valuation metrics
+        avm:
+          avmValue > 0
+            ? {
+                value: avmValue,
+                confidenceScore: avmConfidence,
+                valuationDate: avmDate,
+              }
+            : undefined,
+        taxAssessedValue: taxAssessedValue > 0 ? taxAssessedValue : undefined,
+        preForeclosure: preForeclosure || undefined,
+        pricePerSqft: pricePerSqft > 0 ? pricePerSqft : undefined,
+        taxAssessmentRatio:
+          taxAssessmentRatio > 0 ? taxAssessmentRatio : undefined,
       };
     });
 

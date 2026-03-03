@@ -4,18 +4,21 @@
  */
 
 import { getBatchDataClient } from "./client";
-import { BatchDataPropertyResponse, PropertySearchCriteria } from "./types";
+import { BatchDataPropertyResponse, PropertySearchCriteria, CompFilterConfig } from "./types";
 import {
   getCachedComps,
   cacheComps,
   generateSearchHash,
   trackAPIUsage,
 } from "./cache";
+import { filterComparables } from "./filters";
+import { MarketType } from "@/types/underwriting";
 
 interface CompSearchOptions {
   subjectProperty: BatchDataPropertyResponse;
   minComps?: number; // Default 3
   maxTier?: 1 | 2 | 3; // Max tier to attempt
+  marketType?: MarketType; // Primary/Secondary/Tertiary for market-aware distances
   userPropertyData?: {
     // User-provided values override BatchData lookup
     bedrooms?: number;
@@ -26,30 +29,52 @@ interface CompSearchOptions {
 }
 
 export interface CompSearchResult {
-  comps: any[];
+  allComps: any[]; // ALL comps (including flagged)
+  comps: any[]; // Clean comps used for calculations (backward compat)
+  flaggedComps: any[]; // Outliers, renovated, etc. (display separately)
   tier: 1 | 2 | 3;
   searchRadius: number; // miles
-  compDerivedValue: number;
-  medianPricePerSqft: number;
+  compDerivedValue: number; // Calculated from clean comps only
+  medianPricePerSqft: number; // Calculated from clean comps only
   cached: boolean;
+
+  // NEW: Flagging metadata
+  flaggingApplied: boolean;
+  flagSummary?: {
+    totalFlagged: number;
+    flagReasons: { [key: string]: number };
+  };
+  pricePerSqftStats?: {
+    mean: number; // Stats from clean comps only
+    median: number;
+    stdDev: number;
+  };
 }
 
 /**
- * Execute 3-tier comp search strategy
- * Tier 1: Wide (5mi, ±1 bed/bath, ±20% sqft, 6mo)
- * Tier 2: Wider (10mi, ±30% sqft, 12mo)
- * Tier 3: Maximum (15mi, ±2 bed/bath, 18mo)
+ * Execute 3-tier comp search strategy with market-aware distance scaling
+ *
+ * Distance tiers by market type:
+ * - Primary (urban/dense):    Tier 1: 5mi,  Tier 2: 10mi, Tier 3: 15mi
+ * - Secondary (suburban):     Tier 1: 7mi,  Tier 2: 12mi, Tier 3: 18mi
+ * - Tertiary (rural):         Tier 1: 10mi, Tier 2: 15mi, Tier 3: 20mi
+ *
+ * All tiers use ±20% sqft constraint (tight matching)
+ * Tier 1: ±1 bed/bath
+ * Tier 2: No bed/bath constraint
+ * Tier 3: ±2 bed/bath
  */
 export async function searchComparables(
   options: CompSearchOptions
 ): Promise<CompSearchResult> {
-  const { subjectProperty, minComps = 3, maxTier = 3, userPropertyData } = options;
+  const { subjectProperty, minComps = 3, maxTier = 3, marketType = "Primary", userPropertyData } = options;
   const client = getBatchDataClient();
 
-  // Tier 1: Wide search
-  console.log("Starting Tier 1 comp search (5mi, tight criteria)...");
+  // Tier 1: Tight search
+  const tier1Radius = getRadiusForMarketAndTier(marketType, 1);
+  console.log(`Starting Tier 1 comp search (${tier1Radius}mi, tight criteria, ${marketType} market)...`);
   const tier1Start = Date.now();
-  let tier1Result = await searchTier(client, subjectProperty, 1, userPropertyData);
+  let tier1Result = await searchTier(client, subjectProperty, 1, marketType, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -64,12 +89,13 @@ export async function searchComparables(
 
   if (maxTier < 2) return tier1Result;
 
-  // Tier 2: Wider search
+  // Tier 2: Moderate search
+  const tier2Radius = getRadiusForMarketAndTier(marketType, 2);
   console.log(
-    `Tier 1 found only ${tier1Result.comps.length} comps, expanding to Tier 2...`
+    `Tier 1 found only ${tier1Result.comps.length} comps, expanding to Tier 2 (${tier2Radius}mi)...`
   );
   const tier2Start = Date.now();
-  let tier2Result = await searchTier(client, subjectProperty, 2, userPropertyData);
+  let tier2Result = await searchTier(client, subjectProperty, 2, marketType, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -85,11 +111,12 @@ export async function searchComparables(
   if (maxTier < 3) return tier2Result;
 
   // Tier 3: Maximum search
+  const tier3Radius = getRadiusForMarketAndTier(marketType, 3);
   console.log(
-    `Tier 2 found only ${tier2Result.comps.length} comps, expanding to Tier 3...`
+    `Tier 2 found only ${tier2Result.comps.length} comps, expanding to Tier 3 (${tier3Radius}mi)...`
   );
   const tier3Start = Date.now();
-  let tier3Result = await searchTier(client, subjectProperty, 3, userPropertyData);
+  let tier3Result = await searchTier(client, subjectProperty, 3, marketType, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -108,6 +135,7 @@ async function searchTier(
   client: any,
   subject: BatchDataPropertyResponse,
   tier: 1 | 2 | 3,
+  marketType: MarketType,
   userPropertyData?: {
     bedrooms?: number;
     bathrooms?: number;
@@ -115,7 +143,7 @@ async function searchTier(
     squareFeet?: number;
   }
 ): Promise<CompSearchResult> {
-  const options = buildCompSearchOptions(subject, tier, userPropertyData);
+  const options = buildCompSearchOptions(subject, tier, marketType, userPropertyData);
   const searchHash = generateSearchHash(options);
 
   // Use user-provided sqft if available
@@ -125,16 +153,32 @@ async function searchTier(
   const cached = getCachedComps(searchHash);
   if (cached) {
     console.log(`Using cached comp results for tier ${tier}`);
+
+    // Apply filtering to cached results
+    const filterResult = filterComparables(
+      subject,
+      cached.properties,
+      effectiveSqft,
+      getFilterConfigForTier(tier)
+    );
+
     return {
-      comps: cached.properties,
+      allComps: filterResult.allComps,
+      comps: filterResult.usedForCalculation,
+      flaggedComps: filterResult.flaggedComps,
       tier,
-      searchRadius: getRadiusForTier(tier),
+      searchRadius: getRadiusForMarketAndTier(marketType, tier),
       compDerivedValue: calculateCompDerivedValue(
-        cached.properties,
+        filterResult.usedForCalculation,
         effectiveSqft
       ),
-      medianPricePerSqft: calculateMedianPricePerSqft(cached.properties),
+      medianPricePerSqft: calculateMedianPricePerSqft(
+        filterResult.usedForCalculation
+      ),
       cached: true,
+      flaggingApplied: true,
+      flagSummary: filterResult.flagSummary,
+      pricePerSqftStats: filterResult.statistics,
     };
   }
 
@@ -148,16 +192,34 @@ async function searchTier(
 
   const response = await client.getComparableProperties(subjectAddress, options);
 
-  // Cache result
+  // Cache BEFORE filtering (preserve raw data)
   cacheComps(subject.address.standardizedAddress, searchHash, tier, response);
 
+  // Apply filtering to fresh results
+  const filterResult = filterComparables(
+    subject,
+    response.properties,
+    effectiveSqft,
+    getFilterConfigForTier(tier)
+  );
+
   return {
-    comps: response.properties,
+    allComps: filterResult.allComps,
+    comps: filterResult.usedForCalculation,
+    flaggedComps: filterResult.flaggedComps,
     tier,
-    searchRadius: getRadiusForTier(tier),
-    compDerivedValue: calculateCompDerivedValue(response.properties, effectiveSqft),
-    medianPricePerSqft: calculateMedianPricePerSqft(response.properties),
+    searchRadius: getRadiusForMarketAndTier(marketType, tier),
+    compDerivedValue: calculateCompDerivedValue(
+      filterResult.usedForCalculation,
+      effectiveSqft
+    ),
+    medianPricePerSqft: calculateMedianPricePerSqft(
+      filterResult.usedForCalculation
+    ),
     cached: false,
+    flaggingApplied: true,
+    flagSummary: filterResult.flagSummary,
+    pricePerSqftStats: filterResult.statistics,
   };
 }
 
@@ -165,10 +227,12 @@ async function searchTier(
  * Build comparable property search options for each tier
  * Uses relative values as per BatchData documentation
  * Prefers user-provided values over BatchData lookup
+ * Applies market-aware distance scaling (Primary/Secondary/Tertiary)
  */
 function buildCompSearchOptions(
   subject: BatchDataPropertyResponse,
   tier: 1 | 2 | 3,
+  marketType: MarketType,
   userPropertyData?: {
     bedrooms?: number;
     bathrooms?: number;
@@ -183,7 +247,7 @@ function buildCompSearchOptions(
   const squareFeet = userPropertyData?.squareFeet ?? subject.squareFeet;
 
   const options: any = {
-    distanceMiles: tier === 1 ? 5 : tier === 2 ? 10 : 15,
+    distanceMiles: getRadiusForMarketAndTier(marketType, tier),
   };
 
   // Bed/Bath constraints (relative values)
@@ -201,14 +265,9 @@ function buildCompSearchOptions(
   // Tier 2: No bed/bath constraint
 
   // Square footage constraints (percentage values)
-  if (tier === 1) {
-    options.minAreaPercent = -20; // 80% of subject sqft
-    options.maxAreaPercent = 20;  // 120% of subject sqft
-  } else if (tier === 2) {
-    options.minAreaPercent = -30; // 70% of subject sqft
-    options.maxAreaPercent = 30;  // 130% of subject sqft
-  }
-  // Tier 3: No sqft constraint
+  // Apply ±20% for ALL tiers to prevent "apples to oranges" comparisons
+  options.minAreaPercent = -20; // 80% of subject sqft
+  options.maxAreaPercent = 20;  // 120% of subject sqft
 
   // Year built (Tier 1 only - relative values)
   if (tier === 1 && yearBuilt) {
@@ -219,8 +278,64 @@ function buildCompSearchOptions(
   return options;
 }
 
-function getRadiusForTier(tier: 1 | 2 | 3): number {
-  return tier === 1 ? 5 : tier === 2 ? 10 : 15;
+/**
+ * Get search radius based on market type and tier
+ * Market-aware distance scaling ensures appropriate comp density:
+ * - Primary (urban/dense): Tighter radii (5/10/15mi)
+ * - Secondary (suburban): Moderate radii (7/12/18mi)
+ * - Tertiary (rural): Wider radii (10/15/20mi)
+ */
+function getRadiusForMarketAndTier(marketType: MarketType, tier: 1 | 2 | 3): number {
+  const radiusMap: Record<MarketType, [number, number, number]> = {
+    Primary: [5, 10, 15],
+    Secondary: [7, 12, 18],
+    Tertiary: [10, 15, 20],
+  };
+
+  const radii = radiusMap[marketType] || radiusMap.Primary; // Fallback to Primary
+  return radii[tier - 1]; // tier is 1-indexed, array is 0-indexed
+}
+
+/**
+ * Get filter configuration based on tier
+ * Tier 1: Strict filtering (tight comps)
+ * Tier 2: Moderate filtering (expanded search)
+ * Tier 3: Relaxed filtering (maximum reach - we need comps!)
+ *
+ * Note: Uses IQR method for outlier detection (robust, not affected by extremes)
+ */
+function getFilterConfigForTier(tier: 1 | 2 | 3): Partial<CompFilterConfig> {
+  if (tier === 1) {
+    return {
+      strictPropertyType: true,
+      removeOutliers: true,
+      outlierStdDevThreshold: 2.0, // Deprecated (IQR method used instead)
+      pricePerSqftFilter: true,
+      pricePerSqftTolerancePercent: 30, // ±30%
+      excludeForeclosures: true,
+      detectRenovations: false,
+    };
+  } else if (tier === 2) {
+    return {
+      strictPropertyType: true,
+      removeOutliers: true,
+      outlierStdDevThreshold: 2.5, // Deprecated (IQR method used instead)
+      pricePerSqftFilter: true,
+      pricePerSqftTolerancePercent: 40, // ±40%
+      excludeForeclosures: true,
+      detectRenovations: false,
+    };
+  } else {
+    // Tier 3: Minimal filtering (we need comps!)
+    return {
+      strictPropertyType: false, // Allow different property types
+      removeOutliers: true,
+      outlierStdDevThreshold: 3.0, // Deprecated (IQR method used instead)
+      pricePerSqftFilter: false, // Don't filter by price
+      excludeForeclosures: true,
+      detectRenovations: false,
+    };
+  }
 }
 
 /**

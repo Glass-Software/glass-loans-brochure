@@ -108,4 +108,59 @@ export interface PropertySearchResult {
   lastSalePrice: number;
   distance: number; // miles from subject
   daysOnMarket?: number;
+
+  // NEW: Valuation metrics (optional for backward compatibility)
+  avm?: {
+    value: number;
+    confidenceScore: number;
+    valuationDate: string;
+  };
+  taxAssessedValue?: number;
+  preForeclosure?: boolean;
+
+  // NEW: Derived metrics for filtering
+  pricePerSqft?: number;
+  taxAssessmentRatio?: number; // lastSalePrice / taxAssessedValue
+
+  // NEW: Comp quality flags
+  isOutlier?: boolean; // Statistical outlier (outside IQR bounds: Q1 - 1.5×IQR to Q3 + 1.5×IQR)
+  isRenovated?: boolean; // Likely renovated (sale price > 1.5x tax assessment)
+  outlierReason?: string; // Why this comp is flagged (for display)
+}
+
+// ============================================================================
+// Comp Filtering Configuration
+// ============================================================================
+
+/**
+ * Configuration for post-API comp flagging and filtering
+ */
+export interface CompFilterConfig {
+  strictPropertyType?: boolean; // Default: true - Enforce exact property type matching
+  removeOutliers?: boolean; // Default: true - Flag outliers using IQR method (but keep for display)
+  outlierStdDevThreshold?: number; // DEPRECATED: IQR method is now used instead (kept for backward compatibility)
+  pricePerSqftFilter?: boolean; // Default: true - Flag price divergent comps
+  pricePerSqftTolerancePercent?: number; // Default: 30 - ±30% tolerance
+  minAvmConfidence?: number; // Default: 0 - Minimum AVM confidence to include
+  excludeForeclosures?: boolean; // Default: true - Exclude foreclosures from calculations
+  detectRenovations?: boolean; // Default: false - Flag likely renovated properties
+  renovationThreshold?: number; // Default: 1.5 - Sale price > 1.5x tax = renovated
+}
+
+/**
+ * Result of filtering operation with separated clean and flagged comps
+ */
+export interface FilteredCompResult {
+  allComps: PropertySearchResult[]; // ALL comps (including flagged ones)
+  usedForCalculation: PropertySearchResult[]; // Only clean comps used for median
+  flaggedComps: PropertySearchResult[]; // Outliers, renovated, etc. (display separately)
+  flagSummary: {
+    totalFlagged: number;
+    flagReasons: { [key: string]: number }; // "outlier": 2, "renovated": 1, etc.
+  };
+  statistics: {
+    meanPricePerSqft: number; // Stats from usedForCalculation only
+    medianPricePerSqft: number;
+    stdDevPricePerSqft: number;
+  };
 }

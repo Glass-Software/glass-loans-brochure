@@ -122,6 +122,48 @@ export function detectRiskFlags(
     }
   }
 
+  // NEW: Flagged comps warning
+  if (
+    compResult.flaggingApplied &&
+    compResult.flagSummary &&
+    compResult.flagSummary.totalFlagged > 0
+  ) {
+    const totalComps = compResult.allComps?.length || 0;
+    const flaggedPercent =
+      totalComps > 0 ? (compResult.flagSummary.totalFlagged / totalComps) * 100 : 0;
+
+    if (flaggedPercent > 50) {
+      const flagReasons = Object.entries(compResult.flagSummary.flagReasons)
+        .map(([reason, count]) => `${count} ${reason}`)
+        .join(", ");
+      flags.push({
+        severity: "warning",
+        code: "HIGH_FLAGGED_COMPS",
+        message: `${compResult.flagSummary.totalFlagged} of ${totalComps} comps flagged (${flaggedPercent.toFixed(0)}%) - ${flagReasons}`,
+      });
+    } else if (flaggedPercent > 25) {
+      flags.push({
+        severity: "info",
+        code: "MODERATE_FLAGGED_COMPS",
+        message: `${compResult.flagSummary.totalFlagged} of ${totalComps} comps flagged as outliers/renovated - using ${compResult.comps.length} clean comps for valuation`,
+      });
+    }
+  }
+
+  // NEW: Price volatility warning
+  if (compResult.pricePerSqftStats) {
+    const coefficientOfVariation =
+      compResult.pricePerSqftStats.stdDev / compResult.pricePerSqftStats.mean;
+
+    if (coefficientOfVariation > 0.25) {
+      flags.push({
+        severity: "info",
+        code: "HIGH_PRICE_VOLATILITY",
+        message: `High price variation in clean comps (CV: ${(coefficientOfVariation * 100).toFixed(0)}%) - market has wide price range`,
+      });
+    }
+  }
+
   return flags;
 }
 

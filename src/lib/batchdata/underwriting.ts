@@ -42,10 +42,11 @@ export async function getBatchDataPropertyEstimates(
     );
 
     // Step 3: Search for comparable sales (3-tier strategy with caching)
-    // Use user-provided property details for comp search
+    // Use user-provided property details and market type for comp search
     console.log("Step 3: Searching for comparable sales...");
     const compResult = await searchComparables({
       subjectProperty,
+      marketType: formData.marketType,
       userPropertyData: {
         bedrooms: formData.bedrooms,
         bathrooms: formData.bathrooms,
@@ -81,6 +82,20 @@ export async function getBatchDataPropertyEstimates(
         bathrooms: comp.bathrooms,
         pricePerSqft: Math.round(comp.lastSalePrice / comp.squareFeet),
       })),
+      // NEW: Flagged comps (outliers, renovated, etc.)
+      flaggedComps: compResult.flaggedComps?.map((comp: any) => ({
+        address: comp.address,
+        price: comp.lastSalePrice,
+        sqft: comp.squareFeet,
+        distance: `${comp.distance.toFixed(2)} mi`,
+        soldDate: comp.lastSaleDate,
+        bedrooms: comp.bedrooms,
+        bathrooms: comp.bathrooms,
+        pricePerSqft: Math.round(comp.lastSalePrice / comp.squareFeet),
+        isOutlier: comp.isOutlier,
+        isRenovated: comp.isRenovated,
+        outlierReason: comp.outlierReason,
+      })) || [],
       marketAnalysis: generateMarketAnalysis(
         subjectProperty,
         compResult,
@@ -105,6 +120,10 @@ export async function getBatchDataPropertyEstimates(
       avmConfidence: valuation.avmConfidence,
       valuationMethod: "batchdata",
       riskFlags,
+      // NEW: Flagging metadata
+      flaggingApplied: compResult.flaggingApplied,
+      flagSummary: compResult.flagSummary,
+      pricePerSqftStats: compResult.pricePerSqftStats,
     };
 
     console.log("[Server] Property estimates complete:", {
