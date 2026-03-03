@@ -9,15 +9,22 @@ export type RenovationLevel =
   | "Heavy $70-90/SF";
 export type MarketType = "Primary" | "Secondary" | "Tertiary";
 
+export type PropertyType = "SFR" | "Condo" | "Townhouse" | "Multi-Family";
+
 export interface UnderwritingFormData {
   // Step 1: Property Details
   propertyAddress: string;
   propertyCity?: string;              // Extracted from Google Places (e.g., "Nashville")
   propertyState?: string;             // 2-letter state code (e.g., "TN")
   propertyZip?: string;               // ZIP code (e.g., "37201")
+  propertyCounty?: string;            // County name (e.g., "Davidson County")
   purchasePrice: number;
   rehab: number;
   squareFeet: number;
+  bedrooms: number;
+  bathrooms: number;
+  yearBuilt: number;
+  propertyType: PropertyType;
 
   // Step 2: Property Condition & ARV
   propertyCondition: PropertyCondition;
@@ -48,6 +55,9 @@ export interface PropertyComparable {
   sqft: number;
   distance?: string;
   soldDate?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  pricePerSqft?: number;
 }
 
 export interface AIPropertyEstimates {
@@ -56,6 +66,42 @@ export interface AIPropertyEstimates {
   compsUsed: PropertyComparable[];
   marketAnalysis: string;
   confidence?: "high" | "medium" | "low";
+}
+
+// ============================================================================
+// BatchData Enhanced Types
+// ============================================================================
+
+export interface RiskFlag {
+  severity: "critical" | "warning" | "info";
+  code: string;
+  message: string;
+}
+
+export interface BatchDataEnrichedEstimates extends AIPropertyEstimates {
+  // Existing fields from AIPropertyEstimates
+  estimatedARV: number;
+  asIsValue: number;
+  compsUsed: PropertyComparable[];
+  marketAnalysis: string;
+
+  // New BatchData fields
+  batchDataUsed?: boolean;
+  subjectPropertyDetails?: {
+    propertyType: string;
+    bedrooms: number;
+    bathrooms: number;
+    yearBuilt: number;
+    taxAssessedValue: number;
+    lastSalePrice: number | null;
+    lastSaleDate: string | null;
+  };
+  compTier?: 1 | 2 | 3;
+  compDerivedValue?: number;
+  avmValue?: number;
+  avmConfidence?: number;
+  valuationMethod?: "batchdata" | "ai_fallback" | "heuristic";
+  riskFlags?: RiskFlag[];
 }
 
 // ============================================================================
@@ -98,8 +144,8 @@ export interface UnderwritingResults {
   // User inputs (for display)
   formData: UnderwritingFormData;
 
-  // AI estimates
-  aiEstimates: AIPropertyEstimates;
+  // AI estimates (can be BatchData or AI fallback)
+  aiEstimates: BatchDataEnrichedEstimates;
 
   // Calculated metrics
   calculations: CalculatedResults;
@@ -112,6 +158,10 @@ export interface UnderwritingResults {
   submittedAt: Date;
   usageCount: number;
   usageLimit: number;
+
+  // Report sharing
+  reportId?: string; // Unique ID for shareable report links
+  expiresAt?: string; // ISO date string when the report expires
 }
 
 // ============================================================================

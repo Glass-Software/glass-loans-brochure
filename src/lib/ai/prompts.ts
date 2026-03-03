@@ -1,4 +1,4 @@
-import { UnderwritingFormData, CalculatedResults } from "@/types/underwriting";
+import { UnderwritingFormData, CalculatedResults, BatchDataEnrichedEstimates } from "@/types/underwriting";
 
 /**
  * System prompt for property estimation
@@ -120,7 +120,7 @@ export function generateGaryOpinionPrompt(
   formData: UnderwritingFormData,
   userCalculated: CalculatedResults,
   garyCalculated: CalculatedResults,
-  aiEstimates: { estimatedARV: number; asIsValue: number },
+  aiEstimates: BatchDataEnrichedEstimates,
 ): string {
   const {
     propertyAddress,
@@ -160,6 +160,40 @@ ${propertyAddress !== locationDisplay ? `- Full Address: ${propertyAddress}` : '
 - Loan Amount: $${loanAtPurchase.toLocaleString()} at ${interestRate}% for ${months} months
 - Renovation Funds: $${formData.renovationFunds?.toLocaleString() || "0"}
 
+**DATA QUALITY:**
+${aiEstimates.batchDataUsed
+  ? `✓ VERIFIED DATA: This analysis uses real property data including:
+- ${aiEstimates.compsUsed?.length || 0} actual comparable sales
+- Professional valuation model estimates
+- Public records and tax assessment data
+${aiEstimates.compTier ? `- Search quality: ${aiEstimates.compTier === 1 ? "High (tight criteria)" : aiEstimates.compTier === 2 ? "Good (moderate criteria)" : "Fair (expanded criteria)"}` : ""}`
+  : `⚠ LIMITED DATA: Using estimated values - recommend independent verification`}
+
+${aiEstimates.batchDataUsed && aiEstimates.subjectPropertyDetails
+  ? `**SUBJECT PROPERTY (Public Records):**
+- Type: ${aiEstimates.subjectPropertyDetails.propertyType}
+- Bed/Bath: ${aiEstimates.subjectPropertyDetails.bedrooms}/${aiEstimates.subjectPropertyDetails.bathrooms}
+- Year Built: ${aiEstimates.subjectPropertyDetails.yearBuilt}
+- Tax Assessed Value: $${aiEstimates.subjectPropertyDetails.taxAssessedValue?.toLocaleString()}
+${aiEstimates.subjectPropertyDetails.lastSaleDate
+    ? `- Last Sale: $${aiEstimates.subjectPropertyDetails.lastSalePrice?.toLocaleString()} on ${aiEstimates.subjectPropertyDetails.lastSaleDate}`
+    : ""}`
+  : ""}
+
+${aiEstimates.batchDataUsed && aiEstimates.compsUsed && aiEstimates.compsUsed.length > 0
+  ? `**COMPARABLE SALES (Real Data):**
+${aiEstimates.compsUsed.map((comp: any, i: number) =>
+    `${i + 1}. ${comp.address} - $${comp.price.toLocaleString()} (${comp.sqft.toLocaleString()} sqft, $${comp.pricePerSqft}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""})`
+  ).join("\n")}`
+  : ""}
+
+${aiEstimates.riskFlags && aiEstimates.riskFlags.length > 0
+  ? `**RISK FLAGS DETECTED:**
+${aiEstimates.riskFlags.map((flag: any) =>
+    `- [${flag.severity.toUpperCase()}] ${flag.message}`
+  ).join("\n")}`
+  : ""}
+
 **ARV COMPARISON:**
 - **Borrower's ARV Estimate**: $${userEstimatedArv.toLocaleString()}
 - **Your ARV Estimate**: $${aiEstimates.estimatedARV.toLocaleString()}
@@ -180,20 +214,28 @@ ${additionalDetails ? `\n**BORROWER NOTES:**\n${additionalDetails}\n` : ""}
 **YOUR TASK:**
 Write a 3-4 paragraph professional opinion covering:
 
-1. **ARV Assessment**: Do you agree with the borrower's ARV estimate of $${userEstimatedArv.toLocaleString()}? Explain why your estimate is $${aiEstimates.estimatedARV.toLocaleString()} and whether theirs is reasonable, optimistic, or conservative.
+1. **Data Quality Assessment**: ${aiEstimates.batchDataUsed
+  ? `Comment on the quality of the market data (${aiEstimates.compsUsed?.length} comps found, ${aiEstimates.compTier === 1 ? "tight search" : aiEstimates.compTier === 2 ? "moderate search" : "expanded search"}, valuation confidence: ${aiEstimates.avmConfidence}%). Are the comps tight or did we have to cast a wide net?`
+  : `Note that this analysis uses estimated values due to limited data - recommend proceeding with caution and obtaining independent appraisal.`}
 
-2. **Overall Deal Quality**: Is this a good deal? What's the risk level based on YOUR valuation?
+2. **ARV Assessment**: Do you agree with the borrower's ARV estimate of $${userEstimatedArv.toLocaleString()}? ${aiEstimates.batchDataUsed
+  ? `Reference specific comps by address that support your $${aiEstimates.estimatedARV.toLocaleString()} valuation.`
+  : `Explain why your estimate is $${aiEstimates.estimatedARV.toLocaleString()} and whether theirs is reasonable, optimistic, or conservative.`}
 
-3. **Strengths & Concerns**: What are the key strengths? What are the main risks or red flags?
+3. **Overall Deal Quality**: Is this a good deal? What's the risk level based on YOUR valuation?
 
-4. **Recommendation**: Clear recommendation - Approve, Approve with Conditions, or Decline. If you disagree significantly with their ARV, mention that the deal metrics change under your valuation.
+4. **Risk Factors**: ${aiEstimates.riskFlags && aiEstimates.riskFlags.length > 0
+  ? `Address the specific risk flags detected in the data above.`
+  : `What are the main risks or red flags you see?`}
+
+5. **Recommendation**: Clear recommendation - Approve, Approve with Conditions, or Decline.
 
 **TONE:**
 - Write in first person as Gary
+- ${aiEstimates.batchDataUsed
+  ? "Reference the real market data in your analysis - be specific about which comps support your opinion"
+  : "Acknowledge that you're working with limited data and recommend independent verification"}
 - Be direct and professional
-- Be specific with numbers and metrics
-- Address the ARV comparison directly in your first paragraph
-- If there are problems, state them clearly
 - Don't sugarcoat risks, but be fair
 
 Return ONLY your written opinion, no JSON or additional formatting.`;

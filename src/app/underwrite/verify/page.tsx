@@ -11,11 +11,12 @@ interface VerifyPageProps {
   searchParams: Promise<{
     token?: string;
     submission?: string;
+    report?: string;
   }>;
 }
 
 export default async function VerifyPage({ searchParams }: VerifyPageProps) {
-  const { token, submission: submissionId } = await searchParams;
+  const { token, submission: submissionId, report: reportId } = await searchParams;
 
   if (!token) {
     return (
@@ -101,9 +102,12 @@ export default async function VerifyPage({ searchParams }: VerifyPageProps) {
     );
   }
 
-  // Success! If there's a submission ID, redirect to results page
+  // Success! If there's a report ID or submission ID, redirect to results page
   // Otherwise redirect to underwrite form
-  if (submissionId) {
+  if (reportId) {
+    redirect(`/underwrite/results/${reportId}?verified=true`);
+  } else if (submissionId) {
+    // Backward compatibility for old verification links
     redirect(`/underwrite/results/${submissionId}?verified=true`);
   } else {
     redirect(`/underwrite?email=${encodeURIComponent(user.email)}&verified=true`);

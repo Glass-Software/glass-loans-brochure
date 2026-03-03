@@ -6,6 +6,7 @@ import {
   incrementUsageCount,
   createSubmission,
   checkRateLimit,
+  generateReportId,
 } from "@/lib/db/queries";
 import { validateCompleteForm } from "@/lib/underwriting/validation";
 import {
@@ -175,62 +176,91 @@ export async function POST(request: Request) {
           return;
         }
 
-        // Step 8: Get AI property estimates (25-50%)
-        sendProgress(controller, 2, "Researching property comps with AI...", 25);
+        // Step 8: Get property estimates (25-50%)
+        sendProgress(controller, 2, "Researching property comps...", 25);
 
-        console.log("Fetching AI property estimates...");
-        console.log("OpenRouter API Key configured:", !!process.env.OPENROUTER_API_KEY);
+        console.log("Fetching property estimates...");
 
         let aiEstimates;
-        try {
-          if (process.env.OPENROUTER_API_KEY) {
-            const estimationPrompt =
-              generatePropertyEstimationPrompt(formData as UnderwritingFormData);
 
-            console.log("Calling OpenRouter for property estimates...");
-            aiEstimates = await openRouterClient.generateJSON<{
-              estimatedARV: number;
-              asIsValue: number;
-              monthlyRent: number;
-              compsUsed: Array<{
-                address: string;
-                price: number;
-                sqft: number;
-              }>;
-              marketAnalysis: string;
-            }>(estimationPrompt, {
-              systemPrompt: PROPERTY_ESTIMATION_SYSTEM_PROMPT,
-              temperature: 0.3, // Lower temperature for more consistent estimates
-              maxTokens: 2000,
-            });
-            console.log("Property estimates received successfully");
+        try {
+          // Try primary data source first
+          if (process.env.BATCHDATA_API_KEY) {
+            console.log("[Server] Attempting property data lookup...");
+            const { getBatchDataPropertyEstimates } = await import("@/lib/batchdata/underwriting");
+
+            aiEstimates = await getBatchDataPropertyEstimates(formData as UnderwritingFormData);
+
+            console.log("[Server] Property data retrieved successfully");
+            sendProgress(controller, 2, "Property data retrieved", 50);
           } else {
-            // Fallback estimates if no API key
-            console.warn("OpenRouter API key not set, using fallback estimates");
+            throw new Error("Primary data source not configured");
+          }
+        } catch (dataError: any) {
+          // Fallback to AI-generated estimates
+          console.warn("[Server] Primary data source unavailable, using fallback:", dataError.message);
+          sendProgress(controller, 2, "Analyzing property...", 30);
+
+          try {
+            if (process.env.OPENROUTER_API_KEY) {
+              const estimationPrompt =
+                generatePropertyEstimationPrompt(formData as UnderwritingFormData);
+
+              console.log("Calling OpenRouter for property estimates...");
+              const aiResponse = await openRouterClient.generateJSON<{
+                estimatedARV: number;
+                asIsValue: number;
+                monthlyRent: number;
+                compsUsed: Array<{
+                  address: string;
+                  price: number;
+                  sqft: number;
+                }>;
+                marketAnalysis: string;
+              }>(estimationPrompt, {
+                systemPrompt: PROPERTY_ESTIMATION_SYSTEM_PROMPT,
+                temperature: 0.3,
+                maxTokens: 2000,
+              });
+
+              // Add fallback markers
+              aiEstimates = {
+                ...aiResponse,
+                batchDataUsed: false,
+                valuationMethod: "ai_fallback",
+                compTier: 3, // Mark as lowest confidence
+              };
+
+              console.log("AI estimates received successfully");
+            } else {
+              // Ultimate fallback: Simple heuristics
+              console.warn("No API keys configured, using heuristic estimates");
+              aiEstimates = {
+                estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
+                asIsValue: formData.purchasePrice * 0.85,
+                monthlyRent: Math.round((formData.purchasePrice * 0.01) / 10) * 10,
+                compsUsed: [],
+                marketAnalysis:
+                  "No real estate data available - using estimated values based on purchase price and rehab budget.",
+                batchDataUsed: false,
+                valuationMethod: "heuristic",
+              };
+            }
+          } catch (aiError: any) {
+            console.error("AI estimation also failed:", aiError);
+
+            // Ultimate fallback
             aiEstimates = {
               estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
               asIsValue: formData.purchasePrice * 0.85,
-              monthlyRent: Math.round((formData.purchasePrice * 0.01) / 10) * 10,
               compsUsed: [],
-              marketAnalysis:
-                "No AI analysis available - using estimated values based on purchase price and rehab budget.",
+              marketAnalysis: "Property estimates temporarily unavailable - using conservative estimates.",
+              batchDataUsed: false,
+              valuationMethod: "heuristic",
             };
           }
-        } catch (aiError: any) {
-          console.error("AI estimation error:", {
-            message: aiError.message,
-            name: aiError.name,
-            stack: aiError.stack,
-          });
 
-          // Use fallback estimates
-          aiEstimates = {
-            estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
-            asIsValue: formData.purchasePrice * 0.85,
-            compsUsed: [],
-            marketAnalysis:
-              "AI analysis temporarily unavailable - using estimated values.",
-          };
+          sendProgress(controller, 2, "Fallback estimates complete", 50);
         }
 
         // Step 9: Calculate all metrics TWICE (user ARV vs Gary ARV) (50-65%)
@@ -300,6 +330,12 @@ export async function POST(request: Request) {
         sendProgress(controller, 5, "Saving results...", 90);
 
         console.log("Storing submission...");
+
+        // Generate report ID and calculate expiration
+        const reportId = generateReportId();
+        const retentionDays = user.report_retention_days || 14;
+        const expiresAt = new Date(Date.now() + retentionDays * 24 * 60 * 60 * 1000).toISOString();
+
         const submission = createSubmission({
           userId: user.id,
           propertyAddress: formData.propertyAddress,
@@ -309,6 +345,10 @@ export async function POST(request: Request) {
           purchasePrice: formData.purchasePrice,
           rehab: formData.rehab,
           squareFeet: formData.squareFeet,
+          bedrooms: formData.bedrooms,
+          bathrooms: formData.bathrooms,
+          yearBuilt: formData.yearBuilt,
+          propertyType: formData.propertyType,
           propertyCondition: formData.propertyCondition,
           renovationPerSf: formData.renovationPerSf,
           userEstimatedArv: formData.userEstimatedArv,
@@ -326,6 +366,8 @@ export async function POST(request: Request) {
           finalScore,
           garyOpinion,
           propertyComps: aiEstimates.compsUsed,
+          reportId,
+          expiresAt,
           ipAddress: ip,
           recaptchaScore: recaptchaVerification.score || 0,
         });
@@ -350,13 +392,15 @@ export async function POST(request: Request) {
           sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
           const { token } = regenerateVerificationToken(user.id);
-          const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/underwrite/verify?token=${token}&submission=${submission.id}`;
+          const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/underwrite/verify?token=${token}&report=${reportId}`;
+
+          const reportUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/underwrite/results/${reportId}`;
 
           await sgMail.send({
             to: email,
             from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
             subject: "Verify Your Email - View Your Underwriting Results",
-            text: `Click the link to verify your email and view your underwriting results: ${verificationUrl}`,
+            text: `Click the link to verify your email and view your underwriting results: ${verificationUrl}\n\nAfter verification, you can access your report at any time using this link (valid for ${retentionDays} days): ${reportUrl}`,
             html: `
 <!DOCTYPE html>
 <html>
@@ -372,7 +416,12 @@ export async function POST(request: Request) {
     <div style="text-align: center; margin: 30px 0;">
       <a href="${verificationUrl}" style="background-color: #4A6CF7; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Verify Email & View Results</a>
     </div>
-    <p style="font-size: 14px; color: #666;">This link expires in 24 hours.</p>
+    <p style="font-size: 14px; color: #666;">This verification link expires in 24 hours.</p>
+    <div style="background-color: #e8f0fe; padding: 15px; border-radius: 5px; margin: 20px 0;">
+      <p style="margin: 0 0 10px 0; font-weight: bold; color: #1a73e8;">📎 Save Your Report Link</p>
+      <p style="margin: 0 0 10px 0; font-size: 14px;">After verification, access your report anytime for ${retentionDays} days:</p>
+      <p style="margin: 0; font-size: 13px; word-break: break-all;"><a href="${reportUrl}" style="color: #1a73e8;">${reportUrl}</a></p>
+    </div>
     <p style="font-size: 14px; color: #666;"><strong>Note:</strong> Free tier includes limited uses per verified email address.</p>
     <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
     <p style="font-size: 12px; color: #999; text-align: center;">Glass Loans | 1108 McKennie Ave. Suite 011 Nashville, TN 37206</p>
@@ -386,11 +435,13 @@ export async function POST(request: Request) {
             emailSent: true,
             message: "Check your email to view your underwriting results.",
             submissionId: submission.id,
+            reportId,
           });
         } else {
           // Step 15: User is verified - return results immediately (with dual calculations)
           sendComplete(controller, {
             success: true,
+            reportId,
             results: {
               formData,
               aiEstimates,
@@ -402,6 +453,8 @@ export async function POST(request: Request) {
               submittedAt: new Date(),
               usageCount: user.usage_count + 1,
               usageLimit: user.usage_limit,
+              reportId,
+              expiresAt,
             },
           });
         }

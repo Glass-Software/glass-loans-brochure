@@ -6,6 +6,9 @@
 app = 'glass-loans-brochure-modified-misty-thunder-1484'
 primary_region = 'dfw'
 
+[deploy]
+  release_command = "npx tsx scripts/migrate.ts"
+
 [build]
 
 [http_service]

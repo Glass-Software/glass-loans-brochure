@@ -18,6 +18,14 @@ export const MarketTypeSchema = z.enum(["Primary", "Secondary", "Tertiary"], {
   errorMap: () => ({ message: "Please select a valid market type" }),
 });
 
+// Property Type enum
+export const PropertyTypeSchema = z.enum(
+  ["SFR", "Condo", "Townhouse", "Multi-Family"],
+  {
+    errorMap: () => ({ message: "Please select a valid property type" }),
+  },
+);
+
 // Step 1: Property Details Schema
 export const Step1Schema = z.object({
   propertyAddress: z
@@ -36,6 +44,24 @@ export const Step1Schema = z.object({
     .number()
     .min(100, "Square feet must be at least 100")
     .max(50000, "Square feet must be less than 50,000"),
+  bedrooms: z
+    .number()
+    .int("Bedrooms must be a whole number")
+    .min(1, "At least 1 bedroom required")
+    .max(10, "Bedrooms must be less than 10"),
+  bathrooms: z
+    .number()
+    .min(1, "At least 1 bathroom required")
+    .max(8, "Bathrooms must be less than 8"),
+  yearBuilt: z
+    .number()
+    .int("Year built must be a whole number")
+    .min(1800, "Year built must be after 1800")
+    .max(
+      new Date().getFullYear(),
+      `Year built cannot be in the future`,
+    ),
+  propertyType: PropertyTypeSchema,
 });
 
 // Step 2: Property Condition Schema
@@ -97,6 +123,10 @@ export const UnderwritingFormSchema = z
     purchasePrice: z.number().min(1000, "Purchase price must be at least $1,000"),
     rehab: z.number().min(0, "Rehab cannot be negative"),
     squareFeet: z.number().min(100, "Square feet must be at least 100"),
+    bedrooms: z.number().int().min(1, "At least 1 bedroom required"),
+    bathrooms: z.number().min(1, "At least 1 bathroom required"),
+    yearBuilt: z.number().int().min(1800, "Year built must be after 1800"),
+    propertyType: PropertyTypeSchema,
     propertyCondition: PropertyConditionSchema,
     renovationPerSf: RenovationLevelSchema,
     userEstimatedArv: z

@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getSubmissionById } from "@/lib/db/queries";
+import { getSubmissionById, getSubmissionByReportId } from "@/lib/db/queries";
 import { calculateUnderwriting } from "@/lib/underwriting/calculations";
 import type {
   UnderwritingFormData,
@@ -28,8 +28,13 @@ export default async function ResultsPage({
   const { id } = await params;
   const { verified } = await searchParams;
 
+  // Determine if ID is a report ID (alphanumeric) or submission ID (numeric)
+  const isNumeric = /^\d+$/.test(id);
+
   // Get submission from database
-  const submission = getSubmissionById(parseInt(id, 10));
+  const submission = isNumeric
+    ? getSubmissionById(parseInt(id, 10))
+    : getSubmissionByReportId(id);
 
   if (!submission) {
     notFound();
@@ -82,6 +87,15 @@ export default async function ResultsPage({
           <div className="mb-8 rounded-sm bg-green-50 p-4 dark:bg-green-900/20">
             <p className="text-center text-sm text-green-800 dark:text-green-200">
               ✓ Email verified successfully! Here are your underwriting results.
+            </p>
+          </div>
+        )}
+
+        {submission.expires_at && (
+          <div className="mb-8 rounded-sm border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+            <p className="text-center text-sm text-blue-800 dark:text-blue-200">
+              This report will be available until{" "}
+              {new Date(submission.expires_at).toLocaleDateString()}
             </p>
           </div>
         )}

@@ -14,6 +14,7 @@ export interface User {
   verification_token_expires: string | null; // SQLite stores dates as text
   usage_count: number;
   usage_limit: number; // Configurable limit per user (default 3 for free tier)
+  report_retention_days: number; // How long to keep reports (default 14 days)
   created_at: string;
   updated_at: string;
 }
@@ -189,6 +190,8 @@ export interface UnderwritingSubmission {
   final_score: number | null;
   gary_opinion: string | null;
   ai_property_comps: string | null; // JSON stored as text
+  report_id: string | null; // Unique ID for shareable report links
+  expires_at: string | null; // When the report expires and should be deleted
   ip_address: string | null;
   recaptcha_score: number | null;
   created_at: string;
@@ -203,6 +206,10 @@ export interface CreateSubmissionData {
   purchasePrice: number;
   rehab: number;
   squareFeet: number;
+  bedrooms: number;
+  bathrooms: number;
+  yearBuilt: number;
+  propertyType: string;
   propertyCondition: string;
   renovationPerSf: string;
   userEstimatedArv: number; // User's ARV estimate
@@ -220,6 +227,8 @@ export interface CreateSubmissionData {
   finalScore: number;
   garyOpinion: string;
   propertyComps?: any;
+  reportId: string; // Unique ID for shareable report links
+  expiresAt: string; // When the report expires (ISO string)
   ipAddress?: string;
   recaptchaScore?: number;
 }
@@ -234,14 +243,15 @@ export function createSubmission(
     `
       INSERT INTO underwriting_submissions (
         user_id, property_address, property_city, property_state, property_zip,
-        purchase_price, rehab, square_feet,
+        purchase_price, rehab, square_feet, bedrooms, bathrooms, year_built, property_type,
         property_condition, renovation_per_sf, user_estimated_arv, interest_rate, months,
         loan_at_purchase, renovation_funds, closing_costs_percent, points,
         market_type, additional_details, comp_links, estimated_arv, as_is_value,
         final_score, gary_opinion, ai_property_comps,
+        report_id, expires_at,
         ip_address, recaptcha_score
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `,
     [
@@ -253,6 +263,10 @@ export function createSubmission(
       data.purchasePrice,
       data.rehab,
       data.squareFeet,
+      data.bedrooms,
+      data.bathrooms,
+      data.yearBuilt,
+      data.propertyType,
       data.propertyCondition,
       data.renovationPerSf,
       data.userEstimatedArv,
@@ -270,6 +284,8 @@ export function createSubmission(
       data.finalScore,
       data.garyOpinion,
       data.propertyComps ? JSON.stringify(data.propertyComps) : null,
+      data.reportId,
+      data.expiresAt,
       data.ipAddress || null,
       data.recaptchaScore || null,
     ],
@@ -325,6 +341,41 @@ export function getSubmissionById(
   return queryOne<UnderwritingSubmission>(
     "SELECT * FROM underwriting_submissions WHERE id = ?",
     [submissionId],
+  );
+}
+
+/**
+ * Get submission by report ID (if not expired)
+ */
+export function getSubmissionByReportId(
+  reportId: string,
+): UnderwritingSubmission | null {
+  return queryOne<UnderwritingSubmission>(
+    `
+      SELECT * FROM underwriting_submissions
+      WHERE report_id = ?
+        AND (expires_at IS NULL OR expires_at > DATETIME('now'))
+      LIMIT 1
+    `,
+    [reportId],
+  );
+}
+
+/**
+ * Generate a unique report ID for a submission
+ */
+export function generateReportId(): string {
+  // Generate a URL-safe random ID (12 chars = 72 bits of entropy)
+  return crypto.randomBytes(9).toString("base64url");
+}
+
+/**
+ * Clean up expired reports (run periodically)
+ */
+export function cleanupExpiredReports(): void {
+  execute(
+    "DELETE FROM underwriting_submissions WHERE expires_at < DATETIME('now')",
+    [],
   );
 }
 

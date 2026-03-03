@@ -52,7 +52,7 @@ function UnderwritingContent() {
               <div className="mx-auto max-w-4xl">
                 {/* Header */}
                 <div className="mb-12 text-center">
-                <h1 className="mb-4 text-3xl font-bold text-dark dark:text-white sm:text-4xl md:text-5xl">
+                <h1 className="mb-5 text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl sm:leading-tight md:text-5xl md:leading-tight">
                   AI Loan Underwriting
                 </h1>
                 <p className="text-base text-body-color sm:text-lg">

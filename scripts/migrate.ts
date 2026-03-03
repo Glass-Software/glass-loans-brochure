@@ -9,7 +9,10 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 
-const dbPath = path.join(process.cwd(), "glass-loans.db");
+// Use /data for production (Fly.io mount), otherwise local directory
+const dbPath = process.env.NODE_ENV === "production"
+  ? "/data/glass-loans.db"
+  : path.join(process.cwd(), "glass-loans.db");
 
 console.log("🚀 Starting migration process...");
 console.log(`📁 Database: ${dbPath}\n`);
@@ -135,6 +138,90 @@ try {
 console.log("");
 
 // =============================================================================
+// Migration 005: Add BatchData Cache Tables
+// =============================================================================
+console.log("🔍 Checking Migration 005: Add BatchData Cache Tables");
+
+try {
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>;
+  const hasBatchDataCache = tables.some(t => t.name === 'batchdata_address_cache');
+
+  if (!hasBatchDataCache) {
+    console.log("⏳ Applying Migration 005...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/005_add_batchdata_cache.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 005 completed: BatchData cache tables created");
+  } else {
+    console.log("✅ Migration 005 already applied (BatchData cache tables exist)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 005 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
+// Migration 006: Add Report IDs and Retention
+// =============================================================================
+console.log("🔍 Checking Migration 006: Add Report IDs and Retention");
+
+try {
+  const userColumns = db.pragma("table_info(users)") as Array<{ name: string; type: string }>;
+  const hasReportRetention = userColumns.some(col => col.name === "report_retention_days");
+
+  if (!hasReportRetention) {
+    console.log("⏳ Applying Migration 006...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/006_add_report_ids.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 006 completed: Report IDs and retention added");
+  } else {
+    console.log("✅ Migration 006 already applied (report retention fields exist)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 006 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
+// Migration 007: Add Property Details
+// =============================================================================
+console.log("🔍 Checking Migration 007: Add Property Details");
+
+try {
+  const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string; type: string }>;
+  const hasPropertyDetails = submissionColumns.some(col => col.name === "bedrooms");
+
+  if (!hasPropertyDetails) {
+    console.log("⏳ Applying Migration 007...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/007_add_property_details.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 007 completed: bedrooms, bathrooms, year_built, property_type columns added");
+  } else {
+    console.log("✅ Migration 007 already applied (property detail fields exist)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 007 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
 // Verification & Summary
 // =============================================================================
 console.log("🔍 Verifying final schema...\n");
@@ -150,11 +237,11 @@ try {
 
   console.log("\n📊 Underwriting submissions - key columns:");
   const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string; type: string }>;
-  const keyColumns = ["user_estimated_arv", "estimated_arv", "as_is_value", "monthly_rent", "property_city", "property_state", "property_zip"];
+  const keyColumns = ["user_estimated_arv", "estimated_arv", "as_is_value", "monthly_rent", "property_city", "property_state", "property_zip", "bedrooms", "bathrooms", "year_built", "property_type"];
   submissionColumns
     .filter(col => keyColumns.includes(col.name))
     .forEach(col => {
-      const mark = ["user_estimated_arv", "property_state"].includes(col.name) ? "🔹" : "  ";
+      const mark = ["user_estimated_arv", "property_state", "bedrooms"].includes(col.name) ? "🔹" : "  ";
       const note = col.name === "monthly_rent" ? " (deprecated)" : "";
       console.log(`${mark} ${col.name} (${col.type})${note}`);
     });
@@ -165,6 +252,9 @@ try {
   console.log("   • Migration 002: Usage limit ✅");
   console.log("   • Migration 003: User ARV ✅");
   console.log("   • Migration 004: Location fields ✅");
+  console.log("   • Migration 005: BatchData cache tables ✅");
+  console.log("   • Migration 006: Report IDs and retention ✅");
+  console.log("   • Migration 007: Property details ✅");
   console.log("\n🎉 Database is up to date and ready for use!");
 
 } catch (error: any) {
