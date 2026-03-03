@@ -172,6 +172,10 @@ export interface UnderwritingSubmission {
   purchase_price: number;
   rehab: number;
   square_feet: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  year_built: number | null;
+  property_type: string | null;
   property_condition: string;
   renovation_per_sf: string;
   user_estimated_arv: number | null;

@@ -154,7 +154,7 @@ export class BatchDataClient {
     address: string | AddressInput
   ): Promise<BatchDataAddressResponse> {
     const addressInput = typeof address === "string" ? this.parseAddress(address) : address;
-    const response = await this.request<{ results: { addresses: BatchDataAddressResponse[] } }>(
+    const response = await this.request<{ results: { addresses: any[] } }>(
       "/address/verify",
       { requests: [addressInput] }
     );
@@ -163,7 +163,22 @@ export class BatchDataClient {
     if (addr.error) {
       throw new BatchDataAPIError(`Address verification failed: ${addr.error}`, 400, addr.error);
     }
-    return addr;
+
+    // Normalize address response to expected format
+    return {
+      standardizedAddress: addr.streetNoUnit || addr.street || '',
+      streetNumber: addr.houseNumber || '',
+      streetName: addr.formattedStreet || '',
+      city: addr.city || '',
+      state: addr.state || '',
+      zipCode: addr.zip || '',
+      zipPlus4: addr.zipPlus4 || '',
+      county: addr.county || '',
+      countyFips: addr.countyFipsCode || '',
+      latitude: addr.latitude || 0,
+      longitude: addr.longitude || 0,
+      validated: addr.meta?.normalized || true
+    };
   }
 
   /**
@@ -173,7 +188,7 @@ export class BatchDataClient {
     address: string | AddressInput
   ): Promise<BatchDataPropertyResponse> {
     const addressInput = typeof address === "string" ? this.parseAddress(address) : address;
-    const response = await this.request<{ results: { properties: BatchDataPropertyResponse[] } }>(
+    const response = await this.request<{ results: { properties: any[] } }>(
       "/property/lookup/all-attributes",
       { requests: [addressInput] }
     );
@@ -182,7 +197,63 @@ export class BatchDataClient {
     if (!property) {
       throw new BatchDataAPIError(`Property not found`, 404, "No property data returned");
     }
-    return property;
+
+    // Normalize property response to match expected format
+    return this.normalizePropertyResponse(property);
+  }
+
+  /**
+   * Normalize BatchData property response to expected format
+   * Handles both production API and mock server responses
+   */
+  private normalizePropertyResponse(prop: any): BatchDataPropertyResponse {
+    return {
+      address: {
+        standardizedAddress: prop.address?.street || prop.address?.streetNoUnit || '',
+        streetNumber: prop.address?.houseNumber || '',
+        streetName: prop.address?.streetName || prop.address?.formattedStreet || '',
+        city: prop.address?.city || '',
+        state: prop.address?.state || '',
+        zipCode: prop.address?.zip || '',
+        zipPlus4: prop.address?.zipPlus4 || '',
+        county: prop.address?.county || '',
+        countyFips: prop.address?.countyFipsCode || '',
+        latitude: prop.address?.latitude || 0,
+        longitude: prop.address?.longitude || 0,
+        validated: true
+      },
+      propertyType: prop.general?.propertyTypeDetail || 'Single Family',
+      bedrooms: prop.building?.bedroomCount || prop.building?.calculatedBathroomCount || 0,
+      bathrooms: prop.building?.bathroomCount || prop.building?.calculatedBathroomCount || 0,
+      squareFeet: prop.building?.totalBuildingAreaSquareFeet || prop.building?.livingAreaSquareFeet || 0,
+      lotSize: prop.lot?.lotSizeSquareFeet || 0,
+      yearBuilt: prop.building?.yearBuilt || 0,
+      lastSaleDate: prop.sale?.lastSale?.saleDate || prop.deedHistory?.[0]?.saleDate || null,
+      lastSalePrice: prop.sale?.lastSale?.salePrice || prop.deedHistory?.[0]?.salePrice || null,
+      taxAssessedValue: prop.assessment?.totalAssessedValue || prop.assessment?.totalMarketValue || 0,
+      taxAssessmentHistory: (prop.listing?.taxes || []).map((tax: any) => ({
+        year: tax.year || 0,
+        assessedValue: tax.amount || 0
+      })),
+      mortgageInfo: prop.mortgageHistory?.[0] ? {
+        lenderName: prop.mortgageHistory[0].lenderName || '',
+        amount: prop.mortgageHistory[0].loanAmount || 0,
+        recordDate: prop.mortgageHistory[0].recordingDate || '',
+        loanType: prop.mortgageHistory[0].loanType || ''
+      } : null,
+      liens: [],
+      ownerName: prop.owner?.fullName || '',
+      ownerType: prop.owner?.ownerStatusType || 'Individual',
+      zoning: prop.lot?.zoningCode || '',
+      avm: {
+        value: prop.valuation?.estimatedValue || 0,
+        confidenceScore: prop.valuation?.confidenceScore || 0,
+        valuationDate: prop.valuation?.asOfDate || new Date().toISOString(),
+        lowEstimate: prop.valuation?.priceRangeMin || 0,
+        highEstimate: prop.valuation?.priceRangeMax || 0
+      },
+      preForeclosure: prop.foreclosure?.status ? true : false
+    };
   }
 
   /**
@@ -203,10 +274,58 @@ export class BatchDataClient {
       requestBody
     );
 
-    // BatchData returns results.properties array
+    // Normalize BatchData property objects to simplified format
+    const rawProperties = response.results.properties || [];
+    const normalizedProperties = rawProperties.map((prop: any) => {
+      // Extract address string
+      const addressStr = prop.address?.street ||
+                        `${prop.address?.houseNumber || ''} ${prop.address?.streetName || ''}`.trim() ||
+                        'Unknown';
+
+      // Extract sale data - check multiple possible locations
+      const lastSalePrice = prop.listing?.soldPrice ||
+                           prop.sale?.lastSale?.salePrice ||
+                           prop.valuation?.estimatedValue ||
+                           0;
+
+      const lastSaleDate = prop.listing?.soldDate ||
+                          prop.sale?.lastSale?.saleDate ||
+                          prop.deedHistory?.[0]?.saleDate ||
+                          null;
+
+      // Extract property characteristics
+      const squareFeet = prop.listing?.totalBuildingAreaSquareFeet ||
+                        prop.building?.totalBuildingAreaSquareFeet ||
+                        prop.building?.livingAreaSquareFeet ||
+                        0;
+
+      const bedrooms = prop.listing?.bedroomCount ||
+                      prop.building?.bedroomCount ||
+                      0;
+
+      const bathrooms = prop.listing?.bathroomCount ||
+                       prop.building?.bathroomCount ||
+                       0;
+
+      // Distance would be calculated by BatchData API based on compAddress
+      const distance = 0; // TODO: Calculate if coordinates available
+
+      return {
+        address: addressStr,
+        propertyType: prop.general?.propertyTypeDetail || 'Single Family',
+        bedrooms,
+        bathrooms,
+        squareFeet,
+        lastSaleDate,
+        lastSalePrice,
+        distance,
+        daysOnMarket: 0
+      };
+    });
+
     return {
-      properties: response.results.properties || [],
-      totalResults: response.results.properties?.length || 0
+      properties: normalizedProperties,
+      totalResults: normalizedProperties.length
     };
   }
 

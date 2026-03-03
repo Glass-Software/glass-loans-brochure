@@ -82,6 +82,38 @@ export function calculateUnderwriting(
   // Formula 18: Borrower Spread = same as Borrower Profit (#11)
   const borrowerSpread = borrowerProfit;
 
+  // New calculations for enhanced scoring system
+  const totalProjectCost = totalCost + totalCosts;
+  const stressedARV = arv * 0.9;
+  const stressTestedProfit = stressedARV - totalProjectCost - totalInterest;
+
+  // Calculate component scores (1-10 scale) for new scoring rubric
+
+  // 1. Leverage Score (average of LTV, LARV, LTC)
+  const ltvScore =
+    loanToAsIsValue <= 85 ? 10 : loanToAsIsValue <= 90 ? 7 : loanToAsIsValue <= 95 ? 4 : 1;
+  const larvScore = loanToArv <= 75 ? 10 : loanToArv <= 80 ? 7 : loanToArv <= 85 ? 4 : 1;
+  const ltcScore = loanToCost <= 85 ? 10 : loanToCost <= 90 ? 7 : loanToCost <= 95 ? 4 : 1;
+  const leverageScore = (ltvScore + larvScore + ltcScore) / 3;
+
+  // 2. Profit Score
+  const profitScore =
+    borrowerProfit >= 50000 ? 10 : borrowerProfit >= 25000 ? 7 : borrowerProfit >= 0 ? 4 : 1;
+
+  // 3. Stress-Tested Profit Score
+  const stressScore =
+    stressTestedProfit > 25000
+      ? 10
+      : stressTestedProfit > 0
+        ? 7
+        : stressTestedProfit > -10000
+          ? 4
+          : 1;
+
+  // 4. Underwater Score (loan-to-as-is ratio)
+  const underwaterScore =
+    loanToAsIsValue <= 85 ? 10 : loanToAsIsValue <= 95 ? 7 : loanToAsIsValue <= 100 ? 4 : 1;
+
   return {
     renovationDollarPerSf,
     days,
@@ -93,54 +125,58 @@ export function calculateUnderwriting(
     totalInterest,
     totalCosts,
     totalCostsOverall,
+    arv,
+    totalProjectCost,
     borrowerProfit,
     borrowerProfitStressTested,
     stressTestedLArv,
+    stressTestedProfit,
     isLoanUnderwater,
     loanToAsIsValue,
     loanToArv,
     loanToCost,
     borrowerSpread,
+    leverageScore,
+    profitScore,
+    stressScore,
+    underwaterScore,
   };
 }
 
 /**
- * Calculate final score (0-100) based on key metrics
+ * Calculate final underwriting score (0-100)
+ * Based on weighted scoring rubric:
+ * - 40%: Loan Leverage Metrics (LTV, LARV, LTC)
+ * - 30%: Borrower Profit
+ * - 20%: Stress-Tested Profit (10% ARV reduction)
+ * - 10%: Day-One Underwater Check
  */
 export function calculateFinalScore(
   calculated: CalculatedResults,
   formData: UnderwritingFormData,
 ): number {
-  let score = 0;
+  // Component 1: Loan Leverage Metrics (40 points max)
+  // Uses pre-calculated leverageScore (1-10 scale, averaged from LTV, LARV, LTC)
+  const leveragePoints = (calculated.leverageScore / 10) * 40;
 
-  // Loan to ARV (30 points max)
-  if (calculated.loanToArv <= 60) score += 30;
-  else if (calculated.loanToArv <= 70) score += 20;
-  else if (calculated.loanToArv <= 75) score += 10;
+  // Component 2: Borrower Profit (30 points max)
+  // Uses pre-calculated profitScore (1-10 scale)
+  const profitPoints = (calculated.profitScore / 10) * 30;
 
-  // Loan to As-Is Value (20 points max)
-  if (calculated.loanToAsIsValue <= 75) score += 20;
-  else if (calculated.loanToAsIsValue <= 85) score += 10;
+  // Component 3: Stress-Tested Profit (20 points max)
+  // Uses pre-calculated stressScore (1-10 scale)
+  const stressPoints = (calculated.stressScore / 10) * 20;
 
-  // Borrower Spread (20 points max)
-  if (calculated.borrowerSpread >= 50000) score += 20;
-  else if (calculated.borrowerSpread >= 30000) score += 15;
-  else if (calculated.borrowerSpread >= 20000) score += 10;
+  // Component 4: Day-One Underwater Check (10 points max)
+  // Uses pre-calculated underwaterScore (1-10 scale)
+  const underwaterPoints = (calculated.underwaterScore / 10) * 10;
 
-  // Loan not underwater day 1 (10 points)
-  if (!calculated.isLoanUnderwater) score += 10;
+  // Sum all weighted components
+  const finalScore = Math.round(
+    leveragePoints + profitPoints + stressPoints + underwaterPoints,
+  );
 
-  // Market type (10 points max)
-  if (formData.marketType === "Primary") score += 10;
-  else if (formData.marketType === "Secondary") score += 7;
-  else if (formData.marketType === "Tertiary") score += 5;
-
-  // Property condition (10 points max)
-  if (formData.propertyCondition === "Good") score += 10;
-  else if (formData.propertyCondition === "Bad") score += 5;
-  // Really Bad = 0 points
-
-  return Math.min(100, Math.max(0, score)); // Clamp between 0-100
+  return Math.min(100, Math.max(0, finalScore));
 }
 
 /**

@@ -3,7 +3,17 @@
 import { useState } from "react";
 import { useUnderwriting } from "@/context/UnderwritingContext";
 import { validateStep } from "@/lib/underwriting/validation";
-import type { PropertyCondition, RenovationLevel } from "@/types/underwriting";
+import { getRenovationLevel } from "@/types/underwriting";
+import type { PropertyCondition } from "@/types/underwriting";
+
+const formatNumber = (value: number | undefined): string => {
+  if (!value) return "";
+  return value.toLocaleString("en-US");
+};
+
+const parseNumber = (value: string): number => {
+  return Number(value.replace(/,/g, ""));
+};
 
 export default function Step2PropertyCondition() {
   const { formData, updateFormData, goToNextStep, goToPreviousStep } =
@@ -13,9 +23,19 @@ export default function Step2PropertyCondition() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Calculate renovation $/SF from rehab and square feet
+    const renovationPerSf =
+      formData.rehab && formData.squareFeet
+        ? formData.rehab / formData.squareFeet
+        : 0;
+
+    // Update formData with calculated renovation $/SF
+    updateFormData({ renovationPerSf });
+
     const stepData = {
       propertyCondition: formData.propertyCondition,
-      renovationPerSf: formData.renovationPerSf,
+      renovationPerSf,
+      userEstimatedAsIsValue: formData.userEstimatedAsIsValue,
       userEstimatedArv: formData.userEstimatedArv,
     };
 
@@ -68,49 +88,82 @@ export default function Step2PropertyCondition() {
 
         <div className="w-full px-4 md:w-1/2">
           <div className="mb-8">
-            <label htmlFor="renovationPerSf" className={labelClass}>
-              Renovation Level *
+            <label className={labelClass}>Renovation Budget (Calculated)</label>
+            {formData.rehab && formData.squareFeet ? (
+              <div className="rounded-sm border border-stroke bg-gray-2 px-6 py-3 dark:border-transparent dark:bg-[#2C303B]">
+                <span className="text-base font-semibold text-dark dark:text-white">
+                  ${(formData.rehab / formData.squareFeet).toFixed(2)}/SF
+                </span>
+                <span className="ml-2 inline-block rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                  {getRenovationLevel(formData.rehab / formData.squareFeet)}
+                </span>
+              </div>
+            ) : (
+              <div className="rounded-sm border border-stroke bg-gray-2 px-6 py-3 text-body-color dark:border-transparent dark:bg-[#2C303B] dark:text-body-color-dark">
+                Enter rehab budget and square feet in Step 1
+              </div>
+            )}
+            <p className="mt-2 text-sm text-body-color dark:text-body-color-dark">
+              Automatically calculated from your rehab budget and square footage
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full px-4 md:w-1/2">
+          <div className="mb-8">
+            <label htmlFor="userEstimatedAsIsValue" className={labelClass}>
+              Your Estimated As-Is Value (Current Condition) *
             </label>
-            <select
-              id="renovationPerSf"
-              value={formData.renovationPerSf || ""}
-              onChange={(e) =>
-                updateFormData({
-                  renovationPerSf: e.target.value as RenovationLevel,
-                })
-              }
-              className={selectClass}
-            >
-              <option value="">Select level...</option>
-              <option value="Light $30/SF">Light ($30/SF)</option>
-              <option value="Medium $50-60/SF">Medium ($50-60/SF)</option>
-              <option value="Heavy $70-90/SF">Heavy ($70-90/SF)</option>
-            </select>
-            {errors.renovationPerSf && (
-              <p className={errorClass}>{errors.renovationPerSf}</p>
+            <div className="relative">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-base text-dark dark:text-white">
+                $
+              </span>
+              <input
+                type="text"
+                id="userEstimatedAsIsValue"
+                value={formatNumber(formData.userEstimatedAsIsValue)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "");
+                  updateFormData({
+                    userEstimatedAsIsValue: value ? parseInt(value) : undefined,
+                  });
+                }}
+                placeholder="175,000"
+                className={`${inputClass} pl-10`}
+              />
+            </div>
+            <p className="mt-2 text-sm text-body-color dark:text-body-color-dark">
+              What do you think the property is worth today, before any renovations?
+            </p>
+            {errors.userEstimatedAsIsValue && (
+              <p className={errorClass}>{errors.userEstimatedAsIsValue}</p>
             )}
           </div>
         </div>
 
-        <div className="w-full px-4">
+        <div className="w-full px-4 md:w-1/2">
           <div className="mb-8">
             <label htmlFor="userEstimatedArv" className={labelClass}>
               Your Estimated ARV (After Repair Value) *
             </label>
-            <input
-              type="number"
-              id="userEstimatedArv"
-              value={formData.userEstimatedArv || ""}
-              onChange={(e) =>
-                updateFormData({
-                  userEstimatedArv: e.target.value
-                    ? parseFloat(e.target.value)
-                    : undefined,
-                })
-              }
-              placeholder="210000"
-              className={inputClass}
-            />
+            <div className="relative">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-base text-dark dark:text-white">
+                $
+              </span>
+              <input
+                type="text"
+                id="userEstimatedArv"
+                value={formatNumber(formData.userEstimatedArv)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9]/g, "");
+                  updateFormData({
+                    userEstimatedArv: value ? parseInt(value) : undefined,
+                  });
+                }}
+                placeholder="210,000"
+                className={`${inputClass} pl-10`}
+              />
+            </div>
             <p className="mt-2 text-sm text-body-color dark:text-body-color-dark">
               What do you think this property will be worth after repairs? Gary
               will provide his own estimate and compare it to yours.

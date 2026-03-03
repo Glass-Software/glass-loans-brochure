@@ -5,6 +5,7 @@ import {
   UnderwritingFormData,
   AIPropertyEstimates,
   CalculatedResults,
+  getRenovationLevel,
 } from "@/types/underwriting";
 import {
   formatCurrency,
@@ -64,7 +65,10 @@ export default function CalculationBreakdown({
               value={formatNumber(formData.squareFeet)}
             />
             <Row label="Condition" value={formData.propertyCondition} />
-            <Row label="Renovation Level" value={formData.renovationPerSf} />
+            <Row
+              label="Renovation Budget"
+              value={`$${formData.renovationPerSf.toFixed(2)}/SF (${getRenovationLevel(formData.renovationPerSf)})`}
+            />
             <Row label="Market Type" value={formData.marketType} />
           </Section>
 
@@ -95,24 +99,96 @@ export default function CalculationBreakdown({
             <Row label="Points" value={formatPercentage(formData.points)} />
           </Section>
 
-          {/* AI Estimates */}
-          <Section title="AI Market Analysis">
-            <Row
-              label="Estimated ARV"
-              value={formatCurrency(aiEstimates.estimatedARV)}
-              highlight
-            />
-            <Row
-              label="As-Is Value"
-              value={formatCurrency(aiEstimates.asIsValue)}
-            />
-            {aiEstimates.marketAnalysis && (
-              <div className="mt-2 rounded bg-blue-50 p-3 dark:bg-blue-900/20">
-                <p className="text-sm text-body-color">
-                  {aiEstimates.marketAnalysis}
-                </p>
+          {/* ARV & As-Is Value Comparison */}
+          <Section title="ARV & As-Is Value Comparison">
+            <div className="space-y-4">
+              {/* ARV Comparison */}
+              <div>
+                <div className="mb-2 text-sm font-medium text-dark dark:text-white">
+                  After Repair Value (ARV)
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
+                    <div className="text-xs text-body-color">Your Estimate</div>
+                    <div className="mt-1 text-lg font-semibold text-dark dark:text-white">
+                      {formatCurrency(formData.userEstimatedArv)}
+                    </div>
+                  </div>
+                  <div className="rounded bg-primary/10 p-3 dark:bg-primary/20">
+                    <div className="text-xs text-body-color">Gary's Analysis</div>
+                    <div className="mt-1 text-lg font-semibold text-dark dark:text-white">
+                      {formatCurrency(aiEstimates.estimatedARV)}
+                    </div>
+                  </div>
+                </div>
+                {Math.abs(formData.userEstimatedArv - aiEstimates.estimatedARV) /
+                  aiEstimates.estimatedARV >
+                  0.1 && (
+                  <div className="mt-2 rounded-l-4 border-l-4 border-yellow-400 bg-yellow-50 p-2 dark:bg-yellow-900/20">
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                      ⚠️ Your ARV estimate differs by{" "}
+                      {(
+                        (Math.abs(
+                          formData.userEstimatedArv - aiEstimates.estimatedARV,
+                        ) /
+                          aiEstimates.estimatedARV) *
+                        100
+                      ).toFixed(1)}
+                      % from Gary's analysis
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* As-Is Value Comparison */}
+              <div>
+                <div className="mb-2 text-sm font-medium text-dark dark:text-white">
+                  As-Is Value (Current Condition)
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
+                    <div className="text-xs text-body-color">Your Estimate</div>
+                    <div className="mt-1 text-lg font-semibold text-dark dark:text-white">
+                      {formatCurrency(formData.userEstimatedAsIsValue)}
+                    </div>
+                  </div>
+                  <div className="rounded bg-primary/10 p-3 dark:bg-primary/20">
+                    <div className="text-xs text-body-color">
+                      Gary's Analysis (BatchData)
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-dark dark:text-white">
+                      {formatCurrency(aiEstimates.asIsValue)}
+                    </div>
+                  </div>
+                </div>
+                {Math.abs(formData.userEstimatedAsIsValue - aiEstimates.asIsValue) /
+                  aiEstimates.asIsValue >
+                  0.1 && (
+                  <div className="mt-2 rounded-l-4 border-l-4 border-yellow-400 bg-yellow-50 p-2 dark:bg-yellow-900/20">
+                    <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                      ⚠️ Your as-is estimate differs by{" "}
+                      {(
+                        (Math.abs(
+                          formData.userEstimatedAsIsValue - aiEstimates.asIsValue,
+                        ) /
+                          aiEstimates.asIsValue) *
+                        100
+                      ).toFixed(1)}
+                      % from Gary's analysis
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Market Analysis */}
+              {aiEstimates.marketAnalysis && (
+                <div className="mt-3 rounded bg-blue-50 p-3 dark:bg-blue-900/20">
+                  <p className="text-sm text-body-color">
+                    {aiEstimates.marketAnalysis}
+                  </p>
+                </div>
+              )}
+            </div>
           </Section>
 
           {/* Financial Calculations */}
@@ -165,8 +241,77 @@ export default function CalculationBreakdown({
             />
           </Section>
 
-          {/* Risk Metrics */}
-          <Section title="Risk Metrics">
+          {/* Score Breakdown */}
+          <Section title="Score Breakdown (0-100)">
+            <div className="space-y-3">
+              {/* Loan Leverage Metrics - 40% */}
+              <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-dark dark:text-white">
+                    Loan Leverage Metrics
+                  </span>
+                  <span className="text-sm font-semibold text-primary">
+                    {calculations.leverageScore.toFixed(1)}/10 (40% weight)
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-body-color">
+                  LTV: {formatPercentage(calculations.loanToAsIsValue)}, LARV:{" "}
+                  {formatPercentage(calculations.loanToArv)}, LTC:{" "}
+                  {formatPercentage(calculations.loanToCost)}
+                </div>
+              </div>
+
+              {/* Borrower Profit - 30% */}
+              <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-dark dark:text-white">
+                    Borrower Profit
+                  </span>
+                  <span className="text-sm font-semibold text-primary">
+                    {calculations.profitScore.toFixed(1)}/10 (30% weight)
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-body-color">
+                  {formatCurrency(calculations.borrowerProfit)}
+                </div>
+              </div>
+
+              {/* Stress-Tested Profit - 20% */}
+              <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-dark dark:text-white">
+                    Stress-Tested Profit (10% ARV drop)
+                  </span>
+                  <span className="text-sm font-semibold text-primary">
+                    {calculations.stressScore.toFixed(1)}/10 (20% weight)
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-body-color">
+                  {formatCurrency(calculations.stressTestedProfit)}
+                </div>
+              </div>
+
+              {/* Day-One Underwater Check - 10% */}
+              <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-dark dark:text-white">
+                    Day-One Underwater Check
+                  </span>
+                  <span className="text-sm font-semibold text-primary">
+                    {calculations.underwaterScore.toFixed(1)}/10 (10% weight)
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-body-color">
+                  {calculations.isLoanUnderwater
+                    ? "⚠️ Underwater"
+                    : "✓ Safe cushion"}
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          {/* Detailed Risk Metrics */}
+          <Section title="Detailed Risk Metrics">
             <Row
               label="Loan to ARV"
               value={formatPercentage(calculations.loanToArv)}
@@ -184,7 +329,7 @@ export default function CalculationBreakdown({
               value={formatPercentage(calculations.stressTestedLArv)}
             />
             <Row
-              label="Loan Underwater"
+              label="Loan Underwater Day 1"
               value={calculations.isLoanUnderwater ? "Yes" : "No"}
               highlight
             />

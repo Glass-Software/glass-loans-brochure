@@ -28,7 +28,8 @@ export interface UnderwritingFormData {
 
   // Step 2: Property Condition & ARV
   propertyCondition: PropertyCondition;
-  renovationPerSf: RenovationLevel;
+  renovationPerSf: number; // Calculated: rehab / squareFeet
+  userEstimatedAsIsValue: number; // User's estimate of current property value
   userEstimatedArv: number; // User's estimate of After Repair Value
 
   // Step 3: Loan Terms
@@ -124,9 +125,12 @@ export interface CalculatedResults {
   totalCostsOverall: number; // totalCost + totalCosts
 
   // Profitability metrics
+  arv: number; // ARV being used for this calculation
+  totalProjectCost: number; // purchasePrice + rehab + totalCosts
   borrowerProfit: number;
   borrowerProfitStressTested: number;
   stressTestedLArv: number; // percentage
+  stressTestedProfit: number; // Profit if ARV drops 10%
 
   // Valuation metrics
   isLoanUnderwater: boolean; // Is loan amount > as-is value day 1?
@@ -134,6 +138,12 @@ export interface CalculatedResults {
   loanToArv: number; // percentage
   loanToCost: number; // percentage
   borrowerSpread: number;
+
+  // Scoring components (1-10 scale)
+  leverageScore: number; // Average of LTV, LARV, LTC scores
+  profitScore: number; // Score based on borrower profit
+  stressScore: number; // Score based on stress-tested profit
+  underwaterScore: number; // Score based on loan-to-as-is ratio
 }
 
 // ============================================================================
@@ -238,4 +248,17 @@ export interface ValidationError {
 export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Categorize renovation budget ($/SF) into level
+ */
+export function getRenovationLevel(renovationPerSf: number): RenovationLevel {
+  if (renovationPerSf <= 30) return "Light $30/SF";
+  if (renovationPerSf <= 50) return "Medium $50-60/SF";
+  return "Heavy $70-90/SF";
 }

@@ -5,13 +5,10 @@ export const PropertyConditionSchema = z.enum(["Good", "Bad", "Really Bad"], {
   errorMap: () => ({ message: "Please select a valid property condition" }),
 });
 
-// Renovation Level enum
-export const RenovationLevelSchema = z.enum(
-  ["Light $30/SF", "Medium $50-60/SF", "Heavy $70-90/SF"],
-  {
-    errorMap: () => ({ message: "Please select a valid renovation level" }),
-  },
-);
+// Renovation Level (now calculated as number, not enum)
+export const RenovationLevelSchema = z
+  .number()
+  .min(0, "Renovation per square foot cannot be negative");
 
 // Market Type enum
 export const MarketTypeSchema = z.enum(["Primary", "Secondary", "Tertiary"], {
@@ -65,14 +62,23 @@ export const Step1Schema = z.object({
 });
 
 // Step 2: Property Condition Schema
-export const Step2Schema = z.object({
-  propertyCondition: PropertyConditionSchema,
-  renovationPerSf: RenovationLevelSchema,
-  userEstimatedArv: z
-    .number()
-    .min(1000, "ARV must be at least $1,000")
-    .max(100000000, "ARV must be less than $100M"),
-});
+export const Step2Schema = z
+  .object({
+    propertyCondition: PropertyConditionSchema,
+    renovationPerSf: RenovationLevelSchema,
+    userEstimatedAsIsValue: z
+      .number()
+      .min(1000, "As-is value must be at least $1,000")
+      .max(100000000, "As-is value must be less than $100M"),
+    userEstimatedArv: z
+      .number()
+      .min(1000, "ARV must be at least $1,000")
+      .max(100000000, "ARV must be less than $100M"),
+  })
+  .refine((data) => data.userEstimatedAsIsValue <= data.userEstimatedArv, {
+    message: "As-is value cannot exceed ARV (after-repair value)",
+    path: ["userEstimatedAsIsValue"],
+  });
 
 // Step 3: Loan Terms Schema
 export const Step3Schema = z.object({
@@ -129,6 +135,10 @@ export const UnderwritingFormSchema = z
     propertyType: PropertyTypeSchema,
     propertyCondition: PropertyConditionSchema,
     renovationPerSf: RenovationLevelSchema,
+    userEstimatedAsIsValue: z
+      .number()
+      .min(1000, "As-is value must be at least $1,000")
+      .max(100000000, "As-is value must be less than $100M"),
     userEstimatedArv: z
       .number()
       .min(1000, "ARV must be at least $1,000")
@@ -159,7 +169,11 @@ export const UnderwritingFormSchema = z
       message: "Rehab cost seems unusually high compared to purchase price",
       path: ["rehab"],
     },
-  );
+  )
+  .refine((data) => data.userEstimatedAsIsValue <= data.userEstimatedArv, {
+    message: "As-is value cannot exceed ARV (after-repair value)",
+    path: ["userEstimatedAsIsValue"],
+  });
 
 // Email validation schema
 export const EmailSchema = z

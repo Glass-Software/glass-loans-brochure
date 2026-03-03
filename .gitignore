@@ -45,3 +45,7 @@ glass-loans.db
 
 # Deployment scripts with secrets
 deploy-secrets.sh
+
+# Test files
+test-batchdata-client.ts
+test-underwriting-flow.ts
