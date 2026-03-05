@@ -6,8 +6,6 @@
 import { UnderwritingFormData } from "@/types/underwriting";
 import { getBatchDataClient } from "./client";
 import {
-  getCachedAddress,
-  cacheAddress,
   getCachedProperty,
   cacheProperty,
   trackAPIUsage,
@@ -27,23 +25,54 @@ export async function getBatchDataPropertyEstimates(
   const client = getBatchDataClient();
 
   try {
-    // Step 1: Verify and standardize address (with caching)
-    console.log("Step 1: Verifying address...");
-    const addressResult = await verifyAddress(
-      client,
-      formData.propertyAddress
-    );
+    // Step 1: Try to lookup subject property details (optional - may not exist in database)
+    console.log("Step 1: Looking up subject property...");
+    const addressInput = {
+      street: formData.propertyAddress,
+      city: formData.propertyCity,
+      state: formData.propertyState,
+      zip: formData.propertyZip
+    };
+    console.log("[DEBUG] Property lookup address:", JSON.stringify(addressInput));
 
-    // Step 2: Lookup subject property details (with caching)
-    console.log("Step 2: Looking up subject property...");
-    const subjectProperty = await lookupProperty(
-      client,
-      addressResult.standardizedAddress
-    );
+    let subjectProperty = null;
+    try {
+      subjectProperty = await lookupProperty(client, addressInput);
+      console.log("[DEBUG] Property lookup succeeded");
+    } catch (error: any) {
+      console.log("[DEBUG] Property lookup failed (not in database), using form data instead");
+      // Create a minimal subject property from form input only
+      // Extract street number and name from propertyAddress (e.g., "2316 Fernwood Drive")
+      const addressParts = formData.propertyAddress.trim().split(' ');
+      const streetNumber = addressParts[0] || '';
+      const streetName = addressParts.slice(1).join(' ') || formData.propertyAddress;
 
-    // Step 3: Search for comparable sales (3-tier strategy with caching)
+      const fullAddress = `${formData.propertyAddress}, ${formData.propertyCity}, ${formData.propertyState} ${formData.propertyZip}`;
+
+      subjectProperty = {
+        address: {
+          standardizedAddress: fullAddress,
+          streetNumber: streetNumber,
+          streetName: streetName,
+          city: formData.propertyCity,
+          state: formData.propertyState,
+          zipCode: formData.propertyZip,
+          county: formData.propertyCounty,
+          latitude: 0, // Not needed for comp search
+          longitude: 0, // Not needed for comp search
+        },
+        propertyType: formData.propertyType,
+        bedrooms: formData.bedrooms,
+        bathrooms: formData.bathrooms,
+        squareFeet: formData.squareFeet,
+        yearBuilt: formData.yearBuilt,
+        // No AVM, tax assessment, or other details since property isn't in database
+      };
+    }
+
+    // Step 2: Search for comparable sales (3-tier strategy with caching)
     // Use user-provided property details and market type for comp search
-    console.log("Step 3: Searching for comparable sales...");
+    console.log("Step 2: Searching for comparable sales...");
     const compResult = await searchComparables({
       subjectProperty,
       marketType: formData.marketType,
@@ -55,12 +84,12 @@ export async function getBatchDataPropertyEstimates(
       }
     });
 
-    // Step 4: Calculate valuation (triangulate AVM + comps)
-    console.log("Step 4: Calculating valuation...");
+    // Step 3: Calculate valuation (triangulate AVM + comps)
+    console.log("Step 3: Calculating valuation...");
     const valuation = calculateValuation(subjectProperty, compResult);
 
-    // Step 5: Detect risk flags
-    console.log("Step 5: Detecting risk flags...");
+    // Step 4: Detect risk flags
+    console.log("Step 4: Detecting risk flags...");
     const riskFlags = detectRiskFlags(
       subjectProperty,
       compResult,
@@ -80,7 +109,19 @@ export async function getBatchDataPropertyEstimates(
         soldDate: comp.lastSaleDate,
         bedrooms: comp.bedrooms,
         bathrooms: comp.bathrooms,
+        yearBuilt: comp.yearBuilt,
         pricePerSqft: Math.round(comp.lastSalePrice / comp.squareFeet),
+        // Valuation data to detect overvalued/renovated comps
+        avmValue: comp.avm?.value,
+        avmConfidence: comp.avm?.confidenceScore,
+        taxAssessedValue: comp.taxAssessedValue,
+        // Flag potential issues
+        isPotentialFlip: comp.taxAssessedValue && comp.lastSalePrice > comp.taxAssessedValue * 1.5,
+        // Listing URL for hyperlinks
+        listingUrl: comp.listingUrl,
+        // Outlier flags for UI warnings
+        isOutlier: comp.isOutlier,
+        outlierReason: comp.outlierReason,
       })),
       // NEW: Flagged comps (outliers, renovated, etc.)
       flaggedComps: compResult.flaggedComps?.map((comp: any) => ({
@@ -134,7 +175,16 @@ export async function getBatchDataPropertyEstimates(
 
     return estimates;
   } catch (error: any) {
-    console.error("[Server] Property data error:", error);
+    console.error("[Server] ❌ BatchData ERROR:");
+    console.error("  Message:", error.message);
+    console.error("  Type:", error.constructor.name);
+    if (error.response) {
+      console.error("  Response Status:", error.response.status);
+      console.error("  Response Data:", error.response.data);
+    }
+    if (error.stack) {
+      console.error("  Stack:", error.stack.split('\n').slice(0, 5).join('\n'));
+    }
 
     // Rethrow to trigger fallback in route handler
     throw error;
@@ -142,40 +192,17 @@ export async function getBatchDataPropertyEstimates(
 }
 
 /**
- * Verify address (with caching)
- */
-async function verifyAddress(client: any, address: string): Promise<any> {
-  const startTime = Date.now();
-  const cached = getCachedAddress(address);
-  if (cached) {
-    console.log("Using cached address verification");
-    trackAPIUsage("/address/verify", true, true, Date.now() - startTime);
-    return cached;
-  }
-
-  try {
-    const result = await client.verifyAddress(address);
-    cacheAddress(address, result);
-    trackAPIUsage("/address/verify", true, false, Date.now() - startTime);
-    return result;
-  } catch (error: any) {
-    trackAPIUsage(
-      "/address/verify",
-      false,
-      false,
-      Date.now() - startTime,
-      error.message
-    );
-    throw error;
-  }
-}
-
-/**
  * Lookup property (with caching)
  */
-async function lookupProperty(client: any, address: string): Promise<any> {
+async function lookupProperty(client: any, address: string | any): Promise<any> {
   const startTime = Date.now();
-  const cached = getCachedProperty(address);
+
+  // Generate cache key from address (handle both string and AddressInput)
+  const cacheKey = typeof address === 'string'
+    ? address
+    : `${address.street}, ${address.city}, ${address.state} ${address.zip}`;
+
+  const cached = getCachedProperty(cacheKey);
   if (cached) {
     console.log("Using cached property details");
     trackAPIUsage("/property/lookup", true, true, Date.now() - startTime);
@@ -184,10 +211,17 @@ async function lookupProperty(client: any, address: string): Promise<any> {
 
   try {
     const result = await client.lookupProperty(address);
-    cacheProperty(address, result);
+    cacheProperty(cacheKey, result);
     trackAPIUsage("/property/lookup", true, false, Date.now() - startTime);
     return result;
   } catch (error: any) {
+    console.error("[BatchData] Property lookup failed:");
+    console.error("  Address:", cacheKey);
+    console.error("  Error:", error.message);
+    if (error.response) {
+      console.error("  Status:", error.response.status);
+      console.error("  Data:", JSON.stringify(error.response.data).substring(0, 200));
+    }
     trackAPIUsage(
       "/property/lookup",
       false,

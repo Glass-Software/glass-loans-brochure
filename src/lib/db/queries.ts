@@ -169,6 +169,7 @@ export interface UnderwritingSubmission {
   property_city: string | null;
   property_state: string | null;
   property_zip: string | null;
+  property_county: string | null;
   purchase_price: number;
   rehab: number;
   square_feet: number;
@@ -178,6 +179,7 @@ export interface UnderwritingSubmission {
   property_type: string | null;
   property_condition: string;
   renovation_per_sf: string;
+  user_estimated_as_is_value: number | null;
   user_estimated_arv: number | null;
   interest_rate: number;
   months: number;
@@ -207,6 +209,7 @@ export interface CreateSubmissionData {
   propertyCity?: string;
   propertyState?: string;
   propertyZip?: string;
+  propertyCounty?: string;
   purchasePrice: number;
   rehab: number;
   squareFeet: number;
@@ -216,6 +219,7 @@ export interface CreateSubmissionData {
   propertyType: string;
   propertyCondition: string;
   renovationPerSf: string;
+  userEstimatedAsIsValue: number; // User's as-is value estimate
   userEstimatedArv: number; // User's ARV estimate
   interestRate: number;
   months: number;
@@ -246,16 +250,16 @@ export function createSubmission(
   const result = execute(
     `
       INSERT INTO underwriting_submissions (
-        user_id, property_address, property_city, property_state, property_zip,
+        user_id, property_address, property_city, property_state, property_zip, property_county,
         purchase_price, rehab, square_feet, bedrooms, bathrooms, year_built, property_type,
-        property_condition, renovation_per_sf, user_estimated_arv, interest_rate, months,
+        property_condition, renovation_per_sf, user_estimated_as_is_value, user_estimated_arv, interest_rate, months,
         loan_at_purchase, renovation_funds, closing_costs_percent, points,
         market_type, additional_details, comp_links, estimated_arv, as_is_value,
         final_score, gary_opinion, ai_property_comps,
         report_id, expires_at,
         ip_address, recaptcha_score
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `,
     [
@@ -264,6 +268,7 @@ export function createSubmission(
       data.propertyCity || null,
       data.propertyState || null,
       data.propertyZip || null,
+      data.propertyCounty || null,
       data.purchasePrice,
       data.rehab,
       data.squareFeet,
@@ -273,6 +278,7 @@ export function createSubmission(
       data.propertyType,
       data.propertyCondition,
       data.renovationPerSf,
+      data.userEstimatedAsIsValue,
       data.userEstimatedArv,
       data.interestRate,
       data.months,

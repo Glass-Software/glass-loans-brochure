@@ -115,7 +115,7 @@ export const Step4Schema = z.object({
   marketType: MarketTypeSchema,
   additionalDetails: z.string().max(2000, "Details are too long").optional(),
   compLinks: z
-    .array(z.string().url("Please enter a valid URL"))
+    .array(z.string().min(5, "Address must be at least 5 characters"))
     .max(3, "Maximum 3 comparable properties allowed")
     .optional(),
 });
@@ -152,7 +152,7 @@ export const UnderwritingFormSchema = z
     marketType: MarketTypeSchema,
     additionalDetails: z.string().max(2000).optional(),
     compLinks: z
-      .array(z.string().url())
+      .array(z.string().min(5))
       .max(3)
       .optional(),
   })

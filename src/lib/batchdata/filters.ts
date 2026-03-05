@@ -398,22 +398,22 @@ function flagRenovations(
 }
 
 /**
- * Separate comps into clean vs flagged arrays
+ * Separate comps into calculation vs flagged arrays
+ * NOTE: ALL comps are included in usedForCalculation (outliers are labeled but not excluded)
+ * flaggedComps is a subset for UI display with warnings
  */
 function separateComps(comps: PropertySearchResult[]): {
   usedForCalculation: PropertySearchResult[];
   flaggedComps: PropertySearchResult[];
 } {
-  const usedForCalculation: PropertySearchResult[] = [];
   const flaggedComps: PropertySearchResult[] = [];
 
   comps.forEach((comp) => {
     if (comp.isOutlier || comp.isRenovated) {
       flaggedComps.push(comp);
-    } else {
-      usedForCalculation.push(comp);
     }
   });
 
-  return { usedForCalculation, flaggedComps };
+  // ALL comps used for calculations (outliers are labeled but not excluded)
+  return { usedForCalculation: comps, flaggedComps };
 }

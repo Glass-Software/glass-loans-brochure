@@ -65,10 +65,9 @@ export function calculateUnderwriting(
   // Formula 13: Stress Tested L-ARV = totalLoanAmount / (ARV × 0.9)
   const stressTestedLArv = (totalLoanAmount / (arv * 0.9)) * 100;
 
-  // Formula 14: Is Loan Underwater Day 1? = total owed > as-is value
-  const underwaterAmount =
-    loanAtPurchase + totalInterest + pointsDollar + 0.04 * totalLoanAmount;
-  const isLoanUnderwater = underwaterAmount > asIsValue;
+  // Formula 14: Is Loan Underwater Day 1? (Lender's perspective: loan amount > as-is value)
+  // Simple collateral check: If we lend this amount today, is the property worth at least that much?
+  const isLoanUnderwater = loanAtPurchase > asIsValue;
 
   // Formula 15: Loan to As-is Value = loanAtPurchase / asIsValue
   const loanToAsIsValue = (loanAtPurchase / asIsValue) * 100;

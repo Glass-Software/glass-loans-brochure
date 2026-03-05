@@ -153,7 +153,7 @@ export function detectRiskFlags(
   // NEW: Price volatility warning
   if (compResult.pricePerSqftStats) {
     const coefficientOfVariation =
-      compResult.pricePerSqftStats.stdDev / compResult.pricePerSqftStats.mean;
+      compResult.pricePerSqftStats.stdDevPricePerSqft / compResult.pricePerSqftStats.meanPricePerSqft;
 
     if (coefficientOfVariation > 0.25) {
       flags.push({

@@ -43,11 +43,20 @@ export default async function ResultsPage({
   // Reconstruct form data
   const formData: UnderwritingFormData = {
     propertyAddress: submission.property_address,
+    propertyCity: submission.property_city || undefined,
+    propertyState: submission.property_state || undefined,
+    propertyZip: submission.property_zip || undefined,
+    propertyCounty: submission.property_county || undefined,
     purchasePrice: submission.purchase_price,
     rehab: submission.rehab,
     squareFeet: submission.square_feet,
+    bedrooms: submission.bedrooms || 0,
+    bathrooms: submission.bathrooms || 0,
+    yearBuilt: submission.year_built || 0,
+    propertyType: submission.property_type as any,
     propertyCondition: submission.property_condition as any,
     renovationPerSf: submission.renovation_per_sf as any,
+    userEstimatedAsIsValue: submission.user_estimated_as_is_value || 0, // Fallback for old submissions
     userEstimatedArv: submission.user_estimated_arv || 0, // Fallback for old submissions
     interestRate: submission.interest_rate,
     months: submission.months,

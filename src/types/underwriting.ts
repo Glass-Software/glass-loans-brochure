@@ -43,7 +43,7 @@ export interface UnderwritingFormData {
   // Step 4: Market Details
   marketType: MarketType;
   additionalDetails?: string;
-  compLinks?: string[]; // Optional: up to 3 comparable property URLs
+  compLinks?: string[]; // Optional: up to 3 comparable property addresses
 }
 
 // ============================================================================
@@ -103,6 +103,11 @@ export interface BatchDataEnrichedEstimates extends AIPropertyEstimates {
   avmConfidence?: number;
   valuationMethod?: "batchdata" | "ai_fallback" | "heuristic";
   riskFlags?: RiskFlag[];
+  pricePerSqftStats?: {
+    meanPricePerSqft?: number;
+    medianPricePerSqft?: number;
+    stdDevPricePerSqft?: number;
+  };
 }
 
 // ============================================================================

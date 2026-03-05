@@ -222,6 +222,34 @@ try {
 console.log("");
 
 // =============================================================================
+// Migration 008: Add Missing Form Fields
+// =============================================================================
+console.log("🔍 Checking Migration 008: Add Missing Form Fields");
+
+try {
+  const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string; type: string }>;
+  const hasUserAsIsValue = submissionColumns.some(col => col.name === "user_estimated_as_is_value");
+
+  if (!hasUserAsIsValue) {
+    console.log("⏳ Applying Migration 008...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/008_add_missing_form_fields.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 008 completed: user_estimated_as_is_value, property_county columns added");
+  } else {
+    console.log("✅ Migration 008 already applied (user_estimated_as_is_value exists)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 008 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
 // Verification & Summary
 // =============================================================================
 console.log("🔍 Verifying final schema...\n");
@@ -237,11 +265,11 @@ try {
 
   console.log("\n📊 Underwriting submissions - key columns:");
   const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string; type: string }>;
-  const keyColumns = ["user_estimated_arv", "estimated_arv", "as_is_value", "monthly_rent", "property_city", "property_state", "property_zip", "bedrooms", "bathrooms", "year_built", "property_type"];
+  const keyColumns = ["user_estimated_as_is_value", "user_estimated_arv", "estimated_arv", "as_is_value", "monthly_rent", "property_city", "property_state", "property_zip", "property_county", "bedrooms", "bathrooms", "year_built", "property_type"];
   submissionColumns
     .filter(col => keyColumns.includes(col.name))
     .forEach(col => {
-      const mark = ["user_estimated_arv", "property_state", "bedrooms"].includes(col.name) ? "🔹" : "  ";
+      const mark = ["user_estimated_as_is_value", "user_estimated_arv", "property_state", "bedrooms"].includes(col.name) ? "🔹" : "  ";
       const note = col.name === "monthly_rent" ? " (deprecated)" : "";
       console.log(`${mark} ${col.name} (${col.type})${note}`);
     });
@@ -255,6 +283,7 @@ try {
   console.log("   • Migration 005: BatchData cache tables ✅");
   console.log("   • Migration 006: Report IDs and retention ✅");
   console.log("   • Migration 007: Property details ✅");
+  console.log("   • Migration 008: User as-is value & county ✅");
   console.log("\n🎉 Database is up to date and ready for use!");
 
 } catch (error: any) {

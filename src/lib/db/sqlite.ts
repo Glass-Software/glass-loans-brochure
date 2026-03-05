@@ -38,6 +38,25 @@ export function getDatabase(): Database.Database {
   db.pragma("foreign_keys = ON");
   db.pragma("journal_mode = WAL");
 
+  // Configure WAL checkpointing to prevent corruption
+  // Checkpoint every 1000 pages or 5 minutes
+  db.pragma("wal_autocheckpoint = 1000");
+
+  // Periodically checkpoint WAL to main DB (prevents corruption on crashes)
+  if (typeof setInterval !== "undefined") {
+    const checkpointInterval = setInterval(() => {
+      if (db) {
+        try {
+          db.pragma("wal_checkpoint(PASSIVE)");
+        } catch (err) {
+          console.error("WAL checkpoint failed:", err);
+        }
+      } else {
+        clearInterval(checkpointInterval);
+      }
+    }, 5 * 60 * 1000); // Every 5 minutes
+  }
+
   return db;
 }
 
@@ -102,4 +121,23 @@ export function closeDatabase(): void {
     db.close();
     db = null;
   }
+}
+
+// Graceful shutdown handlers (prevents corruption on server restart)
+if (typeof process !== "undefined") {
+  process.on("SIGINT", () => {
+    console.log("Received SIGINT, closing database...");
+    closeDatabase();
+    process.exit(0);
+  });
+
+  process.on("SIGTERM", () => {
+    console.log("Received SIGTERM, closing database...");
+    closeDatabase();
+    process.exit(0);
+  });
+
+  process.on("exit", () => {
+    closeDatabase();
+  });
 }

@@ -29,7 +29,18 @@ export function getCachedAddress(originalAddress: string): any | null {
     .get(originalAddress.toLowerCase().trim());
 
   if (result) {
-    return JSON.parse((result as any).raw_response);
+    const cached = JSON.parse((result as any).raw_response);
+
+    // Validate cached data to detect incorrect normalization mapping
+    if (!cached.city || !cached.state || !cached.standardizedAddress) {
+      console.warn("[Cache] Invalid cached address (bad normalization), re-fetching:", originalAddress);
+      // Delete entry with bad normalization - will be re-fetched and re-normalized correctly
+      db.prepare(`DELETE FROM batchdata_address_cache WHERE normalized_address = ?`)
+        .run(originalAddress.toLowerCase().trim());
+      return null;
+    }
+
+    return cached;
   }
   return null;
 }
@@ -77,7 +88,18 @@ export function getCachedProperty(address: string): any | null {
     .get(address.toLowerCase().trim());
 
   if (result) {
-    return JSON.parse((result as any).raw_response);
+    const cached = JSON.parse((result as any).raw_response);
+
+    // Validate cached data has required fields to prevent corruption
+    if (!cached.address || !cached.propertyType || cached.squareFeet === undefined) {
+      console.warn("[Cache] Corrupted property cache entry detected, invalidating:", address);
+      // Delete corrupted entry
+      db.prepare(`DELETE FROM batchdata_property_cache WHERE address = ?`)
+        .run(address.toLowerCase().trim());
+      return null;
+    }
+
+    return cached;
   }
   return null;
 }
@@ -119,8 +141,9 @@ export function cacheProperty(address: string, response: any): void {
 
 /**
  * Get cached comp search (24 hour TTL)
+ * Returns null if cached result has fewer than 5 comps (insufficient for reliable valuation)
  */
-export function getCachedComps(searchHash: string): any | null {
+export function getCachedComps(searchHash: string, minComps: number = 5): any | null {
   const db = getDatabase();
   const result = db
     .prepare(
@@ -132,7 +155,19 @@ export function getCachedComps(searchHash: string): any | null {
     .get(searchHash);
 
   if (result) {
-    return JSON.parse((result as any).raw_response);
+    const cached = JSON.parse((result as any).raw_response);
+    const compCount = cached.properties?.length || 0;
+
+    // Validate minimum comp count threshold
+    if (compCount < minComps) {
+      console.log(
+        `[Cache] Bypassing cache - insufficient comps (${compCount} < ${minComps} threshold). Re-fetching from API.`
+      );
+      return null;
+    }
+
+    console.log(`[Cache] Using cached comps (${compCount} comps, meets ${minComps} minimum)`);
+    return cached;
   }
   return null;
 }

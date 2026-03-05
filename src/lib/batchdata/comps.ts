@@ -45,9 +45,9 @@ export interface CompSearchResult {
     flagReasons: { [key: string]: number };
   };
   pricePerSqftStats?: {
-    mean: number; // Stats from clean comps only
-    median: number;
-    stdDev: number;
+    meanPricePerSqft: number; // Stats from clean comps only
+    medianPricePerSqft: number;
+    stdDevPricePerSqft: number;
   };
 }
 
@@ -55,19 +55,24 @@ export interface CompSearchResult {
  * Execute 3-tier comp search strategy with market-aware distance scaling
  *
  * Distance tiers by market type:
- * - Primary (urban/dense):    Tier 1: 5mi,  Tier 2: 10mi, Tier 3: 15mi
- * - Secondary (suburban):     Tier 1: 7mi,  Tier 2: 12mi, Tier 3: 18mi
- * - Tertiary (rural):         Tier 1: 10mi, Tier 2: 15mi, Tier 3: 20mi
+ * - Primary (urban/dense):    Tier 1: 1mi,  Tier 2: 3mi,  Tier 3: 5mi
+ * - Secondary (suburban):     Tier 1: 2mi,  Tier 2: 5mi,  Tier 3: 8mi
+ * - Tertiary (rural):         Tier 1: 5mi,  Tier 2: 10mi, Tier 3: 15mi
  *
- * All tiers use ±20% sqft constraint (tight matching)
- * Tier 1: ±1 bed/bath
- * Tier 2: No bed/bath constraint
- * Tier 3: ±2 bed/bath
+ * Tier 1 (strictest):
+ * - Bed/Bath: Exact match (0 variance)
+ * - Square Feet: ±10%
+ * - Year Built: ±10 years
+ *
+ * Tier 2 & 3 (relaxed):
+ * - Bed/Bath: ±1 variance (never more than ±1)
+ * - Square Feet: ±20%
+ * - Year Built: No constraint
  */
 export async function searchComparables(
   options: CompSearchOptions
 ): Promise<CompSearchResult> {
-  const { subjectProperty, minComps = 3, maxTier = 3, marketType = "Primary", userPropertyData } = options;
+  const { subjectProperty, minComps = 5, maxTier = 3, marketType = "Primary", userPropertyData } = options;
   const client = getBatchDataClient();
 
   // Tier 1: Tight search
@@ -252,22 +257,29 @@ function buildCompSearchOptions(
 
   // Bed/Bath constraints (relative values)
   if (tier === 1) {
+    // Tier 1: EXACT match - no variance allowed (tight comps)
+    options.minBedrooms = 0;   // Exact match
+    options.maxBedrooms = 0;   // Exact match
+    options.minBathrooms = 0;  // Exact match
+    options.maxBathrooms = 0;  // Exact match
+  } else {
+    // Tier 2 & 3: ±1 bed/bath variance (never more than 1)
     options.minBedrooms = -1;  // Subject bedrooms - 1
     options.maxBedrooms = 1;   // Subject bedrooms + 1
     options.minBathrooms = -1; // Subject bathrooms - 1
     options.maxBathrooms = 1;  // Subject bathrooms + 1
-  } else if (tier === 3) {
-    options.minBedrooms = -2;  // Subject bedrooms - 2
-    options.maxBedrooms = 2;   // Subject bedrooms + 2
-    options.minBathrooms = -2; // Subject bathrooms - 2
-    options.maxBathrooms = 2;  // Subject bathrooms + 2
   }
-  // Tier 2: No bed/bath constraint
 
   // Square footage constraints (percentage values)
-  // Apply ±20% for ALL tiers to prevent "apples to oranges" comparisons
-  options.minAreaPercent = -20; // 80% of subject sqft
-  options.maxAreaPercent = 20;  // 120% of subject sqft
+  if (tier === 1) {
+    // Tier 1: Tight sqft matching (±10%)
+    options.minAreaPercent = -10; // 90% of subject sqft
+    options.maxAreaPercent = 10;  // 110% of subject sqft
+  } else {
+    // Tier 2 & 3: Moderate sqft matching (±20%)
+    options.minAreaPercent = -20; // 80% of subject sqft
+    options.maxAreaPercent = 20;  // 120% of subject sqft
+  }
 
   // Year built (Tier 1 only - relative values)
   if (tier === 1 && yearBuilt) {
@@ -281,15 +293,15 @@ function buildCompSearchOptions(
 /**
  * Get search radius based on market type and tier
  * Market-aware distance scaling ensures appropriate comp density:
- * - Primary (urban/dense): Tighter radii (5/10/15mi)
- * - Secondary (suburban): Moderate radii (7/12/18mi)
- * - Tertiary (rural): Wider radii (10/15/20mi)
+ * - Primary (urban/dense): Tight radii (1/3/5mi) - same neighborhood focus
+ * - Secondary (suburban): Moderate radii (2/5/8mi) - broader suburban areas
+ * - Tertiary (rural): Wide radii (5/10/15mi) - rural areas need larger search
  */
 function getRadiusForMarketAndTier(marketType: MarketType, tier: 1 | 2 | 3): number {
   const radiusMap: Record<MarketType, [number, number, number]> = {
-    Primary: [5, 10, 15],
-    Secondary: [7, 12, 18],
-    Tertiary: [10, 15, 20],
+    Primary: [1, 3, 5],
+    Secondary: [2, 5, 8],
+    Tertiary: [5, 10, 15],
   };
 
   const radii = radiusMap[marketType] || radiusMap.Primary; // Fallback to Primary

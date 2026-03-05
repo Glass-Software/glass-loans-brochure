@@ -75,7 +75,7 @@ ${propertyZip ? `- ZIP Code: ${propertyZip}` : ''}
 - Square Feet: ${squareFeet.toLocaleString()}
 - Current Condition: ${propertyCondition}
 - **User's ARV Estimate: $${userEstimatedArv.toLocaleString()}**
-${compLinks && compLinks.length > 0 ? `\n**USER-PROVIDED COMPARABLE PROPERTIES:**\n${compLinks.map((link, i) => `${i + 1}. ${link}`).join('\n')}\n\nPlease analyze these comps and incorporate them into your estimates.` : ''}
+${compLinks && compLinks.length > 0 ? `\n**USER-PROVIDED COMPARABLE PROPERTY ADDRESSES:**\n${compLinks.map((address, i) => `${i + 1}. ${address}`).join('\n')}\n\nPlease research these addresses and incorporate them into your estimates.` : ''}
 
 **REQUESTED ANALYSIS:**
 The user has estimated the ARV at $${userEstimatedArv.toLocaleString()}. Provide your own independent estimates in JSON format:
@@ -100,7 +100,7 @@ The user has estimated the ARV at $${userEstimatedArv.toLocaleString()}. Provide
 
 2. **As-Is Value**: The current market value in ${propertyCondition} condition, without any improvements.
 
-3. **Comps**: ${compLinks && compLinks.length > 0 ? 'The user has provided comparable property links above. Use these as your primary comps, and supplement with additional research if needed.' : `Find 3-5 comparable properties that recently sold${propertyCity && propertyState ? ` in or near ${propertyCity}, ${propertyState}` : propertyState ? ` in ${propertyState}` : ' in the area'}. Focus on renovated properties for ARV comparison.`}
+3. **Comps**: ${compLinks && compLinks.length > 0 ? 'The user has provided comparable property addresses above. Research these addresses and use them as your primary comps, supplementing with additional research if needed.' : `Find 3-5 comparable properties that recently sold${propertyCity && propertyState ? ` in or near ${propertyCity}, ${propertyState}` : propertyState ? ` in ${propertyState}` : ' in the area'}. Focus on renovated properties for ARV comparison.`}
    ${propertyState ? `\n   **🚨 CRITICAL: All comps MUST be located in ${propertyState}. VERIFY the state before including each comp.**` : ''}
 
 4. **Market Analysis**: Briefly explain the local market conditions${propertyState ? ` in ${propertyState}` : ''}, trends, and YOUR reasoning for the estimates. Include a sentence comparing your ARV estimate to the user's estimate of $${userEstimatedArv.toLocaleString()} and whether you agree or disagree.
@@ -260,9 +260,30 @@ ${aiEstimates.subjectPropertyDetails.lastSaleDate
 
 ${aiEstimates.batchDataUsed && aiEstimates.compsUsed && aiEstimates.compsUsed.length > 0
   ? `**COMPARABLE SALES (Real Data):**
-${aiEstimates.compsUsed.map((comp: any, i: number) =>
-    `${i + 1}. ${comp.address} - $${comp.price.toLocaleString()} (${comp.sqft.toLocaleString()} sqft, $${comp.pricePerSqft}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""})`
-  ).join("\n")}`
+${aiEstimates.compsUsed.map((comp: any, i: number) => {
+    let compLine = `${i + 1}. ${comp.address} - $${comp.price.toLocaleString()}`;
+    compLine += `\n   ${comp.bedrooms} bed / ${comp.bathrooms} bath, ${comp.sqft.toLocaleString()} sqft${comp.yearBuilt ? `, built ${comp.yearBuilt}` : ""}`;
+    compLine += `\n   $${comp.pricePerSqft}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""}`;
+
+    // Show valuation data if available
+    if (comp.avmValue || comp.taxAssessedValue) {
+      compLine += `\n   `;
+      if (comp.avmValue) {
+        compLine += `AVM: $${comp.avmValue.toLocaleString()} (${(comp.avmConfidence * 100).toFixed(0)}% confidence)`;
+      }
+      if (comp.taxAssessedValue) {
+        if (comp.avmValue) compLine += `, `;
+        compLine += `Tax Assessed: $${comp.taxAssessedValue.toLocaleString()}`;
+      }
+    }
+
+    // Flag potential issues
+    if (comp.isPotentialFlip) {
+      compLine += `\n   ⚠️ POTENTIAL FLIP: Sale price is ${((comp.price / comp.taxAssessedValue - 1) * 100).toFixed(0)}% above tax assessment (likely renovated)`;
+    }
+
+    return compLine;
+  }).join("\n\n")}`
   : ""}
 
 ${aiEstimates.riskFlags && aiEstimates.riskFlags.length > 0
@@ -280,7 +301,7 @@ ${aiEstimates.riskFlags.map((flag: any) =>
 **AS-IS VALUE COMPARISON:**
 - **Borrower's As-Is Estimate**: $${formData.userEstimatedAsIsValue.toLocaleString()}
 - **Your As-Is Value (BatchData)**: $${aiEstimates.asIsValue.toLocaleString()}
-- **Calculation Method**: MIN(Tax Assessed: $${aiEstimates.subjectPropertyDetails?.taxAssessedValue.toLocaleString() || "N/A"}, 85% of AVM: $${aiEstimates.avmValue ? Math.round(aiEstimates.avmValue * 0.85).toLocaleString() : "N/A"})
+- **Calculation Method**: MIN(Tax Assessed: $${aiEstimates.subjectPropertyDetails?.taxAssessedValue ? aiEstimates.subjectPropertyDetails.taxAssessedValue.toLocaleString() : "N/A"}, 85% of AVM: $${aiEstimates.avmValue ? Math.round(aiEstimates.avmValue * 0.85).toLocaleString() : "N/A"})
 - **Difference**: $${Math.abs(formData.userEstimatedAsIsValue - aiEstimates.asIsValue).toLocaleString()} (${((Math.abs(formData.userEstimatedAsIsValue - aiEstimates.asIsValue) / aiEstimates.asIsValue) * 100).toFixed(1)}%)
 
 **KEY METRICS (Using Your ARV):**
@@ -297,25 +318,29 @@ ${additionalDetails ? `\n**BORROWER NOTES:**\n${additionalDetails}\n` : ""}
 **YOUR TASK:**
 Write a 3-4 paragraph professional opinion covering:
 
-1. **Data Quality Assessment**: ${aiEstimates.batchDataUsed
+1. **Comp Quality Check**: ${aiEstimates.batchDataUsed
+  ? `Review each comp's bed/bath count, year built, and condition flags. Are we comparing apples-to-apples? Flag any comps marked as "POTENTIAL FLIP" - these are renovated properties that may skew ARV estimates upward for a distressed subject property.`
+  : `Note limited data availability.`}
+
+2. **Data Quality Assessment**: ${aiEstimates.batchDataUsed
   ? `Comment on the quality of the market data (${aiEstimates.compsUsed?.length} comps found, ${aiEstimates.compTier === 1 ? "tight search" : aiEstimates.compTier === 2 ? "moderate search" : "expanded search"}, valuation confidence: ${aiEstimates.avmConfidence}%). Are the comps tight or did we have to cast a wide net?`
   : `Note that this analysis uses estimated values due to limited data - recommend proceeding with caution and obtaining independent appraisal.`}
 
-2. **ARV Assessment**: Do you agree with the borrower's ARV estimate of $${userEstimatedArv.toLocaleString()}? ${aiEstimates.batchDataUsed
-  ? `Reference specific comps by address that support your $${aiEstimates.estimatedARV.toLocaleString()} valuation.`
+3. **ARV Assessment**: Do you agree with the borrower's ARV estimate of $${userEstimatedArv.toLocaleString()}? ${aiEstimates.batchDataUsed
+  ? `Reference specific comps by address that support your $${aiEstimates.estimatedARV.toLocaleString()} valuation. If comps are flagged as potential flips, explain how that affects your ARV confidence.`
   : `Explain why your estimate is $${aiEstimates.estimatedARV.toLocaleString()} and whether theirs is reasonable, optimistic, or conservative.`}
 
-3. **As-Is Value Assessment**: Does the borrower's as-is estimate of $${formData.userEstimatedAsIsValue.toLocaleString()} align with your calculation of $${aiEstimates.asIsValue.toLocaleString()}? If there's a significant difference (>10%), explain why and which value is more realistic.
+4. **As-Is Value Assessment**: Does the borrower's as-is estimate of $${formData.userEstimatedAsIsValue.toLocaleString()} align with your calculation of $${aiEstimates.asIsValue.toLocaleString()}? If there's a significant difference (>10%), explain why and which value is more realistic.
 
-4. **Property Condition vs Renovation Level**: Does the ${propertyCondition} condition match the ${getRenovationLevel(rehab / squareFeet)} renovation level ($${(rehab / squareFeet).toFixed(2)}/SF)? If mismatched, explain the implications for achieving the target ARV.
+5. **Property Condition vs Renovation Level**: Does the ${propertyCondition} condition match the ${getRenovationLevel(rehab / squareFeet)} renovation level ($${(rehab / squareFeet).toFixed(2)}/SF)? If mismatched, explain the implications for achieving the target ARV.
 
-5. **Overall Deal Quality**: Is this a good deal? What's the risk level based on YOUR valuation?
+6. **Overall Deal Quality**: Is this a good deal? What's the risk level based on YOUR valuation?
 
-6. **Risk Factors**: ${aiEstimates.riskFlags && aiEstimates.riskFlags.length > 0
+7. **Risk Factors**: ${aiEstimates.riskFlags && aiEstimates.riskFlags.length > 0
   ? `Address the specific risk flags detected in the data above.`
   : `What are the main risks or red flags you see?`}
 
-7. **Recommendation**: Clear recommendation - Approve, Approve with Conditions, or Decline.
+8. **Recommendation**: Clear recommendation - Approve, Approve with Conditions, or Decline.
 
 **TONE:**
 - Write in first person as Gary

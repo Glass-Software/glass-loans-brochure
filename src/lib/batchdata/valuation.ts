@@ -25,11 +25,13 @@ export interface ValuationResult {
  * - If comps tier 3 (wide search): Weight AVM more heavily
  */
 export function calculateValuation(
-  subjectProperty: BatchDataPropertyResponse,
+  subjectProperty: BatchDataPropertyResponse | any,
   compResult: CompSearchResult
 ): ValuationResult {
-  const avmValue = subjectProperty.avm.value;
-  const avmConfidence = subjectProperty.avm.confidenceScore;
+  // Check if AVM data exists (property may not be in BatchData's property database)
+  const hasAVM = subjectProperty.avm && subjectProperty.avm.value > 0;
+  const avmValue = hasAVM ? subjectProperty.avm.value : 0;
+  const avmConfidence = hasAVM ? subjectProperty.avm.confidenceScore : 0;
   const compDerivedValue = compResult.compDerivedValue;
   const compCount = compResult.comps.length;
   const compTier = compResult.tier;
@@ -38,8 +40,15 @@ export function calculateValuation(
   let confidence: "high" | "medium" | "low";
   let valuationMethod: "triangulated" | "avm_only" | "comp_only";
 
-  // Decision tree for valuation
-  if (compCount >= 5 && compTier === 1 && avmConfidence >= 70) {
+  // If no AVM data, rely entirely on comps
+  if (!hasAVM || avmValue === 0) {
+    console.log("[Valuation] No AVM data available, using comp-only valuation");
+    estimatedARV = compDerivedValue;
+    confidence = compCount >= 5 && compTier === 1 ? "medium" : "low";
+    valuationMethod = "comp_only";
+  }
+  // Decision tree for valuation with AVM
+  else if (compCount >= 5 && compTier === 1 && avmConfidence >= 70) {
     // Best case: Tight comps + high AVM confidence
     estimatedARV = Math.round(avmValue * 0.5 + compDerivedValue * 0.5);
     confidence = "high";
@@ -65,18 +74,35 @@ export function calculateValuation(
     confidence = "low";
     valuationMethod = "triangulated";
   } else {
-    // Worst case: Limited data
-    estimatedARV = avmValue;
+    // Worst case: Limited data - use whatever is available
+    if (hasAVM && avmValue > 0) {
+      estimatedARV = avmValue;
+      valuationMethod = "avm_only";
+    } else {
+      estimatedARV = compDerivedValue;
+      valuationMethod = "comp_only";
+    }
     confidence = "low";
-    valuationMethod = "avm_only";
   }
 
   // As-is value = current property condition value (conservative estimate)
-  // Use tax assessed value or 85% of AVM, whichever is lower
-  const asIsValue = Math.min(
-    subjectProperty.taxAssessedValue,
-    Math.round(avmValue * 0.85)
-  );
+  // Use tax assessed value or 85% of AVM/comp value, whichever is available
+  let asIsValue: number;
+  const taxAssessedValue = subjectProperty.taxAssessedValue || 0;
+
+  if (hasAVM && avmValue > 0 && taxAssessedValue > 0) {
+    // Both AVM and tax assessment available - use lower value (conservative)
+    asIsValue = Math.min(taxAssessedValue, Math.round(avmValue * 0.85));
+  } else if (hasAVM && avmValue > 0) {
+    // Only AVM available
+    asIsValue = Math.round(avmValue * 0.85);
+  } else if (taxAssessedValue > 0) {
+    // Only tax assessment available
+    asIsValue = taxAssessedValue;
+  } else {
+    // No property data - estimate from comp-derived value (very conservative)
+    asIsValue = Math.round(compDerivedValue * 0.75);
+  }
 
   return {
     estimatedARV,

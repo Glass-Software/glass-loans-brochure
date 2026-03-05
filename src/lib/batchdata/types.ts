@@ -126,6 +126,9 @@ export interface PropertySearchResult {
   isOutlier?: boolean; // Statistical outlier (outside IQR bounds: Q1 - 1.5×IQR to Q3 + 1.5×IQR)
   isRenovated?: boolean; // Likely renovated (sale price > 1.5x tax assessment)
   outlierReason?: string; // Why this comp is flagged (for display)
+
+  // NEW: Listing URL for hyperlinks
+  listingUrl?: string; // URL to property listing for user to view details
 }
 
 // ============================================================================

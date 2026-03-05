@@ -265,14 +265,36 @@ export class BatchDataClient {
     options?: any
   ): Promise<BatchDataSearchResponse> {
     const requestBody: any = { searchCriteria };
+
+    // Add options with 'take' parameter to limit results (per BatchData docs)
     if (options) {
-      requestBody.options = options;
+      requestBody.options = {
+        ...options,
+        take: 10,  // Get 10 comps for reliable valuation (filtering will reduce to 5-8 clean comps)
+        // Try to request all property details
+        includePropertyDetails: true,
+        fields: ["address", "building", "sale", "listing", "valuation", "assessment", "owner", "ids"]
+      };
+    } else {
+      requestBody.options = {
+        take: 10,
+        includePropertyDetails: true,
+        fields: ["address", "building", "sale", "listing", "valuation", "assessment", "owner", "ids"]
+      };
     }
+
+    // DEBUG: Log the exact request being sent
+    console.log("[BatchData] DEBUG: Request body being sent to /property/search:");
+    console.log(JSON.stringify(requestBody, null, 2));
 
     const response = await this.request<{ results: { properties: any[] } }>(
       "/property/search",
       requestBody
     );
+
+    // DEBUG: Log full raw response to see what BatchData is returning
+    console.log("[BatchData] DEBUG: Full API response:");
+    console.log(JSON.stringify(response, null, 2));
 
     // Normalize BatchData property objects to simplified format
     const rawProperties = response.results.properties || [];
@@ -331,6 +353,9 @@ export class BatchDataClient {
           ? lastSalePrice / taxAssessedValue
           : 0;
 
+      // Extract listing URL if available
+      const listingUrl = prop.listing?.url || prop.listing?.listingUrl || null;
+
       return {
         address: addressStr,
         propertyType: prop.general?.propertyTypeDetail || 'Single Family',
@@ -355,6 +380,7 @@ export class BatchDataClient {
         pricePerSqft: pricePerSqft > 0 ? pricePerSqft : undefined,
         taxAssessmentRatio:
           taxAssessmentRatio > 0 ? taxAssessmentRatio : undefined,
+        listingUrl: listingUrl || undefined,
       };
     });
 
