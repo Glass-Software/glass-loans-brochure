@@ -12,6 +12,8 @@ export interface User {
   email_verified: number; // SQLite uses 0/1 for boolean
   verification_token: string | null;
   verification_token_expires: string | null; // SQLite stores dates as text
+  verification_code: string | null; // 6-digit code for email verification
+  code_expires_at: string | null; // When the code expires
   usage_count: number;
   usage_limit: number; // Configurable limit per user (default 3 for free tier)
   report_retention_days: number; // How long to keep reports (default 14 days)
@@ -156,6 +158,71 @@ export function regenerateVerificationToken(
   const user = queryOne<User>("SELECT * FROM users WHERE id = ?", [userId])!;
 
   return { user, token };
+}
+
+/**
+ * Generate and store 6-digit verification code
+ */
+export function generateVerificationCode(
+  userId: number,
+): { user: User; code: string } {
+  // Generate 6-digit code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const codeExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+
+  execute(
+    `
+      UPDATE users
+      SET verification_code = ?,
+          code_expires_at = ?,
+          updated_at = DATETIME('now')
+      WHERE id = ?
+    `,
+    [code, codeExpires, userId],
+  );
+
+  const user = queryOne<User>("SELECT * FROM users WHERE id = ?", [userId])!;
+
+  return { user, code };
+}
+
+/**
+ * Verify code and mark user as verified
+ */
+export function verifyUserCode(code: string, normalizedEmail: string): User | null {
+  return transaction((db) => {
+    // Check if code is valid
+    const user = queryOne<User>(
+      `
+        SELECT * FROM users
+        WHERE normalized_email = ?
+          AND verification_code = ?
+          AND code_expires_at > DATETIME('now')
+        LIMIT 1
+      `,
+      [normalizedEmail, code],
+    );
+
+    if (!user) {
+      return null;
+    }
+
+    // Update user - mark as verified and clear code
+    execute(
+      `
+        UPDATE users
+        SET email_verified = 1,
+            verification_code = NULL,
+            code_expires_at = NULL,
+            updated_at = DATETIME('now')
+        WHERE id = ?
+      `,
+      [user.id],
+    );
+
+    // Return updated user
+    return queryOne<User>("SELECT * FROM users WHERE id = ?", [user.id]);
+  });
 }
 
 // ============================================================================

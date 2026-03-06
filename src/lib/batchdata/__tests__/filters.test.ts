@@ -34,10 +34,6 @@ const createMockSubjectProperty = (): BatchDataPropertyResponse => ({
   lastSalePrice: 350000,
   taxAssessedValue: 300000,
   taxAssessmentHistory: [],
-  mortgageInfo: null,
-  liens: [],
-  ownerName: 'Test Owner',
-  ownerType: 'Individual',
   zoning: 'R1',
   avm: {
     value: 400000,

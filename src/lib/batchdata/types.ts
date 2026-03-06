@@ -40,31 +40,14 @@ export interface BatchDataPropertyResponse {
   lastSalePrice: number | null;
   taxAssessedValue: number;
   taxAssessmentHistory: TaxAssessment[];
-  mortgageInfo: MortgageInfo | null;
-  liens: Lien[];
-  ownerName: string;
-  ownerType: "Individual" | "LLC" | "Trust" | "Corporation";
   zoning: string;
-  avm: AVMData;
+  avm?: AVMData; // Optional - may not be available for all properties
   preForeclosure: boolean;
 }
 
 export interface TaxAssessment {
   year: number;
   assessedValue: number;
-}
-
-export interface MortgageInfo {
-  lenderName: string;
-  amount: number;
-  recordDate: string;
-  loanType: string;
-}
-
-export interface Lien {
-  type: string;
-  amount: number;
-  recordDate: string;
 }
 
 export interface AVMData {
@@ -104,6 +87,8 @@ export interface PropertySearchResult {
   bedrooms: number;
   bathrooms: number;
   squareFeet: number;
+  yearBuilt?: number; // Year built (optional)
+  lotSize?: number; // Lot size in square feet (optional)
   lastSaleDate: string;
   lastSalePrice: number;
   distance: number; // miles from subject
@@ -141,13 +126,14 @@ export interface PropertySearchResult {
 export interface CompFilterConfig {
   strictPropertyType?: boolean; // Default: true - Enforce exact property type matching
   removeOutliers?: boolean; // Default: true - Flag outliers using IQR method (but keep for display)
-  outlierStdDevThreshold?: number; // DEPRECATED: IQR method is now used instead (kept for backward compatibility)
-  pricePerSqftFilter?: boolean; // Default: true - Flag price divergent comps
+  pricePerSqftFilter?: boolean; // Default: false - DISABLED (counterproductive for rehab projects - comps with higher $/sqft are desirable)
   pricePerSqftTolerancePercent?: number; // Default: 30 - ±30% tolerance
   minAvmConfidence?: number; // Default: 0 - Minimum AVM confidence to include
   excludeForeclosures?: boolean; // Default: true - Exclude foreclosures from calculations
   detectRenovations?: boolean; // Default: false - Flag likely renovated properties
   renovationThreshold?: number; // Default: 1.5 - Sale price > 1.5x tax = renovated
+  lotSizeFilter?: boolean; // Default: false - Only enable for Primary/Secondary markets (urban/suburban density matters)
+  lotSizeTolerancePercent?: number; // Default: 50 - ±50% tolerance (lot size can vary significantly)
 }
 
 /**

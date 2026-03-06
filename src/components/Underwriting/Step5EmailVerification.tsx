@@ -1,21 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useUnderwriting } from "@/context/UnderwritingContext";
 import { EmailSchema } from "@/lib/underwriting/validation";
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 
 export default function Step5EmailVerification() {
+  const router = useRouter();
   const {
-    email,
-    setEmail,
-    emailVerified,
-    setEmailVerified,
-    usageCount,
-    setUsageCount,
-    usageLimit,
     formData,
-    setResults,
     setIsSubmitting,
     isSubmitting,
     setError,
@@ -27,69 +21,108 @@ export default function Step5EmailVerification() {
   } = useUnderwriting();
 
   const { executeRecaptcha } = useGoogleReCaptcha();
-  const [localEmail, setLocalEmail] = useState(email || "");
+  const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
-  const [verificationSent, setVerificationSent] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState(["", "", "", "", "", ""]);
+  const [codeError, setCodeError] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  // Refs for code inputs
+  const codeInputRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+  ];
+
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate email format
     try {
-      EmailSchema.parse(localEmail);
+      EmailSchema.parse(email);
     } catch {
       setEmailError("Please enter a valid email address");
       return;
     }
 
     setEmailError("");
-    setIsSubmitting(true);
+    setSendingCode(true);
 
     try {
-      // Check email and usage
-      const response = await fetch("/api/underwrite/verify-email", {
+      const response = await fetch("/api/underwrite/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: localEmail }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to verify email");
+        throw new Error(data.error || "Failed to send verification code");
       }
 
-      setEmail(localEmail);
-
-      if (data.verified) {
-        // Email already verified
-        setEmailVerified(true);
-        setUsageCount(data.usageCount || 0);
-
-        if (data.limitReached) {
-          setError(
-            `You've reached your limit of ${data.usageLimit} free underwriting analyses. Please contact us for more.`,
-          );
-        } else {
-          // Proceed to submit underwriting
-          await submitUnderwriting(localEmail);
-        }
-      } else {
-        // Email NOT verified - submit underwriting anyway
-        // User will get verification email with link to results
-        await submitUnderwriting(localEmail);
-      }
+      setCodeSent(true);
+      // Focus first code input
+      setTimeout(() => {
+        codeInputRefs[0].current?.focus();
+      }, 100);
     } catch (error: any) {
       setEmailError(error.message || "An error occurred");
     } finally {
-      setIsSubmitting(false);
+      setSendingCode(false);
     }
   };
 
-  const submitUnderwriting = async (userEmail: string) => {
+  const handleCodeChange = (index: number, value: string) => {
+    // Only allow digits
+    if (value && !/^\d$/.test(value)) {
+      return;
+    }
+
+    const newCode = [...verificationCode];
+    newCode[index] = value;
+    setVerificationCode(newCode);
+    setCodeError("");
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      codeInputRefs[index + 1].current?.focus();
+    }
+  };
+
+  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !verificationCode[index] && index > 0) {
+      codeInputRefs[index - 1].current?.focus();
+    }
+  };
+
+  const handleCodePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+
+    if (paste.length === 6) {
+      const newCode = paste.split("");
+      setVerificationCode(newCode);
+      codeInputRefs[5].current?.focus();
+    }
+  };
+
+  const handleVerifyAndSubmit = async () => {
+    const code = verificationCode.join("");
+
+    if (code.length !== 6) {
+      setCodeError("Please enter the 6-digit code");
+      return;
+    }
+
     setIsSubmitting(true);
     setIsProcessing(true);
     setError(null);
+    setCodeError("");
 
     try {
       // Get reCAPTCHA token
@@ -104,7 +137,8 @@ export default function Step5EmailVerification() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: userEmail,
+          email,
+          verificationCode: code,
           recaptchaToken,
           formData,
         }),
@@ -117,21 +151,7 @@ export default function Step5EmailVerification() {
       // Check if we got a streaming response
       const contentType = response.headers.get("content-type");
       if (!contentType?.includes("text/event-stream")) {
-        // Fallback: non-streaming response (shouldn't happen but handle it)
-        const data = await response.json();
-        if (data.limitReached) {
-          setError(data.error || "You've reached your usage limit.");
-          return;
-        }
-        if (data.emailSent) {
-          setVerificationSent(true);
-          return;
-        }
-        if (data.results) {
-          setResults(data.results);
-          setUsageCount(data.results.usageCount || 0);
-        }
-        return;
+        throw new Error("Unexpected response format");
       }
 
       // Read the stream
@@ -143,6 +163,7 @@ export default function Step5EmailVerification() {
       }
 
       let buffer = "";
+      let reportId: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -176,25 +197,29 @@ export default function Step5EmailVerification() {
               setProgressPercent(100);
               setProgressStatus("Complete!");
 
-              if (event.data?.emailSent) {
-                setVerificationSent(true);
-              } else if (event.data?.results) {
-                setResults(event.data.results);
-                setUsageCount(event.data.results.usageCount || 0);
+              if (event.data?.reportId) {
+                reportId = event.data.reportId;
               }
             } else if (event.type === "error") {
               // Error occurred
-              setError(event.status || "An error occurred");
-
-              if (event.data?.code === "USAGE_LIMIT") {
-                // Special handling for usage limit
-                setUsageCount(usageLimit);
+              if (event.data?.code === "INVALID_CODE") {
+                setCodeError(event.status || "Invalid verification code");
+              } else {
+                setError(event.status || "An error occurred");
               }
+              return;
             }
           } catch (parseError) {
             console.error("Failed to parse event:", parseError);
           }
         }
+      }
+
+      // Redirect to report
+      if (reportId) {
+        router.push(`/underwrite/results/${reportId}`);
+      } else {
+        throw new Error("Report ID not received");
       }
     } catch (error: any) {
       setError(error.message || "An error occurred while processing your request");
@@ -215,90 +240,118 @@ export default function Step5EmailVerification() {
   const labelClass = "mb-3 block text-sm font-medium text-dark dark:text-white";
   const errorClass = "mt-1 text-sm text-red-600 dark:text-red-400";
 
-  if (verificationSent) {
-    return (
-      <div className="rounded-sm bg-white p-8 shadow-three dark:bg-gray-dark">
-        <div className="text-center">
-          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <svg
-              className="h-8 w-8 text-primary"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-          </div>
-          <h3 className="mb-2 text-xl font-semibold text-dark dark:text-white">
-            Check Your Email
-          </h3>
-          <p className="mb-6 text-body-color">
-            We&apos;ve sent a verification link to <strong>{localEmail}</strong>.
-            Click the link to view your underwriting results.
-          </p>
-          <p className="text-sm text-body-color">
-            The link expires in 24 hours. Didn&apos;t receive it? Check your spam folder.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <form onSubmit={handleEmailSubmit}>
-      <div className="-mx-4 flex flex-wrap">
-        <div className="w-full px-4">
-          <div className="mb-8">
-            <div className="mb-6 rounded-sm bg-blue-50 p-4 dark:bg-blue-900/20">
-              <p className="text-sm text-body-color">
-                <strong>Final Step:</strong> Enter your email to receive your AI-powered underwriting analysis from Gary.
-              </p>
-              <p className="mt-2 text-xs text-body-color">
-                You get <strong>3 free analyses</strong> per email address. We&apos;ll send you a verification link to view your results.
-              </p>
+    <div className="-mx-4 flex flex-wrap">
+      <div className="w-full px-4">
+        <div className="mb-8">
+          <div className="mb-6 rounded-sm bg-blue-50 p-4 dark:bg-blue-900/20">
+            <p className="text-sm text-body-color">
+              <strong>Final Step:</strong> Verify your email to receive your AI-powered underwriting analysis from Gary.
+            </p>
+            <p className="mt-2 text-xs text-body-color">
+              You get <strong>3 free analyses</strong> per verified email address.
+            </p>
+          </div>
+
+          {!codeSent ? (
+            <form onSubmit={handleSendCode}>
+              <label htmlFor="email" className={labelClass}>
+                Email Address *
+              </label>
+              <div className="flex gap-3">
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  disabled={sendingCode}
+                  className={inputClass}
+                />
+                <button
+                  type="submit"
+                  disabled={sendingCode}
+                  className="whitespace-nowrap rounded-sm bg-primary px-6 py-3 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {sendingCode ? "Sending..." : "Send Code"}
+                </button>
+              </div>
+              {emailError && <p className={errorClass}>{emailError}</p>}
+            </form>
+          ) : (
+            <div>
+              <div className="mb-4 rounded-sm bg-green-50 p-4 dark:bg-green-900/20">
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  ✓ Verification code sent to <strong>{email}</strong>
+                </p>
+                <button
+                  onClick={() => {
+                    setCodeSent(false);
+                    setVerificationCode(["", "", "", "", "", ""]);
+                    setCodeError("");
+                  }}
+                  className="mt-2 text-xs text-primary hover:underline"
+                >
+                  Change email
+                </button>
+              </div>
+
+              <label className={labelClass}>
+                Enter 6-Digit Code *
+              </label>
+              <div className="mb-4 flex justify-center gap-2">
+                {verificationCode.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={codeInputRefs[index]}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleCodeChange(index, e.target.value)}
+                    onKeyDown={(e) => handleCodeKeyDown(index, e)}
+                    onPaste={index === 0 ? handleCodePaste : undefined}
+                    disabled={isSubmitting}
+                    className="h-14 w-14 rounded-sm border border-stroke bg-[#f8f8f8] text-center text-2xl font-semibold text-dark outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white"
+                  />
+                ))}
+              </div>
+              {codeError && <p className={errorClass}>{codeError}</p>}
+
+              <div className="text-center">
+                <button
+                  onClick={handleSendCode}
+                  disabled={sendingCode}
+                  className="text-sm text-body-color hover:text-primary"
+                >
+                  Didn&apos;t receive code? Resend
+                </button>
+              </div>
             </div>
-
-            <label htmlFor="email" className={labelClass}>
-              Email Address *
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={localEmail}
-              onChange={(e) => setLocalEmail(e.target.value)}
-              placeholder="your@email.com"
-              disabled={isSubmitting}
-              className={inputClass}
-            />
-            {emailError && <p className={errorClass}>{emailError}</p>}
-          </div>
-        </div>
-
-        <div className="w-full px-4">
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={goToPreviousStep}
-              disabled={isSubmitting}
-              className="rounded-sm border border-primary px-9 py-4 text-base font-medium text-primary duration-300 hover:bg-primary hover:text-white disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50 dark:shadow-submit-dark"
-            >
-              {isSubmitting ? "Processing..." : "Get Gary's Opinion"}
-            </button>
-          </div>
+          )}
         </div>
       </div>
-    </form>
+
+      <div className="w-full px-4">
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={goToPreviousStep}
+            disabled={isSubmitting || sendingCode}
+            className="rounded-sm border border-primary px-9 py-4 text-base font-medium text-primary duration-300 hover:bg-primary hover:text-white disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={handleVerifyAndSubmit}
+            disabled={!codeSent || isSubmitting || verificationCode.join("").length !== 6}
+            className="rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50 dark:shadow-submit-dark"
+          >
+            {isSubmitting ? "Processing..." : "Verify & Get Report"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

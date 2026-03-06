@@ -34,14 +34,47 @@ export default function GaryOpinion({ opinion }: GaryOpinionProps) {
       </div>
 
       <div className="prose prose-sm max-w-none dark:prose-invert">
-        {opinion.split("\n\n").map((paragraph, index) => (
-          <p
-            key={index}
-            className="mb-4 text-base leading-relaxed text-body-color last:mb-0"
-          >
-            {paragraph}
-          </p>
-        ))}
+        {(() => {
+          // Split by markdown headers (## ) to properly separate sections
+          const parts = opinion.split(/(?=##\s)/g);
+
+          return parts.map((part, index) => {
+            const trimmed = part.trim();
+            if (!trimmed) return null;
+
+            // Check if this part starts with a markdown header
+            if (trimmed.startsWith("## ")) {
+              // Extract header and content
+              const lines = trimmed.split("\n");
+              const headerLine = lines[0];
+              const headerText = headerLine.substring(3).trim(); // Remove "## "
+              const content = lines.slice(1).join("\n").trim();
+
+              return (
+                <div key={index}>
+                  <h2 className="mb-3 mt-6 text-lg font-bold text-dark dark:text-white first:mt-0">
+                    {headerText}
+                  </h2>
+                  {content && (
+                    <p className="mb-4 text-base leading-relaxed text-dark dark:text-white">
+                      {content}
+                    </p>
+                  )}
+                </div>
+              );
+            }
+
+            // Regular paragraph (no header)
+            return (
+              <p
+                key={index}
+                className="mb-4 text-base leading-relaxed text-dark dark:text-white last:mb-0"
+              >
+                {trimmed}
+              </p>
+            );
+          });
+        })()}
       </div>
     </div>
   );

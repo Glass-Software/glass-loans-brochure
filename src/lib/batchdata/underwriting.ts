@@ -4,16 +4,9 @@
  */
 
 import { UnderwritingFormData } from "@/types/underwriting";
-import { getBatchDataClient } from "./client";
-import {
-  getCachedProperty,
-  cacheProperty,
-  trackAPIUsage,
-} from "./cache";
 import { searchComparables } from "./comps";
 import { calculateValuation } from "./valuation";
 import { detectRiskFlags } from "./risk";
-import { BatchDataError } from "./errors";
 
 /**
  * Main entry point: Get property estimates using BatchData
@@ -22,53 +15,45 @@ import { BatchDataError } from "./errors";
 export async function getBatchDataPropertyEstimates(
   formData: UnderwritingFormData
 ): Promise<any> {
-  const client = getBatchDataClient();
-
   try {
-    // Step 1: Try to lookup subject property details (optional - may not exist in database)
-    console.log("Step 1: Looking up subject property...");
-    const addressInput = {
-      street: formData.propertyAddress,
-      city: formData.propertyCity,
-      state: formData.propertyState,
-      zip: formData.propertyZip
+    // Step 1: Build subject property from form data (no longer using property lookup API)
+    console.log("Step 1: Building subject property from form data...");
+
+    // Extract street number and name from propertyAddress (e.g., "2316 Fernwood Drive")
+    const addressParts = formData.propertyAddress.trim().split(' ');
+    const streetNumber = addressParts[0] || '';
+    const streetName = addressParts.slice(1).join(' ') || formData.propertyAddress;
+
+    const fullAddress = `${formData.propertyAddress}, ${formData.propertyCity}, ${formData.propertyState} ${formData.propertyZip}`;
+
+    const subjectProperty = {
+      address: {
+        standardizedAddress: fullAddress,
+        streetNumber: streetNumber,
+        streetName: streetName,
+        city: formData.propertyCity,
+        state: formData.propertyState,
+        zipCode: formData.propertyZip,
+        zipPlus4: '',
+        county: formData.propertyCounty || '',
+        countyFips: '',
+        latitude: 0, // Not needed for comp search
+        longitude: 0, // Not needed for comp search
+        validated: true,
+      },
+      propertyType: formData.propertyType,
+      bedrooms: formData.bedrooms,
+      bathrooms: formData.bathrooms,
+      squareFeet: formData.squareFeet,
+      lotSize: 0, // Not available from form data
+      yearBuilt: formData.yearBuilt,
+      lastSaleDate: null,
+      lastSalePrice: null,
+      taxAssessedValue: 0,
+      taxAssessmentHistory: [],
+      zoning: '',
+      preForeclosure: false,
     };
-    console.log("[DEBUG] Property lookup address:", JSON.stringify(addressInput));
-
-    let subjectProperty = null;
-    try {
-      subjectProperty = await lookupProperty(client, addressInput);
-      console.log("[DEBUG] Property lookup succeeded");
-    } catch (error: any) {
-      console.log("[DEBUG] Property lookup failed (not in database), using form data instead");
-      // Create a minimal subject property from form input only
-      // Extract street number and name from propertyAddress (e.g., "2316 Fernwood Drive")
-      const addressParts = formData.propertyAddress.trim().split(' ');
-      const streetNumber = addressParts[0] || '';
-      const streetName = addressParts.slice(1).join(' ') || formData.propertyAddress;
-
-      const fullAddress = `${formData.propertyAddress}, ${formData.propertyCity}, ${formData.propertyState} ${formData.propertyZip}`;
-
-      subjectProperty = {
-        address: {
-          standardizedAddress: fullAddress,
-          streetNumber: streetNumber,
-          streetName: streetName,
-          city: formData.propertyCity,
-          state: formData.propertyState,
-          zipCode: formData.propertyZip,
-          county: formData.propertyCounty,
-          latitude: 0, // Not needed for comp search
-          longitude: 0, // Not needed for comp search
-        },
-        propertyType: formData.propertyType,
-        bedrooms: formData.bedrooms,
-        bathrooms: formData.bathrooms,
-        squareFeet: formData.squareFeet,
-        yearBuilt: formData.yearBuilt,
-        // No AVM, tax assessment, or other details since property isn't in database
-      };
-    }
 
     // Step 2: Search for comparable sales (3-tier strategy with caching)
     // Use user-provided property details and market type for comp search
@@ -76,6 +61,8 @@ export async function getBatchDataPropertyEstimates(
     const compResult = await searchComparables({
       subjectProperty,
       marketType: formData.marketType,
+      rehabBudget: formData.rehab, // Pass rehab budget for percentile-based ARV
+      userProvidedCompAddresses: formData.compLinks || [], // User-provided comps (additive)
       userPropertyData: {
         bedrooms: formData.bedrooms,
         bathrooms: formData.bathrooms,
@@ -192,48 +179,6 @@ export async function getBatchDataPropertyEstimates(
 }
 
 /**
- * Lookup property (with caching)
- */
-async function lookupProperty(client: any, address: string | any): Promise<any> {
-  const startTime = Date.now();
-
-  // Generate cache key from address (handle both string and AddressInput)
-  const cacheKey = typeof address === 'string'
-    ? address
-    : `${address.street}, ${address.city}, ${address.state} ${address.zip}`;
-
-  const cached = getCachedProperty(cacheKey);
-  if (cached) {
-    console.log("Using cached property details");
-    trackAPIUsage("/property/lookup", true, true, Date.now() - startTime);
-    return cached;
-  }
-
-  try {
-    const result = await client.lookupProperty(address);
-    cacheProperty(cacheKey, result);
-    trackAPIUsage("/property/lookup", true, false, Date.now() - startTime);
-    return result;
-  } catch (error: any) {
-    console.error("[BatchData] Property lookup failed:");
-    console.error("  Address:", cacheKey);
-    console.error("  Error:", error.message);
-    if (error.response) {
-      console.error("  Status:", error.response.status);
-      console.error("  Data:", JSON.stringify(error.response.data).substring(0, 200));
-    }
-    trackAPIUsage(
-      "/property/lookup",
-      false,
-      false,
-      Date.now() - startTime,
-      error.message
-    );
-    throw error;
-  }
-}
-
-/**
  * Generate market analysis narrative for Gary
  */
 function generateMarketAnalysis(
@@ -250,9 +195,37 @@ function generateMarketAnalysis(
       valuation.estimatedARV) *
     100;
 
-  let analysis = `Based on ${compCount} comparable sales within ${compResult.searchRadius} miles (${tierLabel} search criteria), `;
-  analysis += `the estimated ARV is $${valuation.estimatedARV.toLocaleString()}. `;
+  const renovationPerSqft = formData.squareFeet > 0 ? formData.rehab / formData.squareFeet : 0;
+  const hasRehab = formData.rehab > 0;
 
+  let analysis = `Based on ${compCount} comparable sales within ${compResult.searchRadius} miles (${tierLabel} search criteria)`;
+
+  // User-provided comps mention
+  const userProvidedCount = compResult.comps.filter((c: any) => c.isUserProvided).length;
+  if (userProvidedCount > 0) {
+    analysis += `, including ${userProvidedCount} user-provided comp${userProvidedCount > 1 ? 's' : ''}`;
+  }
+
+  analysis += `, the estimated ARV is $${valuation.estimatedARV.toLocaleString()}. `;
+
+  // Explain percentile methodology for rehab projects
+  if (hasRehab) {
+    let percentileLabel: string;
+    if (renovationPerSqft > 50) {
+      percentileLabel = "87.5th percentile (heavy renovation - targeting top-tier renovated comps)";
+    } else if (renovationPerSqft > 30) {
+      percentileLabel = "80th percentile (medium renovation - targeting upper renovated comps)";
+    } else {
+      percentileLabel = "65th percentile (light renovation - targeting moderately updated comps)";
+    }
+
+    analysis += `With a renovation budget of $${formData.rehab.toLocaleString()} ($${renovationPerSqft.toFixed(0)}/sqft), `;
+    analysis += `this ARV uses the ${percentileLabel}. This targets properties that have been recently renovated to similar quality. `;
+  } else {
+    analysis += `No renovation budget - ARV equals as-is value based on median market comps (50th percentile). `;
+  }
+
+  // Confidence assessment
   if (compResult.tier === 1) {
     analysis += "High confidence: Tight comps with similar characteristics. ";
   } else if (compResult.tier === 2) {
@@ -262,19 +235,7 @@ function generateMarketAnalysis(
       "Lower confidence: Wide search radius required - limited comparable sales. ";
   }
 
-  analysis += `Median price per sqft is $${compResult.medianPricePerSqft.toFixed(
-    2
-  )}. `;
-
-  if (valuation.valuationMethod === "triangulated") {
-    analysis += `This estimate triangulates BatchData AVM ($${valuation.avmValue.toLocaleString()}, ${
-      valuation.avmConfidence
-    }% confidence) with comp-derived value ($${valuation.compDerivedValue.toLocaleString()}). `;
-  } else if (valuation.valuationMethod === "avm_only") {
-    analysis += `Limited comps available - estimate weighted toward BatchData AVM. `;
-  } else {
-    analysis += `Low AVM confidence - estimate weighted toward comparable sales. `;
-  }
+  analysis += `Median price per sqft is $${compResult.medianPricePerSqft.toFixed(2)}. `;
 
   // Compare to user's estimate
   if (Math.abs(userArvDiff) < 5) {

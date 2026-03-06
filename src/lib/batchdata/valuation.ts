@@ -17,12 +17,19 @@ export interface ValuationResult {
 }
 
 /**
- * Triangulate valuation between AVM and comp-derived value
+ * Calculate ARV and As-Is Value
  *
- * Strategy:
- * - If AVM confidence > 70 and 5+ tight comps: Weight 50/50
- * - If AVM confidence < 50 or < 3 comps: Weight more heavily toward available data
- * - If comps tier 3 (wide search): Weight AVM more heavily
+ * NEW STRATEGY (Percentile-Based ARV):
+ * - ARV = 100% comp-derived value (using percentiles based on rehab budget)
+ *   - No rehab: ARV = As-Is Value (median comps, 50th percentile)
+ *   - With rehab: ARV = Upper percentile comps (65th-87.5th based on renovation intensity)
+ * - AVM is ONLY used for as-is value, NOT for ARV
+ *   - AVM = Automated estimate of property in CURRENT condition
+ *   - ARV = Market value AFTER renovation (from renovated comps)
+ *
+ * Confidence based on:
+ * - Number of comps found
+ * - Search tier tightness
  */
 export function calculateValuation(
   subjectProperty: BatchDataPropertyResponse | any,
@@ -40,49 +47,17 @@ export function calculateValuation(
   let confidence: "high" | "medium" | "low";
   let valuationMethod: "triangulated" | "avm_only" | "comp_only";
 
-  // If no AVM data, rely entirely on comps
-  if (!hasAVM || avmValue === 0) {
-    console.log("[Valuation] No AVM data available, using comp-only valuation");
-    estimatedARV = compDerivedValue;
-    confidence = compCount >= 5 && compTier === 1 ? "medium" : "low";
-    valuationMethod = "comp_only";
-  }
-  // Decision tree for valuation with AVM
-  else if (compCount >= 5 && compTier === 1 && avmConfidence >= 70) {
-    // Best case: Tight comps + high AVM confidence
-    estimatedARV = Math.round(avmValue * 0.5 + compDerivedValue * 0.5);
-    confidence = "high";
-    valuationMethod = "triangulated";
-  } else if (compCount >= 3 && compTier <= 2 && avmConfidence >= 60) {
-    // Good case: Decent comps + moderate AVM confidence
-    estimatedARV = Math.round(avmValue * 0.6 + compDerivedValue * 0.4);
-    confidence = "medium";
-    valuationMethod = "triangulated";
-  } else if (compCount < 3 && avmConfidence >= 50) {
-    // Low comp count: Trust AVM more
-    estimatedARV = Math.round(avmValue * 0.8 + compDerivedValue * 0.2);
-    confidence = "medium";
-    valuationMethod = "avm_only";
-  } else if (compCount >= 3 && avmConfidence < 50) {
-    // Low AVM confidence: Trust comps more
-    estimatedARV = Math.round(avmValue * 0.3 + compDerivedValue * 0.7);
-    confidence = "medium";
-    valuationMethod = "comp_only";
-  } else if (compTier === 3) {
-    // Wide comp search: Weight AVM more
-    estimatedARV = Math.round(avmValue * 0.7 + compDerivedValue * 0.3);
-    confidence = "low";
-    valuationMethod = "triangulated";
+  // ARV = 100% comp-derived value (already percentile-adjusted based on rehab budget)
+  estimatedARV = compDerivedValue;
+  valuationMethod = "comp_only";
+
+  // Confidence based on comp count and tier tightness
+  if (compCount >= 5 && compTier === 1) {
+    confidence = "high"; // 5+ tight comps
+  } else if (compCount >= 3 && compTier <= 2) {
+    confidence = "medium"; // 3+ moderate comps
   } else {
-    // Worst case: Limited data - use whatever is available
-    if (hasAVM && avmValue > 0) {
-      estimatedARV = avmValue;
-      valuationMethod = "avm_only";
-    } else {
-      estimatedARV = compDerivedValue;
-      valuationMethod = "comp_only";
-    }
-    confidence = "low";
+    confidence = "low"; // <3 comps or wide search
   }
 
   // As-is value = current property condition value (conservative estimate)

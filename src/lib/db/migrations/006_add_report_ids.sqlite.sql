@@ -1,8 +1,8 @@
 -- Add report ID system and configurable retention
 -- Reports are accessible via shareable links for a configurable duration
 
--- Add report retention setting to users (defaults to 14 days)
-ALTER TABLE users ADD COLUMN report_retention_days INTEGER DEFAULT 14;
+-- Add report retention setting to users (defaults to 15 days for free tier)
+ALTER TABLE users ADD COLUMN report_retention_days INTEGER DEFAULT 15;
 
 -- Add report ID and expiration to submissions
 ALTER TABLE underwriting_submissions ADD COLUMN report_id TEXT;

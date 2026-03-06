@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeEmail } from "@/lib/email/normalization";
 import {
-  findUserByNormalizedEmail,
-  createUser,
   incrementUsageCount,
   createSubmission,
   checkRateLimit,
@@ -100,7 +98,7 @@ function sendError(
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { email, recaptchaToken, formData } = body;
+  const { email, verificationCode, recaptchaToken, formData } = body;
 
   // Create a readable stream for progress updates
   const stream = new ReadableStream({
@@ -109,8 +107,8 @@ export async function POST(request: Request) {
         // Step 1: Validate inputs (0-5%)
         sendProgress(controller, 1, "Validating request...", 5);
 
-        if (!email || !formData) {
-          sendError(controller, "Email and form data are required", "INVALID_REQUEST");
+        if (!email || !formData || !verificationCode) {
+          sendError(controller, "Email, verification code, and form data are required", "INVALID_REQUEST");
           controller.close();
           return;
         }
@@ -152,20 +150,29 @@ export async function POST(request: Request) {
           return;
         }
 
-        // Step 6: Normalize email and find/create user (20-25%)
-        sendProgress(controller, 1, "Verifying email...", 20);
+        // Step 6: Verify email code (20-25%)
+        sendProgress(controller, 1, "Verifying email code...", 20);
 
         const normalizedEmail = normalizeEmail(email);
-        let user = findUserByNormalizedEmail(normalizedEmail);
 
-        // If user doesn't exist, this means they skipped the verify-email step
-        // Create them now (they'll get verification email after underwriting)
-        if (!user) {
-          const { user: newUser } = createUser(email, normalizedEmail);
-          user = newUser;
+        // Import verifyUserCode
+        const { verifyUserCode } = await import("@/lib/db/queries");
+
+        const verifiedUser = verifyUserCode(verificationCode, normalizedEmail);
+
+        if (!verifiedUser) {
+          sendError(
+            controller,
+            "Invalid or expired verification code. Please request a new code.",
+            "INVALID_CODE"
+          );
+          controller.close();
+          return;
         }
 
-        // Step 7: Check usage limit (for all users, verified or not)
+        const user = verifiedUser;
+
+        // Step 7: Check usage limit
         if (user.usage_count >= user.usage_limit) {
           sendError(
             controller,
@@ -377,33 +384,25 @@ export async function POST(request: Request) {
         // Step 13: Increment usage count
         incrementUsageCount(user.id);
 
-        // Step 14: Handle response based on verification status
-        if (!user.email_verified) {
-          // User not verified yet - send verification email with link to results
-          sendProgress(controller, 5, "Sending verification email...", 95);
-          console.log("Sending verification email to unverified user...");
+        // Step 14: Send email with report link (90-95%)
+        sendProgress(controller, 5, "Sending report link to your email...", 95);
 
-          // Import sendgrid and regenerate token
-          const { regenerateVerificationToken } = await import("@/lib/db/queries");
-          const sgMail = (await import("@sendgrid/mail")).default;
+        const sgMail = (await import("@sendgrid/mail")).default;
 
-          if (!process.env.SENDGRID_API_KEY) {
-            throw new Error("SENDGRID_API_KEY is not set");
-          }
+        if (!process.env.SENDGRID_API_KEY) {
+          throw new Error("SENDGRID_API_KEY is not set");
+        }
 
-          sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-          const { token } = regenerateVerificationToken(user.id);
-          const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/underwrite/verify?token=${token}&report=${reportId}`;
+        const reportUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/underwrite/results/${reportId}`;
 
-          const reportUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/underwrite/results/${reportId}`;
-
-          await sgMail.send({
-            to: email,
-            from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
-            subject: "Verify Your Email - View Your Underwriting Results",
-            text: `Click the link to verify your email and view your underwriting results: ${verificationUrl}\n\nAfter verification, you can access your report at any time using this link (valid for ${retentionDays} days): ${reportUrl}`,
-            html: `
+        await sgMail.send({
+          to: email,
+          from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
+          subject: "Your Underwriting Report Link - Glass Loans",
+          text: `Your underwriting report is ready!\n\nView your report: ${reportUrl}\n\nThis link will be valid for ${retentionDays} days.\n\nBest,\nGlass Loans Team`,
+          html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -412,54 +411,26 @@ export async function POST(request: Request) {
     <h1 style="color: white; margin: 0;">Glass Loans</h1>
   </div>
   <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
-    <h2 style="color: #333; margin-top: 0;">Your Underwriting Analysis is Ready!</h2>
-    <p>Gary has analyzed your property at <strong>${formData.propertyAddress}</strong>.</p>
-    <p><strong>Final Score: ${finalScore}/100</strong></p>
+    <h2 style="color: #333; margin-top: 0;">Your Report is Ready!</h2>
+    <p>Your underwriting analysis has been completed.</p>
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${verificationUrl}" style="background-color: #4A6CF7; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Verify Email & View Results</a>
+      <a href="${reportUrl}" style="background-color: #4A6CF7; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Report</a>
     </div>
-    <p style="font-size: 14px; color: #666;">This verification link expires in 24 hours.</p>
-    <div style="background-color: #e8f0fe; padding: 15px; border-radius: 5px; margin: 20px 0;">
-      <p style="margin: 0 0 10px 0; font-weight: bold; color: #1a73e8;">📎 Save Your Report Link</p>
-      <p style="margin: 0 0 10px 0; font-size: 14px;">After verification, access your report anytime for ${retentionDays} days:</p>
-      <p style="margin: 0; font-size: 13px; word-break: break-all;"><a href="${reportUrl}" style="color: #1a73e8;">${reportUrl}</a></p>
-    </div>
-    <p style="font-size: 14px; color: #666;"><strong>Note:</strong> Free tier includes limited uses per verified email address.</p>
+    <p style="font-size: 14px; color: #666;">This link will be valid for ${retentionDays} days.</p>
     <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
     <p style="font-size: 12px; color: #999; text-align: center;">Glass Loans | 1108 McKennie Ave. Suite 011 Nashville, TN 37206</p>
   </div>
 </body>
 </html>`,
-          });
+        });
 
-          sendComplete(controller, {
-            success: true,
-            emailSent: true,
-            message: "Check your email to view your underwriting results.",
-            submissionId: submission.id,
-            reportId,
-          });
-        } else {
-          // Step 15: User is verified - return results immediately (with dual calculations)
-          sendComplete(controller, {
-            success: true,
-            reportId,
-            results: {
-              formData,
-              aiEstimates,
-              calculations: garyCalculations, // Primary calculations (for compatibility)
-              userCalculations, // User's ARV calculations
-              garyCalculations, // Gary's ARV calculations
-              garyOpinion,
-              finalScore,
-              submittedAt: new Date(),
-              usageCount: user.usage_count + 1,
-              usageLimit: user.usage_limit,
-              reportId,
-              expiresAt,
-            },
-          });
-        }
+        // Step 15: Return success with reportId for immediate redirect
+        sendComplete(controller, {
+          success: true,
+          reportId,
+          emailSent: true,
+          message: "Report generated successfully! Redirecting...",
+        });
 
         controller.close();
       } catch (error: any) {

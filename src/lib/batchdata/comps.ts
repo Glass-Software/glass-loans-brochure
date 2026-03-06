@@ -19,6 +19,8 @@ interface CompSearchOptions {
   minComps?: number; // Default 3
   maxTier?: 1 | 2 | 3; // Max tier to attempt
   marketType?: MarketType; // Primary/Secondary/Tertiary for market-aware distances
+  rehabBudget?: number; // Rehab budget for percentile-based ARV calculation
+  userProvidedCompAddresses?: string[]; // User-provided comp addresses (additive)
   userPropertyData?: {
     // User-provided values override BatchData lookup
     bedrooms?: number;
@@ -52,6 +54,64 @@ export interface CompSearchResult {
 }
 
 /**
+ * Fetch user-provided comparable properties
+ * These are ADDITIVE to BatchData search results, not replacements
+ */
+async function fetchUserProvidedComps(
+  client: any,
+  compAddresses: string[],
+  subjectAddress: { street: string; city: string; state: string; zip: string }
+): Promise<any[]> {
+  if (!compAddresses || compAddresses.length === 0) {
+    return [];
+  }
+
+  console.log(`[User Comps] Fetching ${compAddresses.length} user-provided comps...`);
+
+  const userComps: any[] = [];
+
+  for (const address of compAddresses) {
+    try {
+      // Attempt to look up the property
+      const property = await client.lookupProperty(address);
+
+      // Convert to comp format
+      const comp = {
+        address: property.address.standardizedAddress,
+        propertyType: property.propertyType,
+        bedrooms: property.bedrooms,
+        bathrooms: property.bathrooms,
+        squareFeet: property.squareFeet,
+        yearBuilt: property.yearBuilt,
+        lotSize: property.lotSize,
+        lastSaleDate: property.lastSaleDate,
+        lastSalePrice: property.lastSalePrice,
+        distance: 0, // User comps don't have distance calculation
+        avm: property.avm,
+        taxAssessedValue: property.taxAssessedValue,
+        preForeclosure: property.preForeclosure,
+        pricePerSqft: property.squareFeet > 0 && property.lastSalePrice > 0
+          ? property.lastSalePrice / property.squareFeet
+          : 0,
+        taxAssessmentRatio: property.taxAssessedValue > 0 && property.lastSalePrice > 0
+          ? property.lastSalePrice / property.taxAssessedValue
+          : 0,
+        isUserProvided: true, // Flag to identify user-provided comps
+      };
+
+      userComps.push(comp);
+      console.log(`[User Comps] ✓ Fetched: ${comp.address}`);
+    } catch (error: any) {
+      console.error(`[User Comps] ✗ Failed to fetch ${address}: ${error.message}`);
+      // Continue with other comps - don't fail entire search
+    }
+  }
+
+  console.log(`[User Comps] Successfully fetched ${userComps.length}/${compAddresses.length} user-provided comps`);
+  return userComps;
+}
+
+/**
  * Execute 3-tier comp search strategy with market-aware distance scaling
  *
  * Distance tiers by market type:
@@ -59,27 +119,47 @@ export interface CompSearchResult {
  * - Secondary (suburban):     Tier 1: 2mi,  Tier 2: 5mi,  Tier 3: 8mi
  * - Tertiary (rural):         Tier 1: 5mi,  Tier 2: 10mi, Tier 3: 15mi
  *
+ * All Tiers:
+ * - Year Built: ±10 years (ensures age-appropriate comps)
+ *
  * Tier 1 (strictest):
  * - Bed/Bath: Exact match (0 variance)
  * - Square Feet: ±10%
- * - Year Built: ±10 years
  *
  * Tier 2 & 3 (relaxed):
  * - Bed/Bath: ±1 variance (never more than ±1)
  * - Square Feet: ±20%
- * - Year Built: No constraint
  */
 export async function searchComparables(
   options: CompSearchOptions
 ): Promise<CompSearchResult> {
-  const { subjectProperty, minComps = 5, maxTier = 3, marketType = "Primary", userPropertyData } = options;
+  const {
+    subjectProperty,
+    minComps = 3,
+    maxTier = 3,
+    marketType = "Primary",
+    rehabBudget = 0,
+    userProvidedCompAddresses = [],
+    userPropertyData
+  } = options;
   const client = getBatchDataClient();
 
+  // Step 1: Fetch user-provided comps first (if any)
+  const subjectAddress = {
+    street: subjectProperty.address.streetNumber + " " + subjectProperty.address.streetName,
+    city: subjectProperty.address.city,
+    state: subjectProperty.address.state,
+    zip: subjectProperty.address.zipCode,
+  };
+
+  const userComps = await fetchUserProvidedComps(client, userProvidedCompAddresses, subjectAddress);
+
+  // Step 2: Run tiered BatchData search
   // Tier 1: Tight search
   const tier1Radius = getRadiusForMarketAndTier(marketType, 1);
   console.log(`Starting Tier 1 comp search (${tier1Radius}mi, tight criteria, ${marketType} market)...`);
   const tier1Start = Date.now();
-  let tier1Result = await searchTier(client, subjectProperty, 1, marketType, userPropertyData);
+  let tier1Result = await searchTier(client, subjectProperty, 1, marketType, rehabBudget, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -87,8 +167,11 @@ export async function searchComparables(
     Date.now() - tier1Start
   );
 
+  // Merge user comps with tier 1 results
+  tier1Result = mergeUserComps(tier1Result, userComps, rehabBudget, userPropertyData?.squareFeet ?? subjectProperty.squareFeet);
+
   if (tier1Result.comps.length >= minComps) {
-    console.log(`Tier 1 found ${tier1Result.comps.length} comps - using these`);
+    console.log(`Tier 1 found ${tier1Result.comps.length} comps (${userComps.length} user-provided) - using these`);
     return tier1Result;
   }
 
@@ -100,7 +183,7 @@ export async function searchComparables(
     `Tier 1 found only ${tier1Result.comps.length} comps, expanding to Tier 2 (${tier2Radius}mi)...`
   );
   const tier2Start = Date.now();
-  let tier2Result = await searchTier(client, subjectProperty, 2, marketType, userPropertyData);
+  let tier2Result = await searchTier(client, subjectProperty, 2, marketType, rehabBudget, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -108,8 +191,11 @@ export async function searchComparables(
     Date.now() - tier2Start
   );
 
+  // Merge user comps with tier 2 results
+  tier2Result = mergeUserComps(tier2Result, userComps, rehabBudget, userPropertyData?.squareFeet ?? subjectProperty.squareFeet);
+
   if (tier2Result.comps.length >= minComps) {
-    console.log(`Tier 2 found ${tier2Result.comps.length} comps - using these`);
+    console.log(`Tier 2 found ${tier2Result.comps.length} comps (${userComps.length} user-provided) - using these`);
     return tier2Result;
   }
 
@@ -121,7 +207,7 @@ export async function searchComparables(
     `Tier 2 found only ${tier2Result.comps.length} comps, expanding to Tier 3 (${tier3Radius}mi)...`
   );
   const tier3Start = Date.now();
-  let tier3Result = await searchTier(client, subjectProperty, 3, marketType, userPropertyData);
+  let tier3Result = await searchTier(client, subjectProperty, 3, marketType, rehabBudget, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -129,8 +215,42 @@ export async function searchComparables(
     Date.now() - tier3Start
   );
 
-  console.log(`Tier 3 found ${tier3Result.comps.length} comps (maximum reach)`);
+  // Merge user comps with tier 3 results
+  tier3Result = mergeUserComps(tier3Result, userComps, rehabBudget, userPropertyData?.squareFeet ?? subjectProperty.squareFeet);
+
+  console.log(`Tier 3 found ${tier3Result.comps.length} comps (${userComps.length} user-provided, maximum reach)`);
   return tier3Result;
+}
+
+/**
+ * Merge user-provided comps with BatchData search results
+ * User comps are ADDITIVE, not replacements
+ */
+function mergeUserComps(
+  searchResult: CompSearchResult,
+  userComps: any[],
+  rehabBudget: number,
+  subjectSqft: number
+): CompSearchResult {
+  if (userComps.length === 0) {
+    return searchResult;
+  }
+
+  // Merge all comps (BatchData + user-provided)
+  const allComps = [...searchResult.allComps, ...userComps];
+  const comps = [...searchResult.comps, ...userComps];
+
+  // Recalculate comp-derived value with all comps
+  const compDerivedValue = calculateCompDerivedValue(comps, subjectSqft, rehabBudget);
+  const medianPricePerSqft = calculateMedianPricePerSqft(comps);
+
+  return {
+    ...searchResult,
+    allComps,
+    comps,
+    compDerivedValue,
+    medianPricePerSqft,
+  };
 }
 
 /**
@@ -141,6 +261,7 @@ async function searchTier(
   subject: BatchDataPropertyResponse,
   tier: 1 | 2 | 3,
   marketType: MarketType,
+  rehabBudget: number,
   userPropertyData?: {
     bedrooms?: number;
     bathrooms?: number;
@@ -164,7 +285,7 @@ async function searchTier(
       subject,
       cached.properties,
       effectiveSqft,
-      getFilterConfigForTier(tier)
+      getFilterConfigForTier(tier, marketType)
     );
 
     return {
@@ -175,7 +296,8 @@ async function searchTier(
       searchRadius: getRadiusForMarketAndTier(marketType, tier),
       compDerivedValue: calculateCompDerivedValue(
         filterResult.usedForCalculation,
-        effectiveSqft
+        effectiveSqft,
+        rehabBudget
       ),
       medianPricePerSqft: calculateMedianPricePerSqft(
         filterResult.usedForCalculation
@@ -205,7 +327,7 @@ async function searchTier(
     subject,
     response.properties,
     effectiveSqft,
-    getFilterConfigForTier(tier)
+    getFilterConfigForTier(tier, marketType)
   );
 
   return {
@@ -216,7 +338,8 @@ async function searchTier(
     searchRadius: getRadiusForMarketAndTier(marketType, tier),
     compDerivedValue: calculateCompDerivedValue(
       filterResult.usedForCalculation,
-      effectiveSqft
+      effectiveSqft,
+      rehabBudget
     ),
     medianPricePerSqft: calculateMedianPricePerSqft(
       filterResult.usedForCalculation
@@ -262,8 +385,15 @@ function buildCompSearchOptions(
     options.maxBedrooms = 0;   // Exact match
     options.minBathrooms = 0;  // Exact match
     options.maxBathrooms = 0;  // Exact match
+  } else if (marketType === "Primary" && tier === 2) {
+    // Tier 2 in Primary markets: Keep bedroom matching EXACT (cities need tight comps)
+    // Only relax sqft and distance, not bed/bath
+    options.minBedrooms = 0;   // Exact match
+    options.maxBedrooms = 0;   // Exact match
+    options.minBathrooms = -1; // Allow ±1 bathroom
+    options.maxBathrooms = 1;  // Allow ±1 bathroom
   } else {
-    // Tier 2 & 3: ±1 bed/bath variance (never more than 1)
+    // Tier 2 (Secondary/Tertiary) & Tier 3 (all markets): ±1 bed/bath variance
     options.minBedrooms = -1;  // Subject bedrooms - 1
     options.maxBedrooms = 1;   // Subject bedrooms + 1
     options.minBathrooms = -1; // Subject bathrooms - 1
@@ -281,8 +411,8 @@ function buildCompSearchOptions(
     options.maxAreaPercent = 20;  // 120% of subject sqft
   }
 
-  // Year built (Tier 1 only - relative values)
-  if (tier === 1 && yearBuilt) {
+  // Year built (ALL tiers - relative values)
+  if (yearBuilt) {
     options.minYearBuilt = -10; // Subject year - 10
     options.maxYearBuilt = 10;  // Subject year + 10
   }
@@ -309,53 +439,121 @@ function getRadiusForMarketAndTier(marketType: MarketType, tier: 1 | 2 | 3): num
 }
 
 /**
- * Get filter configuration based on tier
+ * Get filter configuration based on tier and market type
  * Tier 1: Strict filtering (tight comps)
  * Tier 2: Moderate filtering (expanded search)
  * Tier 3: Relaxed filtering (maximum reach - we need comps!)
  *
  * Note: Uses IQR method for outlier detection (robust, not affected by extremes)
+ * Note: Price per sqft filtering DISABLED - counterproductive for rehab projects where higher $/sqft comps show ARV potential
  */
-function getFilterConfigForTier(tier: 1 | 2 | 3): Partial<CompFilterConfig> {
+function getFilterConfigForTier(tier: 1 | 2 | 3, marketType?: MarketType): Partial<CompFilterConfig> {
+  // Lot size filtering only relevant in Primary/Secondary (urban/suburban density matters)
+  const lotSizeFilter = marketType === "Primary" || marketType === "Secondary";
+
   if (tier === 1) {
     return {
       strictPropertyType: true,
       removeOutliers: true,
-      outlierStdDevThreshold: 2.0, // Deprecated (IQR method used instead)
-      pricePerSqftFilter: true,
-      pricePerSqftTolerancePercent: 30, // ±30%
+      pricePerSqftFilter: false, // DISABLED: Comps with higher $/sqft show ARV potential for rehab
+      pricePerSqftTolerancePercent: 30,
       excludeForeclosures: true,
       detectRenovations: false,
+      lotSizeFilter,
+      lotSizeTolerancePercent: 50, // ±50%
     };
   } else if (tier === 2) {
     return {
       strictPropertyType: true,
       removeOutliers: true,
-      outlierStdDevThreshold: 2.5, // Deprecated (IQR method used instead)
-      pricePerSqftFilter: true,
-      pricePerSqftTolerancePercent: 40, // ±40%
+      pricePerSqftFilter: false, // DISABLED: Comps with higher $/sqft show ARV potential for rehab
+      pricePerSqftTolerancePercent: 40,
       excludeForeclosures: true,
       detectRenovations: false,
+      lotSizeFilter,
+      lotSizeTolerancePercent: 60, // ±60%
     };
   } else {
     // Tier 3: Minimal filtering (we need comps!)
     return {
       strictPropertyType: false, // Allow different property types
       removeOutliers: true,
-      outlierStdDevThreshold: 3.0, // Deprecated (IQR method used instead)
-      pricePerSqftFilter: false, // Don't filter by price
+      pricePerSqftFilter: false,
       excludeForeclosures: true,
       detectRenovations: false,
+      lotSizeFilter: false, // Don't flag lot size in Tier 3
     };
   }
 }
 
 /**
- * Calculate comp-derived value: median $/sqft × subject sqft
+ * Calculate comp-derived value based on renovation budget
+ *
+ * Logic:
+ * - No rehab (0): Use median (50th percentile) - as-is condition comps
+ * - Light rehab (≤$30/sqft): Use 65th percentile - minor updates
+ * - Medium rehab ($31-50/sqft): Use 80th percentile - substantial renovation
+ * - Heavy rehab (>$50/sqft): Use 87.5th percentile - full gut renovation
+ *
+ * Percentile approach captures the natural market distribution:
+ * - Lower percentiles = as-is or dated properties
+ * - Upper percentiles = recently renovated properties
  */
-function calculateCompDerivedValue(comps: any[], subjectSqft: number): number {
-  const medianPricePerSqft = calculateMedianPricePerSqft(comps);
-  return Math.round(medianPricePerSqft * subjectSqft);
+function calculateCompDerivedValue(
+  comps: any[],
+  subjectSqft: number,
+  rehabBudget: number = 0
+): number {
+  if (!comps || comps.length === 0) return 0;
+
+  const pricesPerSqft = comps
+    .filter((c) => c.squareFeet > 0 && c.lastSalePrice > 0)
+    .map((c) => c.lastSalePrice / c.squareFeet)
+    .sort((a, b) => a - b);
+
+  if (pricesPerSqft.length === 0) return 0;
+
+  // Calculate renovation intensity
+  const renovationPerSqft = subjectSqft > 0 ? rehabBudget / subjectSqft : 0;
+
+  // Determine target percentile based on renovation level
+  let targetPercentile: number;
+
+  if (renovationPerSqft === 0) {
+    // No renovation: Use median (as-is condition)
+    targetPercentile = 50;
+  } else if (renovationPerSqft <= 30) {
+    // Light renovation: Use 65th percentile
+    targetPercentile = 65;
+  } else if (renovationPerSqft <= 50) {
+    // Medium renovation: Use 80th percentile
+    targetPercentile = 80;
+  } else {
+    // Heavy renovation: Use 87.5th percentile (between 85th-90th)
+    targetPercentile = 87.5;
+  }
+
+  const targetPricePerSqft = calculatePercentile(pricesPerSqft, targetPercentile);
+  return Math.round(targetPricePerSqft * subjectSqft);
+}
+
+/**
+ * Calculate percentile value from sorted array
+ * @param sortedArray - Must be pre-sorted in ascending order
+ * @param percentile - Value between 0-100 (e.g., 50 for median, 75 for 75th percentile)
+ */
+function calculatePercentile(sortedArray: number[], percentile: number): number {
+  if (sortedArray.length === 0) return 0;
+  if (percentile <= 0) return sortedArray[0];
+  if (percentile >= 100) return sortedArray[sortedArray.length - 1];
+
+  const index = (percentile / 100) * (sortedArray.length - 1);
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  const weight = index - lower;
+
+  // Linear interpolation between values
+  return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
 }
 
 /**
@@ -371,8 +569,5 @@ function calculateMedianPricePerSqft(comps: any[]): number {
 
   if (pricesPerSqft.length === 0) return 0;
 
-  const mid = Math.floor(pricesPerSqft.length / 2);
-  return pricesPerSqft.length % 2 === 0
-    ? (pricesPerSqft[mid - 1] + pricesPerSqft[mid]) / 2
-    : pricesPerSqft[mid];
+  return calculatePercentile(pricesPerSqft, 50);
 }

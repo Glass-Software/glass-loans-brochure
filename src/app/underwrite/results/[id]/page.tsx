@@ -2,9 +2,12 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSubmissionById, getSubmissionByReportId } from "@/lib/db/queries";
 import { calculateUnderwriting } from "@/lib/underwriting/calculations";
+import CalculationBreakdown from "@/components/Underwriting/CalculationBreakdown";
+import GaryOpinion from "@/components/Underwriting/GaryOpinion";
 import type {
   UnderwritingFormData,
-  CalculatedResults
+  CalculatedResults,
+  BatchDataEnrichedEstimates
 } from "@/types/underwriting";
 
 export const metadata: Metadata = {
@@ -71,15 +74,16 @@ export default async function ResultsPage({
       : undefined,
   };
 
-  // Reconstruct AI estimates
-  const aiEstimates = {
+  // Reconstruct AI estimates with full BatchDataEnrichedEstimates type
+  const aiEstimates: BatchDataEnrichedEstimates = {
     estimatedARV: submission.estimated_arv || 0,
     asIsValue: submission.as_is_value || 0,
-    monthlyRent: submission.monthly_rent || 0,
     compsUsed: submission.ai_property_comps
       ? JSON.parse(submission.ai_property_comps)
       : [],
     marketAnalysis: "",
+    batchDataUsed: true,
+    valuationMethod: "batchdata",
   };
 
   // Recalculate metrics using Gary's ARV estimate
@@ -157,139 +161,17 @@ export default async function ResultsPage({
           </div>
 
           {/* Gary's Opinion */}
-          <div className="mb-8 rounded-sm bg-white p-8 shadow-three dark:bg-gray-dark">
-            <h2 className="mb-4 text-2xl font-bold text-dark dark:text-white">
-              Gary&apos;s Opinion
-            </h2>
-            <div className="prose max-w-none text-body-color dark:prose-invert">
-              {submission.gary_opinion}
-            </div>
+          <div className="mb-8">
+            <GaryOpinion opinion={submission.gary_opinion || ""} />
           </div>
 
-          {/* Detailed Breakdown */}
-          <div className="rounded-sm bg-white p-8 shadow-three dark:bg-gray-dark">
-            <h2 className="mb-4 text-2xl font-bold text-dark dark:text-white">
-              Detailed Analysis
-            </h2>
-
-            <div className="space-y-6">
-              {/* Property Info */}
-              <div>
-                <h3 className="mb-2 text-lg font-semibold text-dark dark:text-white">
-                  Property Details
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Purchase Price:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      ${formData.purchasePrice.toLocaleString()}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Rehab Budget:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      ${formData.rehab.toLocaleString()}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">Square Feet:</span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      {formData.squareFeet.toLocaleString()}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">$/SF:</span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      ${calculations.renovationDollarPerSf.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Loan Terms */}
-              <div>
-                <h3 className="mb-2 text-lg font-semibold text-dark dark:text-white">
-                  Loan Terms
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Loan Amount:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      ${calculations.totalLoanAmount.toLocaleString()}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Interest Rate:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      {formData.interestRate}%
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">Term:</span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      {formData.months} months
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Total Interest:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      ${calculations.totalInterest.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Key Metrics */}
-              <div>
-                <h3 className="mb-2 text-lg font-semibold text-dark dark:text-white">
-                  Key Metrics
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Loan-to-Cost:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      {calculations.loanToCost.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Loan-to-As-Is:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      {calculations.loanToAsIsValue.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Stress Test L-ARV:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      {calculations.stressTestedLArv.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-body-color">
-                      Loan Underwater Day 1:
-                    </span>
-                    <span className="ml-2 font-medium text-dark dark:text-white">
-                      {calculations.isLoanUnderwater ? "Yes" : "No"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Detailed Calculation Breakdown */}
+          <div className="mb-8">
+            <CalculationBreakdown
+              formData={formData}
+              aiEstimates={aiEstimates}
+              calculations={calculations}
+            />
           </div>
 
           {/* CTA */}

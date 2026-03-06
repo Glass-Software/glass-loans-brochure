@@ -17,6 +17,13 @@ const dbPath = process.env.NODE_ENV === "production"
 console.log("🚀 Starting migration process...");
 console.log(`📁 Database: ${dbPath}\n`);
 
+// Ensure directory exists (especially important for Fly.io /data mount)
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  console.log(`📁 Creating directory: ${dbDir}`);
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 // Check if database exists
 if (!fs.existsSync(dbPath)) {
   console.log("⚠️  Database file not found. Creating new database...");
@@ -250,6 +257,34 @@ try {
 console.log("");
 
 // =============================================================================
+// Migration 009: Add Verification Code
+// =============================================================================
+console.log("🔍 Checking Migration 009: Add Verification Code");
+
+try {
+  const userColumns = db.pragma("table_info(users)") as Array<{ name: string; type: string }>;
+  const hasVerificationCode = userColumns.some(col => col.name === "verification_code");
+
+  if (!hasVerificationCode) {
+    console.log("⏳ Applying Migration 009...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/009_add_verification_code.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 009 completed: verification_code, code_expires_at columns added");
+  } else {
+    console.log("✅ Migration 009 already applied (verification_code exists)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 009 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
 // Verification & Summary
 // =============================================================================
 console.log("🔍 Verifying final schema...\n");
@@ -284,6 +319,7 @@ try {
   console.log("   • Migration 006: Report IDs and retention ✅");
   console.log("   • Migration 007: Property details ✅");
   console.log("   • Migration 008: User as-is value & county ✅");
+  console.log("   • Migration 009: Email verification code ✅");
   console.log("\n🎉 Database is up to date and ready for use!");
 
 } catch (error: any) {

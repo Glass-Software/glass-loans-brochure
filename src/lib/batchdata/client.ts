@@ -7,7 +7,6 @@ import {
   AddressInput,
   BatchDataAddressResponse,
   BatchDataPropertyResponse,
-  PropertySearchCriteria,
   BatchDataSearchResponse,
 } from "./types";
 import {
@@ -52,7 +51,7 @@ export class BatchDataClient {
   private async request<T>(
     endpoint: string,
     data: any,
-    attempt: number = 1
+    attempt: number = 1,
   ): Promise<T> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -61,9 +60,9 @@ export class BatchDataClient {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
-          "Accept": "application/json, application/xml",
+          Accept: "application/json, application/xml",
         },
         body: JSON.stringify(data),
         signal: controller.signal,
@@ -79,7 +78,9 @@ export class BatchDataClient {
           : this.retryConfig.retryDelay;
 
         if (attempt < this.retryConfig.maxRetries) {
-          console.log(`Rate limited, retrying after ${delay}ms (attempt ${attempt}/${this.retryConfig.maxRetries})`);
+          console.log(
+            `Rate limited, retrying after ${delay}ms (attempt ${attempt}/${this.retryConfig.maxRetries})`,
+          );
           await this.sleep(delay);
           return this.request<T>(endpoint, data, attempt + 1);
         }
@@ -90,7 +91,9 @@ export class BatchDataClient {
       if (this.retryConfig.retryableStatusCodes.has(response.status)) {
         if (attempt < this.retryConfig.maxRetries) {
           const delay = this.retryConfig.retryDelay * attempt; // Exponential backoff
-          console.log(`Request failed with ${response.status}, retrying after ${delay}ms (attempt ${attempt}/${this.retryConfig.maxRetries})`);
+          console.log(
+            `Request failed with ${response.status}, retrying after ${delay}ms (attempt ${attempt}/${this.retryConfig.maxRetries})`,
+          );
           await this.sleep(delay);
           return this.request<T>(endpoint, data, attempt + 1);
         }
@@ -101,7 +104,7 @@ export class BatchDataClient {
         throw new BatchDataAPIError(
           `BatchData API error: ${response.status}`,
           response.status,
-          errorText
+          errorText,
         );
       }
 
@@ -139,7 +142,9 @@ export class BatchDataClient {
     } else {
       // Fallback: Try to extract what we can
       const tokens = addressString.trim().split(/\s+/);
-      const zip = tokens[tokens.length - 1].match(/^\d{5}(-\d{4})?$/) ? tokens.pop()! : "";
+      const zip = tokens[tokens.length - 1].match(/^\d{5}(-\d{4})?$/)
+        ? tokens.pop()!
+        : "";
       const state = tokens.length > 0 ? tokens.pop()! : "";
       const city = tokens.length > 0 ? tokens.pop()! : "";
       const street = tokens.join(" ");
@@ -151,33 +156,38 @@ export class BatchDataClient {
    * Verify and standardize address
    */
   async verifyAddress(
-    address: string | AddressInput
+    address: string | AddressInput,
   ): Promise<BatchDataAddressResponse> {
-    const addressInput = typeof address === "string" ? this.parseAddress(address) : address;
+    const addressInput =
+      typeof address === "string" ? this.parseAddress(address) : address;
     const response = await this.request<{ results: { addresses: any[] } }>(
       "/address/verify",
-      { requests: [addressInput] }
+      { requests: [addressInput] },
     );
     // BatchData returns results.addresses array, we take the first one
     const addr = response.results.addresses[0];
     if (addr.error) {
-      throw new BatchDataAPIError(`Address verification failed: ${addr.error}`, 400, addr.error);
+      throw new BatchDataAPIError(
+        `Address verification failed: ${addr.error}`,
+        400,
+        addr.error,
+      );
     }
 
     // Normalize address response to expected format
     return {
-      standardizedAddress: addr.streetNoUnit || addr.street || '',
-      streetNumber: addr.houseNumber || '',
-      streetName: addr.formattedStreet || '',
-      city: addr.city || '',
-      state: addr.state || '',
-      zipCode: addr.zip || '',
-      zipPlus4: addr.zipPlus4 || '',
-      county: addr.county || '',
-      countyFips: addr.countyFipsCode || '',
+      standardizedAddress: addr.streetNoUnit || addr.street || "",
+      streetNumber: addr.houseNumber || "",
+      streetName: addr.formattedStreet || "",
+      city: addr.city || "",
+      state: addr.state || "",
+      zipCode: addr.zip || "",
+      zipPlus4: addr.zipPlus4 || "",
+      county: addr.county || "",
+      countyFips: addr.countyFipsCode || "",
       latitude: addr.latitude || 0,
       longitude: addr.longitude || 0,
-      validated: addr.meta?.normalized || true
+      validated: addr.meta?.normalized || true,
     };
   }
 
@@ -185,17 +195,22 @@ export class BatchDataClient {
    * Lookup property details with all attributes
    */
   async lookupProperty(
-    address: string | AddressInput
+    address: string | AddressInput,
   ): Promise<BatchDataPropertyResponse> {
-    const addressInput = typeof address === "string" ? this.parseAddress(address) : address;
+    const addressInput =
+      typeof address === "string" ? this.parseAddress(address) : address;
     const response = await this.request<{ results: { properties: any[] } }>(
       "/property/lookup/all-attributes",
-      { requests: [addressInput] }
+      { requests: [addressInput] },
     );
     // BatchData returns results.properties array, we take the first one
     const property = response.results.properties[0];
     if (!property) {
-      throw new BatchDataAPIError(`Property not found`, 404, "No property data returned");
+      throw new BatchDataAPIError(
+        `Property not found`,
+        404,
+        "No property data returned",
+      );
     }
 
     // Normalize property response to match expected format
@@ -209,50 +224,61 @@ export class BatchDataClient {
   private normalizePropertyResponse(prop: any): BatchDataPropertyResponse {
     return {
       address: {
-        standardizedAddress: prop.address?.street || prop.address?.streetNoUnit || '',
-        streetNumber: prop.address?.houseNumber || '',
-        streetName: prop.address?.streetName || prop.address?.formattedStreet || '',
-        city: prop.address?.city || '',
-        state: prop.address?.state || '',
-        zipCode: prop.address?.zip || '',
-        zipPlus4: prop.address?.zipPlus4 || '',
-        county: prop.address?.county || '',
-        countyFips: prop.address?.countyFipsCode || '',
+        standardizedAddress:
+          prop.address?.street || prop.address?.streetNoUnit || "",
+        streetNumber: prop.address?.houseNumber || "",
+        streetName:
+          prop.address?.streetName || prop.address?.formattedStreet || "",
+        city: prop.address?.city || "",
+        state: prop.address?.state || "",
+        zipCode: prop.address?.zip || "",
+        zipPlus4: prop.address?.zipPlus4 || "",
+        county: prop.address?.county || "",
+        countyFips: prop.address?.countyFipsCode || "",
         latitude: prop.address?.latitude || 0,
         longitude: prop.address?.longitude || 0,
-        validated: true
+        validated: true,
       },
-      propertyType: prop.general?.propertyTypeDetail || 'Single Family',
-      bedrooms: prop.building?.bedroomCount || prop.building?.calculatedBathroomCount || 0,
-      bathrooms: prop.building?.bathroomCount || prop.building?.calculatedBathroomCount || 0,
-      squareFeet: prop.building?.totalBuildingAreaSquareFeet || prop.building?.livingAreaSquareFeet || 0,
+      propertyType: prop.general?.propertyTypeDetail || "Single Family",
+      bedrooms:
+        prop.building?.bedroomCount ||
+        prop.building?.calculatedBathroomCount ||
+        0,
+      bathrooms:
+        prop.building?.bathroomCount ||
+        prop.building?.calculatedBathroomCount ||
+        0,
+      squareFeet:
+        prop.building?.totalBuildingAreaSquareFeet ||
+        prop.building?.livingAreaSquareFeet ||
+        0,
       lotSize: prop.lot?.lotSizeSquareFeet || 0,
       yearBuilt: prop.building?.yearBuilt || 0,
-      lastSaleDate: prop.sale?.lastSale?.saleDate || prop.deedHistory?.[0]?.saleDate || null,
-      lastSalePrice: prop.sale?.lastSale?.salePrice || prop.deedHistory?.[0]?.salePrice || null,
-      taxAssessedValue: prop.assessment?.totalAssessedValue || prop.assessment?.totalMarketValue || 0,
+      lastSaleDate:
+        prop.sale?.lastSale?.saleDate ||
+        prop.deedHistory?.[0]?.saleDate ||
+        null,
+      lastSalePrice:
+        prop.sale?.lastSale?.salePrice ||
+        prop.deedHistory?.[0]?.salePrice ||
+        null,
+      taxAssessedValue:
+        prop.assessment?.totalAssessedValue ||
+        prop.assessment?.totalMarketValue ||
+        0,
       taxAssessmentHistory: (prop.listing?.taxes || []).map((tax: any) => ({
         year: tax.year || 0,
-        assessedValue: tax.amount || 0
+        assessedValue: tax.amount || 0,
       })),
-      mortgageInfo: prop.mortgageHistory?.[0] ? {
-        lenderName: prop.mortgageHistory[0].lenderName || '',
-        amount: prop.mortgageHistory[0].loanAmount || 0,
-        recordDate: prop.mortgageHistory[0].recordingDate || '',
-        loanType: prop.mortgageHistory[0].loanType || ''
-      } : null,
-      liens: [],
-      ownerName: prop.owner?.fullName || '',
-      ownerType: prop.owner?.ownerStatusType || 'Individual',
-      zoning: prop.lot?.zoningCode || '',
+      zoning: prop.lot?.zoningCode || "",
       avm: {
         value: prop.valuation?.estimatedValue || 0,
         confidenceScore: prop.valuation?.confidenceScore || 0,
         valuationDate: prop.valuation?.asOfDate || new Date().toISOString(),
         lowEstimate: prop.valuation?.priceRangeMin || 0,
-        highEstimate: prop.valuation?.priceRangeMax || 0
+        highEstimate: prop.valuation?.priceRangeMax || 0,
       },
-      preForeclosure: prop.foreclosure?.status ? true : false
+      preForeclosure: prop.foreclosure?.status ? true : false,
     };
   }
 
@@ -262,7 +288,7 @@ export class BatchDataClient {
    */
   async searchProperties(
     searchCriteria: any,
-    options?: any
+    options?: any,
   ): Promise<BatchDataSearchResponse> {
     const requestBody: any = { searchCriteria };
 
@@ -270,26 +296,54 @@ export class BatchDataClient {
     if (options) {
       requestBody.options = {
         ...options,
-        take: 10,  // Get 10 comps for reliable valuation (filtering will reduce to 5-8 clean comps)
+        take: 5, // Get 5 high-quality comps (cost optimization)
         // Try to request all property details
         includePropertyDetails: true,
-        fields: ["address", "building", "sale", "listing", "valuation", "assessment", "owner", "ids"]
+        fields: [
+          "address",
+          "building",
+          "sale",
+          "listing",
+          "valuation",
+          "assessment",
+          "ids",
+        ],
+        // Sort by most recent sales first
+        sort: {
+          sortOrder: "desc",
+          field: "lastSoldDate",
+        },
       };
     } else {
       requestBody.options = {
-        take: 10,
+        take: 5,
         includePropertyDetails: true,
-        fields: ["address", "building", "sale", "listing", "valuation", "assessment", "owner", "ids"]
+        fields: [
+          "address",
+          "building",
+          "sale",
+          "listing",
+          "valuation",
+          "assessment",
+          "ids",
+        ],
+        // Sort by most recent sales first
+        sort: {
+          sortOrder: "desc",
+          field: "lastSoldDate",
+        },
       };
     }
 
     // DEBUG: Log the exact request being sent
-    console.log("[BatchData] DEBUG: Request body being sent to /property/search:");
+    console.log(
+      "[BatchData] DEBUG: Request body being sent to /property/search:",
+    );
     console.log(JSON.stringify(requestBody, null, 2));
 
     const response = await this.request<{ results: { properties: any[] } }>(
       "/property/search",
-      requestBody
+      requestBody,
     );
 
     // DEBUG: Log full raw response to see what BatchData is returning
@@ -298,39 +352,48 @@ export class BatchDataClient {
 
     // Normalize BatchData property objects to simplified format
     const rawProperties = response.results.properties || [];
-    const normalizedProperties = rawProperties.map((prop: any) => {
+    const normalizedProperties = rawProperties
+      .map((prop: any) => {
       // Extract address string
-      const addressStr = prop.address?.street ||
-                        `${prop.address?.houseNumber || ''} ${prop.address?.streetName || ''}`.trim() ||
-                        'Unknown';
+      const addressStr =
+        prop.address?.street ||
+        `${prop.address?.houseNumber || ""} ${prop.address?.streetName || ""}`.trim() ||
+        "Unknown";
 
       // Extract sale data - check multiple possible locations
-      const lastSalePrice = prop.listing?.soldPrice ||
-                           prop.sale?.lastSale?.salePrice ||
-                           prop.valuation?.estimatedValue ||
-                           0;
+      const lastSalePrice =
+        prop.listing?.soldPrice ||
+        prop.sale?.lastSale?.salePrice ||
+        prop.valuation?.estimatedValue ||
+        0;
 
-      const lastSaleDate = prop.listing?.soldDate ||
-                          prop.sale?.lastSale?.saleDate ||
-                          prop.deedHistory?.[0]?.saleDate ||
-                          null;
+      const lastSaleDate =
+        prop.listing?.soldDate ||
+        prop.sale?.lastSale?.saleDate ||
+        prop.deedHistory?.[0]?.saleDate ||
+        null;
 
       // Extract property characteristics
-      const squareFeet = prop.listing?.totalBuildingAreaSquareFeet ||
-                        prop.building?.totalBuildingAreaSquareFeet ||
-                        prop.building?.livingAreaSquareFeet ||
-                        0;
+      // Prioritize livingAreaSquareFeet since that's what we filter on in the query
+      const squareFeet =
+        prop.building?.livingAreaSquareFeet ||
+        prop.listing?.livingAreaSquareFeet ||
+        prop.building?.totalBuildingAreaSquareFeet ||
+        prop.listing?.totalBuildingAreaSquareFeet ||
+        0;
 
-      const bedrooms = prop.listing?.bedroomCount ||
-                      prop.building?.bedroomCount ||
-                      0;
+      const lotSize = prop.lot?.lotSizeSquareFeet || 0;
 
-      const bathrooms = prop.listing?.bathroomCount ||
-                       prop.building?.bathroomCount ||
-                       0;
+      const bedrooms =
+        prop.listing?.bedroomCount || prop.building?.bedroomCount || 0;
 
-      // Distance would be calculated by BatchData API based on compAddress
-      const distance = 0; // TODO: Calculate if coordinates available
+      const bathrooms =
+        prop.listing?.bathroomCount || prop.building?.bathroomCount || 0;
+
+      const yearBuilt = prop.building?.yearBuilt || prop.listing?.yearBuilt || 0;
+
+      // Extract distance from BatchData API response
+      const distance = prop.address?.distanceFromSubject || prop.distance || 0;
 
       // NEW: Extract valuation data
       const avmValue = prop.valuation?.estimatedValue || 0;
@@ -358,10 +421,12 @@ export class BatchDataClient {
 
       return {
         address: addressStr,
-        propertyType: prop.general?.propertyTypeDetail || 'Single Family',
+        propertyType: prop.general?.propertyTypeDetail || "Single Family",
         bedrooms,
         bathrooms,
         squareFeet,
+        yearBuilt: yearBuilt > 0 ? yearBuilt : undefined,
+        lotSize: lotSize > 0 ? lotSize : undefined,
         lastSaleDate,
         lastSalePrice,
         distance,
@@ -382,11 +447,23 @@ export class BatchDataClient {
           taxAssessmentRatio > 0 ? taxAssessmentRatio : undefined,
         listingUrl: listingUrl || undefined,
       };
-    });
+    })
+      .filter((prop: any) => {
+        // Filter out invalid comps that don't meet our minimum requirements
+        if (prop.squareFeet === 0) {
+          console.log(`[BatchData] Filtering out comp with 0 sqft: ${prop.address}`);
+          return false;
+        }
+        if (prop.lastSalePrice === 0) {
+          console.log(`[BatchData] Filtering out comp with no sale price: ${prop.address}`);
+          return false;
+        }
+        return true;
+      });
 
     return {
       properties: normalizedProperties,
-      totalResults: normalizedProperties.length
+      totalResults: normalizedProperties.length,
     };
   }
 
@@ -398,15 +475,15 @@ export class BatchDataClient {
     subjectAddress: AddressInput,
     options?: {
       distanceMiles?: number;
-      minBedrooms?: number;    // Relative: -1 means "subject bedrooms - 1"
-      maxBedrooms?: number;    // Relative: +1 means "subject bedrooms + 1"
-      minBathrooms?: number;   // Relative
-      maxBathrooms?: number;   // Relative
+      minBedrooms?: number; // Relative: -1 means "subject bedrooms - 1"
+      maxBedrooms?: number; // Relative: +1 means "subject bedrooms + 1"
+      minBathrooms?: number; // Relative
+      maxBathrooms?: number; // Relative
       minAreaPercent?: number; // Percentage: -20 means "80% of subject sqft"
       maxAreaPercent?: number; // Percentage: +20 means "120% of subject sqft"
-      minYearBuilt?: number;   // Relative: -10 means "subject year - 10"
-      maxYearBuilt?: number;   // Relative: +10 means "subject year + 10"
-    }
+      minYearBuilt?: number; // Relative: -10 means "subject year - 10"
+      maxYearBuilt?: number; // Relative: +10 means "subject year + 10"
+    },
   ): Promise<BatchDataSearchResponse> {
     const searchCriteria = {
       compAddress: {
@@ -414,7 +491,12 @@ export class BatchDataClient {
         city: subjectAddress.city,
         state: subjectAddress.state,
         zip: subjectAddress.zip,
-      }
+      },
+      building: {
+        livingAreaSquareFeet: {
+          min: 1, // CRITICAL: Only return comps with valid square footage
+        },
+      },
     };
 
     const searchOptions: any = {};
@@ -426,31 +508,51 @@ export class BatchDataClient {
     }
 
     // Bedrooms filter (relative values)
-    if (options?.minBedrooms !== undefined || options?.maxBedrooms !== undefined) {
+    if (
+      options?.minBedrooms !== undefined ||
+      options?.maxBedrooms !== undefined
+    ) {
       searchOptions.useBedrooms = true;
-      if (options.minBedrooms !== undefined) searchOptions.minBedrooms = options.minBedrooms;
-      if (options.maxBedrooms !== undefined) searchOptions.maxBedrooms = options.maxBedrooms;
+      if (options.minBedrooms !== undefined)
+        searchOptions.minBedrooms = options.minBedrooms;
+      if (options.maxBedrooms !== undefined)
+        searchOptions.maxBedrooms = options.maxBedrooms;
     }
 
     // Bathrooms filter (relative values)
-    if (options?.minBathrooms !== undefined || options?.maxBathrooms !== undefined) {
+    if (
+      options?.minBathrooms !== undefined ||
+      options?.maxBathrooms !== undefined
+    ) {
       searchOptions.useBathrooms = true;
-      if (options.minBathrooms !== undefined) searchOptions.minBathrooms = options.minBathrooms;
-      if (options.maxBathrooms !== undefined) searchOptions.maxBathrooms = options.maxBathrooms;
+      if (options.minBathrooms !== undefined)
+        searchOptions.minBathrooms = options.minBathrooms;
+      if (options.maxBathrooms !== undefined)
+        searchOptions.maxBathrooms = options.maxBathrooms;
     }
 
     // Area filter (percentage values)
-    if (options?.minAreaPercent !== undefined || options?.maxAreaPercent !== undefined) {
+    if (
+      options?.minAreaPercent !== undefined ||
+      options?.maxAreaPercent !== undefined
+    ) {
       searchOptions.useArea = true;
-      if (options.minAreaPercent !== undefined) searchOptions.minAreaPercent = options.minAreaPercent;
-      if (options.maxAreaPercent !== undefined) searchOptions.maxAreaPercent = options.maxAreaPercent;
+      if (options.minAreaPercent !== undefined)
+        searchOptions.minAreaPercent = options.minAreaPercent;
+      if (options.maxAreaPercent !== undefined)
+        searchOptions.maxAreaPercent = options.maxAreaPercent;
     }
 
     // Year built filter (relative values)
-    if (options?.minYearBuilt !== undefined || options?.maxYearBuilt !== undefined) {
+    if (
+      options?.minYearBuilt !== undefined ||
+      options?.maxYearBuilt !== undefined
+    ) {
       searchOptions.useYearBuilt = true;
-      if (options.minYearBuilt !== undefined) searchOptions.minYearBuilt = options.minYearBuilt;
-      if (options.maxYearBuilt !== undefined) searchOptions.maxYearBuilt = options.maxYearBuilt;
+      if (options.minYearBuilt !== undefined)
+        searchOptions.minYearBuilt = options.minYearBuilt;
+      if (options.maxYearBuilt !== undefined)
+        searchOptions.maxYearBuilt = options.maxYearBuilt;
     }
 
     return this.searchProperties(searchCriteria, searchOptions);
@@ -482,7 +584,9 @@ export function getBatchDataClient(): BatchDataClient {
       ? "https://stoplight.io/mocks/batchdata/batchdata/20349728"
       : "https://api.batchdata.com/api/v1";
 
-    console.log(`[BatchData] Using ${useMock ? "MOCK" : "PRODUCTION"} endpoint: ${baseUrl}`);
+    console.log(
+      `[BatchData] Using ${useMock ? "MOCK" : "PRODUCTION"} endpoint: ${baseUrl}`,
+    );
 
     batchDataClient = new BatchDataClient({ apiKey, baseUrl });
   }

@@ -15,7 +15,7 @@ export function generateSearchHash(criteria: any): string {
 }
 
 /**
- * Get cached address verification (30 day TTL)
+ * Get cached address verification (6 month TTL)
  */
 export function getCachedAddress(originalAddress: string): any | null {
   const db = getDatabase();
@@ -46,11 +46,11 @@ export function getCachedAddress(originalAddress: string): any | null {
 }
 
 /**
- * Cache address verification (30 days)
+ * Cache address verification (6 months)
  */
 export function cacheAddress(originalAddress: string, response: any): void {
   const db = getDatabase();
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+  const expiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(); // 6 months (180 days)
 
   db.prepare(
     `INSERT OR REPLACE INTO batchdata_address_cache
@@ -74,7 +74,7 @@ export function cacheAddress(originalAddress: string, response: any): void {
 }
 
 /**
- * Get cached property details (7 day TTL)
+ * Get cached property details (6 month TTL)
  */
 export function getCachedProperty(address: string): any | null {
   const db = getDatabase();
@@ -105,11 +105,11 @@ export function getCachedProperty(address: string): any | null {
 }
 
 /**
- * Cache property details (7 days)
+ * Cache property details (6 months)
  */
 export function cacheProperty(address: string, response: any): void {
   const db = getDatabase();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  const expiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(); // 6 months (180 days)
 
   db.prepare(
     `INSERT OR REPLACE INTO batchdata_property_cache
@@ -128,11 +128,11 @@ export function cacheProperty(address: string, response: any): void {
     response.lastSaleDate,
     response.lastSalePrice,
     response.taxAssessedValue,
-    response.ownerName,
-    response.ownerType,
-    response.avm.value,
-    response.avm.confidenceScore,
-    response.avm.valuationDate,
+    '', // owner_name - no longer fetched
+    '', // owner_type - no longer fetched
+    response.avm?.value || 0,
+    response.avm?.confidenceScore || 0,
+    response.avm?.valuationDate || new Date().toISOString(),
     response.preForeclosure ? 1 : 0,
     JSON.stringify(response),
     expiresAt
@@ -141,9 +141,9 @@ export function cacheProperty(address: string, response: any): void {
 
 /**
  * Get cached comp search (24 hour TTL)
- * Returns null if cached result has fewer than 5 comps (insufficient for reliable valuation)
+ * Returns null if cached result has fewer than 3 comps (insufficient for reliable valuation)
  */
-export function getCachedComps(searchHash: string, minComps: number = 5): any | null {
+export function getCachedComps(searchHash: string, minComps: number = 3): any | null {
   const db = getDatabase();
   const result = db
     .prepare(
@@ -173,7 +173,7 @@ export function getCachedComps(searchHash: string, minComps: number = 5): any | 
 }
 
 /**
- * Cache comp search (24 hours)
+ * Cache comp search (6 months)
  */
 export function cacheComps(
   subjectAddress: string,
@@ -182,7 +182,7 @@ export function cacheComps(
   response: any
 ): void {
   const db = getDatabase();
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+  const expiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(); // 6 months (180 days)
 
   db.prepare(
     `INSERT OR REPLACE INTO batchdata_comps_cache

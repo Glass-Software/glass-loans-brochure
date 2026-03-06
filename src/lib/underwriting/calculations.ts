@@ -59,11 +59,11 @@ export function calculateUnderwriting(
   // Formula 11: Borrower Profit = ARV - totalCostsOverall
   const borrowerProfit = arv - totalCostsOverall;
 
-  // Formula 12: Borrower Profit (Stress Tested) = (ARV × 0.9) - totalCostsOverall
-  const borrowerProfitStressTested = arv * 0.9 - totalCostsOverall;
+  // Formula 12: Borrower Profit (Stress Tested) = (ARV × 0.95) - totalCostsOverall
+  const borrowerProfitStressTested = arv * 0.95 - totalCostsOverall;
 
-  // Formula 13: Stress Tested L-ARV = totalLoanAmount / (ARV × 0.9)
-  const stressTestedLArv = (totalLoanAmount / (arv * 0.9)) * 100;
+  // Formula 13: Stress Tested L-ARV = totalLoanAmount / (ARV × 0.95)
+  const stressTestedLArv = (totalLoanAmount / (arv * 0.95)) * 100;
 
   // Formula 14: Is Loan Underwater Day 1? (Lender's perspective: loan amount > as-is value)
   // Simple collateral check: If we lend this amount today, is the property worth at least that much?
@@ -83,7 +83,7 @@ export function calculateUnderwriting(
 
   // New calculations for enhanced scoring system
   const totalProjectCost = totalCost + totalCosts;
-  const stressedARV = arv * 0.9;
+  const stressedARV = arv * 0.95;
   const stressTestedProfit = stressedARV - totalProjectCost - totalInterest;
 
   // Calculate component scores (1-10 scale) for new scoring rubric

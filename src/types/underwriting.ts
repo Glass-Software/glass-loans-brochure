@@ -4,9 +4,9 @@
 
 export type PropertyCondition = "Good" | "Bad" | "Really Bad";
 export type RenovationLevel =
-  | "Light $30/SF"
-  | "Medium $50-60/SF"
-  | "Heavy $70-90/SF";
+  | "Light ≤$30/SF"
+  | "Medium $31-50/SF"
+  | "Heavy >$50/SF";
 export type MarketType = "Primary" | "Secondary" | "Tertiary";
 
 export type PropertyType = "SFR" | "Condo" | "Townhouse" | "Multi-Family";
@@ -263,7 +263,7 @@ export interface ValidationResult {
  * Categorize renovation budget ($/SF) into level
  */
 export function getRenovationLevel(renovationPerSf: number): RenovationLevel {
-  if (renovationPerSf <= 30) return "Light $30/SF";
-  if (renovationPerSf <= 50) return "Medium $50-60/SF";
-  return "Heavy $70-90/SF";
+  if (renovationPerSf <= 30) return "Light ≤$30/SF";
+  if (renovationPerSf <= 50) return "Medium $31-50/SF";
+  return "Heavy >$50/SF";
 }

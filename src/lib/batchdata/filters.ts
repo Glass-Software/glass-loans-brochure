@@ -16,13 +16,14 @@ import {
 const DEFAULT_FILTER_CONFIG: CompFilterConfig = {
   strictPropertyType: true,
   removeOutliers: true,
-  outlierStdDevThreshold: 2.0,
-  pricePerSqftFilter: true,
+  pricePerSqftFilter: false, // DISABLED: Counterproductive for rehab - higher $/sqft comps show ARV potential
   pricePerSqftTolerancePercent: 30,
   minAvmConfidence: 0,
   excludeForeclosures: true,
   detectRenovations: false,
   renovationThreshold: 1.5,
+  lotSizeFilter: false, // Only enable for Primary/Secondary markets
+  lotSizeTolerancePercent: 50,
 };
 
 /**
@@ -55,10 +56,20 @@ export function filterComparables(
     flagForeclosures(comps, flagReasons);
   }
 
-  // Step 3: Flag comps with missing critical data
+  // Step 3: Flag lot size mismatches (Primary/Secondary markets only)
+  if (filterConfig.lotSizeFilter && subjectProperty.lotSize > 0) {
+    flagLotSizeMismatch(
+      subjectProperty.lotSize,
+      comps,
+      filterConfig.lotSizeTolerancePercent!,
+      flagReasons
+    );
+  }
+
+  // Step 4: Flag comps with missing critical data
   flagMissingData(comps, flagReasons);
 
-  // Step 4: Calculate statistics from comps with valid data
+  // Step 5: Calculate statistics from comps with valid data
   const validComps = comps.filter(
     (c) => c.squareFeet > 0 && c.lastSalePrice > 0 && c.pricePerSqft && c.pricePerSqft > 0 && !c.isOutlier
   );
@@ -83,18 +94,12 @@ export function filterComparables(
 
   const statistics = calculatePricePerSqftStats(validComps);
 
-  // Step 5: Flag statistical outliers (but KEEP them)
+  // Step 6: Flag statistical outliers (but KEEP them)
   if (filterConfig.removeOutliers && validComps.length >= 3) {
-    flagOutliers(
-      comps,
-      statistics.meanPricePerSqft,
-      statistics.stdDevPricePerSqft,
-      filterConfig.outlierStdDevThreshold!,
-      flagReasons
-    );
+    flagOutliers(comps, flagReasons);
   }
 
-  // Step 6: Flag price per sqft proximity divergence
+  // Step 7: Flag price per sqft proximity divergence (DISABLED by default - see config comment)
   if (filterConfig.pricePerSqftFilter && validComps.length >= 3) {
     const effectiveSqft = userSquareFeet || subjectProperty.squareFeet;
     const subjectPricePerSqft = calculateSubjectPricePerSqft(
@@ -112,12 +117,12 @@ export function filterComparables(
     }
   }
 
-  // Step 7: Flag likely renovations (optional)
+  // Step 8: Flag likely renovations (optional)
   if (filterConfig.detectRenovations && filterConfig.renovationThreshold) {
     flagRenovations(comps, filterConfig.renovationThreshold, flagReasons);
   }
 
-  // Step 8: Separate clean comps from flagged comps
+  // Step 9: Separate clean comps from flagged comps
   const { usedForCalculation, flaggedComps } = separateComps(comps);
 
   // Recalculate statistics using only clean comps
@@ -282,9 +287,6 @@ function calculatePricePerSqftStats(
  */
 function flagOutliers(
   comps: PropertySearchResult[],
-  mean: number,
-  stdDev: number,
-  threshold: number, // Unused in IQR, kept for backward compatibility
   flagReasons: { [key: string]: number }
 ): void {
   // Get all valid price per sqft values
@@ -332,7 +334,7 @@ function calculateSubjectPricePerSqft(
   if (effectiveSqft === 0) return 0;
 
   // Prefer AVM value if confidence is high
-  if (subject.avm.confidenceScore >= 60 && subject.avm.value > 0) {
+  if (subject.avm && subject.avm.confidenceScore >= 60 && subject.avm.value > 0) {
     return subject.avm.value / effectiveSqft;
   }
 
@@ -393,6 +395,39 @@ function flagRenovations(
         : `Likely renovated (sale ${comp.taxAssessmentRatio.toFixed(1)}x tax assessment)`;
       flagReasons["likely_renovated"] =
         (flagReasons["likely_renovated"] || 0) + 1;
+    }
+  });
+}
+
+/**
+ * Flag lot size mismatches (only relevant for Primary/Secondary markets)
+ * Lot size matters most in urban/suburban areas where density affects value
+ */
+function flagLotSizeMismatch(
+  subjectLotSize: number,
+  comps: PropertySearchResult[],
+  tolerancePercent: number,
+  flagReasons: { [key: string]: number }
+): void {
+  if (subjectLotSize <= 0) return; // No subject lot size data
+
+  const lowerBound = subjectLotSize * (1 - tolerancePercent / 100);
+  const upperBound = subjectLotSize * (1 + tolerancePercent / 100);
+
+  comps.forEach((comp) => {
+    if (!comp.lotSize || comp.lotSize <= 0 || comp.isOutlier) return; // Skip if no data or already flagged
+
+    if (comp.lotSize < lowerBound || comp.lotSize > upperBound) {
+      const percentDiff = ((Math.abs(comp.lotSize - subjectLotSize) / subjectLotSize) * 100).toFixed(0);
+      const lotSizeAcres = (comp.lotSize / 43560).toFixed(2);
+      const subjectAcres = (subjectLotSize / 43560).toFixed(2);
+
+      comp.isOutlier = true;
+      comp.outlierReason = comp.outlierReason
+        ? `${comp.outlierReason}; Lot size mismatch (${lotSizeAcres} acres vs ${subjectAcres} acres, ${percentDiff}% difference)`
+        : `Lot size mismatch (${lotSizeAcres} acres vs ${subjectAcres} acres, ${percentDiff}% difference)`;
+      flagReasons["lot_size_mismatch"] =
+        (flagReasons["lot_size_mismatch"] || 0) + 1;
     }
   });
 }

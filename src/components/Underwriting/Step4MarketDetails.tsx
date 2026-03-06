@@ -374,7 +374,7 @@ export default function Step4MarketDetails() {
                     value={compLinks[index] || ""}
                     onChange={(e) => handleAddressInput(e.target.value, index)}
                     onKeyDown={(e) => handleKeyDown(e, index)}
-                    placeholder={`Comp ${index + 1} address (e.g., 1904 Avalon Dr, Nashville, TN 37216)`}
+                    placeholder={`Comp ${index + 1} address (e.g., 1234 Example Dr, Nashville, TN 37222)`}
                     className={selectClass}
                     autoComplete="off"
                   />
