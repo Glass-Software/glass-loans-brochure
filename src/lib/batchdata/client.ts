@@ -283,12 +283,47 @@ export class BatchDataClient {
   }
 
   /**
+   * Calculate distance between two points using Haversine formula
+   * Returns distance in miles
+   */
+  private calculateDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number {
+    // If any coordinates are invalid, return 0
+    if (!lat1 || !lon1 || !lat2 || !lon2) {
+      return 0;
+    }
+
+    const R = 3959; // Earth's radius in miles
+    const dLat = this.toRadians(lat2 - lat1);
+    const dLon = this.toRadians(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRadians(lat1)) *
+        Math.cos(this.toRadians(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private toRadians(degrees: number): number {
+    return degrees * (Math.PI / 180);
+  }
+
+  /**
    * Search for properties matching criteria
    * Also used for comparable property search with compAddress
    */
   async searchProperties(
     searchCriteria: any,
     options?: any,
+    subjectCoordinates?: { latitude: number; longitude: number }
   ): Promise<BatchDataSearchResponse> {
     const requestBody: any = { searchCriteria };
 
@@ -392,8 +427,23 @@ export class BatchDataClient {
 
       const yearBuilt = prop.building?.yearBuilt || prop.listing?.yearBuilt || 0;
 
-      // Extract distance from BatchData API response
-      const distance = prop.address?.distanceFromSubject || prop.distance || 0;
+      // Extract coordinates for distance calculation
+      const propLatitude = prop.address?.latitude || 0;
+      const propLongitude = prop.address?.longitude || 0;
+
+      // Calculate distance from subject property if coordinates are available
+      let distance = 0;
+      if (subjectCoordinates && propLatitude && propLongitude) {
+        distance = this.calculateDistance(
+          subjectCoordinates.latitude,
+          subjectCoordinates.longitude,
+          propLatitude,
+          propLongitude
+        );
+      } else {
+        // Fallback: Try to extract distance from API response (may not be provided)
+        distance = prop.address?.distanceFromSubject || prop.distance || 0;
+      }
 
       // NEW: Extract valuation data
       const avmValue = prop.valuation?.estimatedValue || 0;
@@ -485,6 +535,22 @@ export class BatchDataClient {
       maxYearBuilt?: number; // Relative: +10 means "subject year + 10"
     },
   ): Promise<BatchDataSearchResponse> {
+    // First, verify the subject address to get its coordinates for distance calculation
+    let subjectCoordinates: { latitude: number; longitude: number } | undefined;
+    try {
+      const verifiedAddress = await this.verifyAddress(subjectAddress);
+      if (verifiedAddress.latitude && verifiedAddress.longitude) {
+        subjectCoordinates = {
+          latitude: verifiedAddress.latitude,
+          longitude: verifiedAddress.longitude,
+        };
+        console.log(`[BatchData] Subject coordinates: ${subjectCoordinates.latitude}, ${subjectCoordinates.longitude}`);
+      }
+    } catch (error) {
+      console.warn(`[BatchData] Could not verify subject address for distance calculation:`, error);
+      // Continue without coordinates - distances will be 0
+    }
+
     const searchCriteria = {
       compAddress: {
         street: subjectAddress.street,
@@ -555,7 +621,7 @@ export class BatchDataClient {
         searchOptions.maxYearBuilt = options.maxYearBuilt;
     }
 
-    return this.searchProperties(searchCriteria, searchOptions);
+    return this.searchProperties(searchCriteria, searchOptions, subjectCoordinates);
   }
 }
 

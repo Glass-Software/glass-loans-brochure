@@ -22,36 +22,17 @@ const Hero = () => {
                   Loan Management Software
                 </h1>
                 <h1 className="mb-5 text-3xl font-bold leading-tight text-black dark:text-white sm:text-4xl sm:leading-tight md:text-5xl md:leading-tight">
-                  That Works
+                  That Just Works
                 </h1>
-                <p className="mb-12 text-base !leading-relaxed text-body-color dark:text-body-color-dark sm:text-lg md:text-xl">
-                  Glass makes private and hard money lending simple with an
-                  intuitive platform. Manage loan origination, servicing, and
-                  payoffs with ease—no complex systems or unnecessary steps.
-                  With a clean, user-friendly interface Glass helps you stay
-                  focused on growing your business while handling the details
-                  seamlessly.
+                <p className="mb-5 text-base !leading-relaxed text-body-color dark:text-body-color-dark sm:text-lg md:text-xl">
+                  Glass is a platform that makes private lending simple,
+                  organized, and scalable.
                 </p>
-                <div className="flex flex-col items-center justify-center space-y-4 mb-12">
-                  <Link
-                    href="https://calendly.com/willcoleman202/30min"
-                    className="rounded-sm bg-primary px-8 py-4 text-base font-semibold text-white duration-300 ease-in-out hover:bg-primary/80"
-                  >
-                    Book a Call
-                  </Link>
-                  <Link
-                    href="https://app.glassloans.io/admin/login"
-                    className="text-base font-medium text-body-color duration-300 ease-in-out hover:text-primary dark:text-body-color-dark dark:hover:text-primary"
-                  >
-                    Already have an account? Login
-                  </Link>
-                </div>
-
                 {/* Video Demo Section */}
                 <div className="mx-auto max-w-[770px] overflow-hidden rounded-md">
                   <div className="relative aspect-[16/9] items-center justify-center">
                     <Image
-                      src="/images/video/dashboard-demo.png"
+                      src="/images/video/glass_dashboard_thumbnail.png"
                       alt="Glass Loans Software Demo"
                       fill
                       className="object-cover"
@@ -74,6 +55,21 @@ const Hero = () => {
                     </div>
                   </div>
                 </div>
+
+                <div className="mb-12 mt-4 flex flex-col items-center justify-center space-y-4">
+                  <Link
+                    href="https://calendly.com/willcoleman202/30min"
+                    className="rounded-sm bg-primary px-8 py-4 text-base font-semibold text-white duration-300 ease-in-out hover:bg-primary/80"
+                  >
+                    Learn More
+                  </Link>
+                  <Link
+                    href="https://app.glassloans.io/admin/login"
+                    className="text-base font-medium text-body-color duration-300 ease-in-out hover:text-primary dark:text-body-color-dark dark:hover:text-primary"
+                  >
+                    Already have an account? Login
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
@@ -82,7 +78,7 @@ const Hero = () => {
         <ModalVideo
           channel="youtube"
           isOpen={isOpen}
-          videoId="fpN_YmkW9QQ"
+          videoId="MCrkFKhXVIM"
           onClose={() => setOpen(false)}
           youtube={{ autoplay: 1 }}
         />
