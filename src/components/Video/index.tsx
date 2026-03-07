@@ -64,7 +64,16 @@ const Video = () => {
         isOpen={isOpen}
         videoId="L61p2uyiMSo"
         onClose={() => setOpen(false)}
-        youtube={{ autoplay: 1 }}
+        youtube={{ autoplay: 1, vq: "hd1080", hd: 1 }}
+        classNames={{
+          modalVideoEffect: 'modal-video-effect',
+          modalVideo: 'modal-video',
+          modalVideoClose: 'modal-video-close',
+          modalVideoBody: 'modal-video-body !max-w-[1600px] w-full',
+          modalVideoInner: 'modal-video-inner w-full',
+          modalVideoIframeWrap: 'modal-video-movie-wrap',
+          modalVideoCloseBtn: 'modal-video-close-btn'
+        }}
       />
 
       <div className="absolute bottom-0 left-0 right-0 z-[-1] h-full w-full bg-[url(/images/video/shape.svg)] bg-cover bg-center bg-no-repeat"></div>

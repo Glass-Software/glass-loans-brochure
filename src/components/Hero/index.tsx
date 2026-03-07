@@ -80,7 +80,22 @@ const Hero = () => {
           isOpen={isOpen}
           videoId="MCrkFKhXVIM"
           onClose={() => setOpen(false)}
-          youtube={{ autoplay: 1 }}
+          youtube={{
+            autoplay: 1,
+            vq: "hd1080",
+            quality: "hd1080",
+            rel: 0,
+            modestbranding: 1
+          }}
+          classNames={{
+            modalVideoEffect: 'modal-video-effect',
+            modalVideo: 'modal-video',
+            modalVideoClose: 'modal-video-close',
+            modalVideoBody: 'modal-video-body !max-w-[1600px] w-full',
+            modalVideoInner: 'modal-video-inner w-full',
+            modalVideoIframeWrap: 'modal-video-movie-wrap',
+            modalVideoCloseBtn: 'modal-video-close-btn'
+          }}
         />
         <div className="absolute right-0 top-0 z-[-1] opacity-30 lg:opacity-100">
           <svg
