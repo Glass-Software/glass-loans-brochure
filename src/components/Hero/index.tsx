@@ -32,7 +32,7 @@ const Hero = () => {
                 <div className="mx-auto max-w-[770px] overflow-hidden rounded-md">
                   <div className="relative aspect-[16/9] items-center justify-center">
                     <Image
-                      src="/images/video/glass_dashboard_thumbnail.png"
+                      src="/images/video/glass_dashboard_thumbnail_1.png"
                       alt="Glass Loans Software Demo"
                       fill
                       className="object-cover"

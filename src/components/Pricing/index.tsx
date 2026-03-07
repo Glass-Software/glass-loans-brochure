@@ -1,9 +1,12 @@
 "use client";
+import { useState } from "react";
 import SectionTitle from "../Common/SectionTitle";
 import PricingBox from "./PricingBox";
 import Link from "next/link";
 
 const Pricing = () => {
+  const [isMonthly, setIsMonthly] = useState(true);
+
   return (
     <section id="pricing" className="relative py-16 md:py-20 lg:py-28">
       <div className="container">
@@ -14,23 +17,51 @@ const Pricing = () => {
           width="665px"
         />
 
+        <div className="mb-10 flex justify-center">
+          <div className="inline-flex rounded-md bg-white p-1 shadow-three dark:bg-gray-dark">
+            <button
+              onClick={() => setIsMonthly(true)}
+              className={`rounded px-6 py-2 text-base font-medium transition ${
+                isMonthly
+                  ? "bg-primary text-white"
+                  : "text-body-color hover:text-primary dark:text-body-color-dark"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setIsMonthly(false)}
+              className={`rounded px-6 py-2 text-base font-medium transition ${
+                !isMonthly
+                  ? "bg-primary text-white"
+                  : "text-body-color hover:text-primary dark:text-body-color-dark"
+              }`}
+            >
+              Annual
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 gap-x-8 gap-y-10 md:grid-cols-2 lg:grid-cols-3">
           <PricingBox
             packageName="Lite"
-            price="395"
-            duration="mo"
+            monthlyPrice="395"
+            annualPrice="3,950"
+            isMonthly={isMonthly}
             subtitle="0-25 Loans"
           />
           <PricingBox
             packageName="Basic"
-            price="695"
-            duration="mo"
+            monthlyPrice="695"
+            annualPrice="6,950"
+            isMonthly={isMonthly}
             subtitle="25-75 Loans"
           />
           <PricingBox
             packageName="Plus"
-            price="1,295"
-            duration="mo"
+            monthlyPrice="1,295"
+            annualPrice="12,950"
+            isMonthly={isMonthly}
             subtitle="75-150 Loans"
           />
         </div>
