@@ -113,7 +113,7 @@ export async function POST(request: Request) {
  * Send verification email via SendGrid
  */
 async function sendVerificationEmail(email: string, token: string) {
-  const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/underwrite/verify?token=${token}`;
+  const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || "https://glassloans.io"}/underwrite/verify?token=${token}`;
 
   const msg = {
     to: email,

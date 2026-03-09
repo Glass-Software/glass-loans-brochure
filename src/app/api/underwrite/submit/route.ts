@@ -395,7 +395,7 @@ export async function POST(request: Request) {
 
         sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-        const reportUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/underwrite/results/${reportId}`;
+        const reportUrl = `${process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || "https://glassloans.io"}/underwrite/results/${reportId}`;
 
         await sgMail.send({
           to: email,
