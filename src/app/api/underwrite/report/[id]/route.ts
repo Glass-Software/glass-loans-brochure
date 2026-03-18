@@ -3,7 +3,7 @@ import { getSubmissionByReportId } from "@/lib/db/queries";
 import {
   UnderwritingResults,
   UnderwritingFormData,
-  BatchDataEnrichedEstimates,
+  PropertyComps,
 } from "@/types/underwriting";
 
 /**
@@ -61,11 +61,10 @@ export async function GET(
       points: submission.points,
       marketType: submission.market_type as any,
       additionalDetails: submission.additional_details || undefined,
-      compLinks: submission.comp_links ? JSON.parse(submission.comp_links) : undefined,
     };
 
-    // Reconstruct AI estimates
-    const aiEstimates: BatchDataEnrichedEstimates = submission.ai_property_comps
+    // Reconstruct property comps
+    const propertyComps: PropertyComps = submission.ai_property_comps
       ? JSON.parse(submission.ai_property_comps)
       : {
           estimatedARV: submission.estimated_arv || 0,
@@ -80,8 +79,8 @@ export async function GET(
     // Recalculate metrics using Gary's ARV estimate
     const calculations = calculateUnderwriting(
       formData,
-      aiEstimates.estimatedARV,
-      aiEstimates.asIsValue
+      propertyComps.estimatedARV,
+      propertyComps.asIsValue
     );
 
     // Transform to UnderwritingResults format
@@ -90,7 +89,7 @@ export async function GET(
       calculations,
       garyOpinion: submission.gary_opinion || "",
       formData,
-      aiEstimates,
+      propertyComps,
       submittedAt: new Date(submission.created_at),
       usageCount: 0, // Not relevant for shared reports
       usageLimit: 0, // Not relevant for shared reports

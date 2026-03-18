@@ -14,19 +14,30 @@ import {
 import { openRouterClient } from "@/lib/ai/openrouter";
 import {
   generatePropertyEstimationPrompt,
+  generateGaryValuationPrompt,
   generateGaryOpinionPrompt,
   PROPERTY_ESTIMATION_SYSTEM_PROMPT,
+  GARY_VALUATION_SYSTEM_PROMPT,
   GARY_OPINION_SYSTEM_PROMPT,
   generateMockGaryOpinion,
 } from "@/lib/ai/prompts";
 import { verifyRecaptchaToken } from "@/lib/recaptcha/verify";
 import type { UnderwritingFormData } from "@/types/underwriting";
 
+/** AI property estimation response shape for OpenRouter generateJSON */
+type PropertyEstimationResponse = {
+  estimatedARV: number;
+  asIsValue: number;
+  monthlyRent: number;
+  compsUsed: Array<{ address: string; price: number; sqft: number }>;
+  marketAnalysis: string;
+};
+
 /**
  * Progress event types for streaming
  */
 type ProgressEvent = {
-  type: 'progress' | 'complete' | 'error';
+  type: "progress" | "complete" | "error";
   step: number;
   status: string;
   progress: number;
@@ -41,10 +52,10 @@ function sendProgress(
   controller: ReadableStreamDefaultController,
   step: number,
   status: string,
-  progress: number
+  progress: number,
 ) {
   const event: ProgressEvent = {
-    type: 'progress',
+    type: "progress",
     step,
     status,
     progress,
@@ -58,14 +69,11 @@ function sendProgress(
 /**
  * Helper to send completion event
  */
-function sendComplete(
-  controller: ReadableStreamDefaultController,
-  data: any
-) {
+function sendComplete(controller: ReadableStreamDefaultController, data: any) {
   const event: ProgressEvent = {
-    type: 'complete',
+    type: "complete",
     step: 5,
-    status: 'Analysis complete!',
+    status: "Analysis complete!",
     progress: 100,
     timestamp: new Date().toISOString(),
     data,
@@ -81,10 +89,10 @@ function sendComplete(
 function sendError(
   controller: ReadableStreamDefaultController,
   error: string,
-  code?: string
+  code?: string,
 ) {
   const event: ProgressEvent = {
-    type: 'error',
+    type: "error",
     step: 0,
     status: error,
     progress: 0,
@@ -98,7 +106,13 @@ function sendError(
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { email, verificationCode, recaptchaToken, formData } = body;
+  const {
+    email,
+    recaptchaToken,
+    formData,
+    propertyComps,
+    compSelectionState,
+  } = body;
 
   // Create a readable stream for progress updates
   const stream = new ReadableStream({
@@ -107,8 +121,12 @@ export async function POST(request: Request) {
         // Step 1: Validate inputs (0-5%)
         sendProgress(controller, 1, "Validating request...", 5);
 
-        if (!email || !formData || !verificationCode) {
-          sendError(controller, "Email, verification code, and form data are required", "INVALID_REQUEST");
+        if (!email || !formData) {
+          sendError(
+            controller,
+            "Email and form data are required",
+            "INVALID_REQUEST",
+          );
           controller.close();
           return;
         }
@@ -124,16 +142,29 @@ export async function POST(request: Request) {
         // Step 3: Verify reCAPTCHA token (5-15%)
         sendProgress(controller, 1, "Verifying security...", 10);
 
-        const recaptchaVerification = await verifyRecaptchaToken(recaptchaToken, 0.5);
+        const recaptchaVerification = await verifyRecaptchaToken(
+          recaptchaToken,
+          0.5,
+        );
 
         if (!recaptchaVerification.success) {
-          console.warn("reCAPTCHA verification failed:", recaptchaVerification.error);
-          sendError(controller, "Security verification failed. Please try again.", "RECAPTCHA_FAILED");
+          console.warn(
+            "reCAPTCHA verification failed:",
+            recaptchaVerification.error,
+          );
+          sendError(
+            controller,
+            "Security verification failed. Please try again.",
+            "RECAPTCHA_FAILED",
+          );
           controller.close();
           return;
         }
 
-        console.log("reCAPTCHA verified with score:", recaptchaVerification.score);
+        console.log(
+          "reCAPTCHA verified with score:",
+          recaptchaVerification.score,
+        );
 
         // Step 4: Get client IP for rate limiting
         const forwarded = request.headers.get("x-forwarded-for");
@@ -142,132 +173,263 @@ export async function POST(request: Request) {
         // Step 5: Check rate limit (10 requests per hour per IP) (15-20%)
         sendProgress(controller, 1, "Checking rate limits...", 15);
 
-        const rateLimit = await checkRateLimit(ip, "/api/underwrite/submit", 10, 60);
+        const rateLimit = await checkRateLimit(
+          ip,
+          "/api/underwrite/submit",
+          10,
+          60,
+        );
 
         if (!rateLimit.allowed) {
-          sendError(controller, "Rate limit exceeded. Please try again later.", "RATE_LIMIT");
-          controller.close();
-          return;
-        }
-
-        // Step 6: Verify email code (20-25%)
-        sendProgress(controller, 1, "Verifying email code...", 20);
-
-        const normalizedEmail = normalizeEmail(email);
-
-        // Import verifyUserCode
-        const { verifyUserCode } = await import("@/lib/db/queries");
-
-        const verifiedUser = verifyUserCode(verificationCode, normalizedEmail);
-
-        if (!verifiedUser) {
           sendError(
             controller,
-            "Invalid or expired verification code. Please request a new code.",
-            "INVALID_CODE"
+            "Rate limit exceeded. Please try again later.",
+            "RATE_LIMIT",
           );
           controller.close();
           return;
         }
 
-        const user = verifiedUser;
+        // Step 6: Get verified user (20-25%)
+        sendProgress(controller, 1, "Verifying user...", 20);
+
+        const normalizedEmail = normalizeEmail(email);
+
+        // Import findVerifiedUserByEmail (code was already verified in Step 5)
+        const { findVerifiedUserByEmail } = await import("@/lib/db/queries");
+
+        const user = findVerifiedUserByEmail(normalizedEmail);
+
+        if (!user) {
+          sendError(
+            controller,
+            "User not found or email not verified. Please complete email verification first.",
+            "USER_NOT_VERIFIED",
+          );
+          controller.close();
+          return;
+        }
 
         // Step 7: Check usage limit
         if (user.usage_count >= user.usage_limit) {
           sendError(
             controller,
             `You've reached your limit of ${user.usage_limit} free underwriting ${user.usage_limit === 1 ? "analysis" : "analyses"}.`,
-            "USAGE_LIMIT"
+            "USAGE_LIMIT",
           );
           controller.close();
           return;
         }
 
-        // Step 8: Get property estimates (25-50%)
-        sendProgress(controller, 2, "Researching property comps...", 25);
+        // Step 8: Process comps and comp selection (25-50%)
+        sendProgress(controller, 2, "Processing comp selections...", 25);
 
-        console.log("Fetching property estimates...");
+        console.log("Processing comp selection...");
 
         let aiEstimates;
 
-        try {
-          // Try primary data source first
-          if (process.env.BATCHDATA_API_KEY) {
-            console.log("[Server] Attempting property data lookup...");
-            const { getBatchDataPropertyEstimates } = await import("@/lib/batchdata/underwriting");
+        // Comps are now fetched in Step 5 and passed from frontend
+        if (propertyComps && compSelectionState) {
+          console.log(
+            `[Server] Using comps from Step 6 (${propertyComps.compsUsed.length} total comps)`,
+          );
 
-            aiEstimates = await getBatchDataPropertyEstimates(formData as UnderwritingFormData);
+          // Filter comps based on user selection (remove comps marked as "removed")
+          const activeComps = propertyComps.compsUsed.filter(
+            (comp: any, idx: number) => {
+              const state = compSelectionState.find(
+                (s: any) => s.compIndex === idx,
+              );
+              return !state?.removed;
+            },
+          );
 
-            console.log("[Server] Property data retrieved successfully");
-            sendProgress(controller, 2, "Property data retrieved", 50);
-          } else {
-            throw new Error("Primary data source not configured");
+          console.log(
+            `[Server] ${activeComps.length} active comps after filtering (${propertyComps.compsUsed.length - activeComps.length} removed)`,
+          );
+
+          // Validate minimum comps
+          if (activeComps.length < 3) {
+            sendError(
+              controller,
+              "At least 3 comps are required. Please select more comps.",
+              "INSUFFICIENT_COMPS",
+            );
+            controller.close();
+            return;
           }
-        } catch (dataError: any) {
-          // Fallback to AI-generated estimates
-          console.warn("[Server] Primary data source unavailable, using fallback:", dataError.message);
-          sendProgress(controller, 2, "Analyzing property...", 30);
+
+          sendProgress(
+            controller,
+            2,
+            `Using ${activeComps.length} selected comps...`,
+            35,
+          );
+
+          // Recalculate ARV using WEIGHTED median (considers emphasis)
+          const { calculateWeightedARVFromComps } = await import(
+            "@/lib/underwriting/calculations"
+          );
+          const recalculatedARV = calculateWeightedARVFromComps(
+            activeComps,
+            compSelectionState,
+            formData as UnderwritingFormData,
+          );
+
+          console.log(
+            `[Server] Recalculated ARV: $${recalculatedARV.toLocaleString()} (was: $${propertyComps.estimatedARV.toLocaleString()})`,
+          );
+
+          aiEstimates = {
+            estimatedARV: recalculatedARV,
+            asIsValue: propertyComps.asIsValue,
+            compsUsed: propertyComps.compsUsed, // ALL comps (not filtered)
+            marketAnalysis:
+              propertyComps.marketAnalysis ||
+              "Market analysis based on selected comparable sales",
+            confidence: activeComps.length >= 5 ? "high" : "medium",
+            providerUsed: propertyComps.avmMetadata?.source || "user_selection",
+          };
+
+          sendProgress(
+            controller,
+            2,
+            `ARV recalculated: $${recalculatedARV.toLocaleString()}`,
+            40,
+          );
+        } else {
+          // Fallback: Fetch comps if not provided (backward compatibility)
+          console.log("[Server] No comps provided, fetching from providers...");
+          sendProgress(controller, 2, "Researching property comps...", 25);
 
           try {
-            if (process.env.OPENROUTER_API_KEY) {
-              const estimationPrompt =
-                generatePropertyEstimationPrompt(formData as UnderwritingFormData);
+            // Try real estate data providers (RentCast, Realie, etc.)
+            const { getPropertyEstimates, hasAvailableProvider } = await import(
+              "@/lib/comps/provider"
+            );
 
-              console.log("Calling OpenRouter for property estimates...");
-              const aiResponse = await openRouterClient.generateJSON<{
-                estimatedARV: number;
-                asIsValue: number;
-                monthlyRent: number;
-                compsUsed: Array<{
-                  address: string;
-                  price: number;
-                  sqft: number;
-                }>;
-                marketAnalysis: string;
-              }>(estimationPrompt, {
-                systemPrompt: PROPERTY_ESTIMATION_SYSTEM_PROMPT,
-                temperature: 0.3,
-                maxTokens: 2000,
-              });
+            if (hasAvailableProvider()) {
+              sendProgress(
+                controller,
+                2,
+                "Searching comparable properties...",
+                25,
+              );
 
-              // Add fallback markers
-              aiEstimates = {
-                ...aiResponse,
-                batchDataUsed: false,
-                valuationMethod: "ai_fallback",
-                compTier: 3, // Mark as lowest confidence
-              };
+              try {
+                const result = await getPropertyEstimates(
+                  formData as UnderwritingFormData,
+                );
+                aiEstimates = result;
+                console.log(
+                  `[Server] ${result.providerUsed} returned ${aiEstimates.compsUsed.length} comps`,
+                );
+                sendProgress(
+                  controller,
+                  2,
+                  `Found ${aiEstimates.compsUsed.length} comparable sales (${result.providerUsed})`,
+                  35,
+                );
+              } catch (providerError: any) {
+                console.warn("[Server] Provider error:", providerError.message);
 
-              console.log("AI estimates received successfully");
+                // Distinguish between error types
+                if (
+                  providerError.code === "INVALID_PARAMS" ||
+                  providerError.code === "INVALID_ADDRESS"
+                ) {
+                  sendError(
+                    controller,
+                    "Invalid property location. Please check the address.",
+                    "INVALID_ADDRESS",
+                  );
+                  controller.close();
+                  return;
+                } else if (providerError.code === "RATE_LIMIT") {
+                  console.warn("[Server] Rate limit hit, falling back to AI");
+                } else if (providerError.code === "NOT_FOUND") {
+                  console.warn("[Server] No comps found, falling back to AI");
+                }
+
+                // Fall through to AI fallback
+                throw providerError;
+              }
             } else {
-              // Ultimate fallback: Simple heuristics
-              console.warn("No API keys configured, using heuristic estimates");
+              console.log(
+                "[Server] No data providers configured - using AI fallback",
+              );
+              throw new Error("Primary data source not configured");
+            }
+          } catch (dataError: any) {
+            // Fallback to AI estimation if Realie.ai failed or unavailable
+            console.warn("[Server] Falling back to AI estimates");
+            sendProgress(
+              controller,
+              2,
+              "Using AI estimation (no market data available)...",
+              30,
+            );
+
+            try {
+              if (process.env.OPENROUTER_API_KEY) {
+                const estimationPrompt = generatePropertyEstimationPrompt(
+                  formData as UnderwritingFormData,
+                );
+
+                console.log("Calling OpenRouter for property estimates...");
+                const aiResponse =
+                  await openRouterClient.generateJSON<PropertyEstimationResponse>(
+                    estimationPrompt,
+                    {
+                      systemPrompt: PROPERTY_ESTIMATION_SYSTEM_PROMPT,
+                      temperature: 0.3,
+                      maxTokens: 2000,
+                    },
+                  );
+
+                // Add fallback markers
+                aiEstimates = {
+                  ...aiResponse,
+                  batchDataUsed: false,
+                  valuationMethod: "ai_fallback",
+                  compTier: 3, // Mark as lowest confidence
+                };
+
+                console.log("AI estimates received successfully");
+              } else {
+                // Ultimate fallback: Simple heuristics
+                console.warn(
+                  "No API keys configured, using heuristic estimates",
+                );
+                aiEstimates = {
+                  estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
+                  asIsValue: formData.purchasePrice * 0.85,
+                  monthlyRent:
+                    Math.round((formData.purchasePrice * 0.01) / 10) * 10,
+                  compsUsed: [],
+                  marketAnalysis:
+                    "No real estate data available - using estimated values based on purchase price and rehab budget.",
+                  batchDataUsed: false,
+                  valuationMethod: "heuristic",
+                };
+              }
+            } catch (aiError: any) {
+              console.error("AI estimation also failed:", aiError);
+
+              // Ultimate fallback
               aiEstimates = {
                 estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
                 asIsValue: formData.purchasePrice * 0.85,
-                monthlyRent: Math.round((formData.purchasePrice * 0.01) / 10) * 10,
                 compsUsed: [],
                 marketAnalysis:
-                  "No real estate data available - using estimated values based on purchase price and rehab budget.",
+                  "Property estimates temporarily unavailable - using conservative estimates.",
                 batchDataUsed: false,
                 valuationMethod: "heuristic",
               };
             }
-          } catch (aiError: any) {
-            console.error("AI estimation also failed:", aiError);
 
-            // Ultimate fallback
-            aiEstimates = {
-              estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
-              asIsValue: formData.purchasePrice * 0.85,
-              compsUsed: [],
-              marketAnalysis: "Property estimates temporarily unavailable - using conservative estimates.",
-              batchDataUsed: false,
-              valuationMethod: "heuristic",
-            };
+            sendProgress(controller, 2, "Fallback estimates complete", 50);
           }
-
-          sendProgress(controller, 2, "Fallback estimates complete", 50);
         }
 
         // Step 9: Calculate all metrics TWICE (user ARV vs Gary ARV) (50-65%)
@@ -280,7 +442,7 @@ export async function POST(request: Request) {
           aiEstimates.asIsValue,
         );
 
-        const garyCalculations = calculateUnderwriting(
+        let garyCalculations = calculateUnderwriting(
           formData as UnderwritingFormData,
           aiEstimates.estimatedARV,
           aiEstimates.asIsValue,
@@ -294,44 +456,132 @@ export async function POST(request: Request) {
           formData as UnderwritingFormData,
         );
 
-        // Step 11: Generate Gary's opinion (using both calculations) (65-90%)
-        sendProgress(controller, 4, "Getting Gary's underwriting opinion...", 65);
+        // Step 11: Generate Gary's valuations (CALL 1 - Low temperature) (65-75%)
+        sendProgress(
+          controller,
+          4,
+          "Calculating property valuations...",
+          65,
+        );
 
-        console.log("Generating Gary's opinion...");
+        console.log("Gary Call 1: Calculating valuations...");
+        let garyAsIsValue: number;
+        let garyEstimatedARV: number;
         let garyOpinion: string;
+        const apiAsIsValue = aiEstimates.asIsValue; // Store API's as-is value separately
 
         try {
           if (process.env.OPENROUTER_API_KEY) {
+            // CALL 1: Get valuations from Gary (low temperature for consistency)
+            const valuationPrompt = generateGaryValuationPrompt(
+              formData as UnderwritingFormData,
+              aiEstimates.compsUsed,
+              compSelectionState,
+            );
+
+            console.log("Calling OpenRouter for Gary's valuations (temp 0.15)...");
+            const valuationResponse = await openRouterClient.generateJSON<{
+              asIsValue: number;
+              estimatedARV: number;
+            }>(valuationPrompt, {
+              systemPrompt: GARY_VALUATION_SYSTEM_PROMPT,
+              temperature: 0.15, // Low temperature for consistent calculations
+              maxTokens: 500, // Short response, just JSON
+            });
+
+            garyAsIsValue = valuationResponse.asIsValue;
+            garyEstimatedARV = valuationResponse.estimatedARV;
+
+            console.log(`Gary's As-Is: $${garyAsIsValue.toLocaleString()}`);
+            console.log(`Gary's ARV: $${garyEstimatedARV.toLocaleString()}`);
+            console.log(`API As-Is: $${apiAsIsValue.toLocaleString()}`);
+
+            // Validate values are reasonable (basic sanity check)
+            if (garyAsIsValue <= 0 || garyEstimatedARV <= 0) {
+              throw new Error("Invalid valuations from Gary (values must be positive)");
+            }
+            if (garyEstimatedARV < garyAsIsValue * 0.8) {
+              console.warn("Warning: Gary's ARV is significantly lower than as-is value");
+            }
+
+            sendProgress(
+              controller,
+              4,
+              `Valuations calculated: ARV $${(garyEstimatedARV / 1000).toFixed(0)}k`,
+              75,
+            );
+
+            // CALL 2: Get opinion from Gary (higher temperature for natural writing)
+            sendProgress(
+              controller,
+              4,
+              "Writing underwriting opinion...",
+              80,
+            );
+
+            console.log("Gary Call 2: Writing opinion (temp 0.7)...");
+
+            // Recalculate Gary's metrics using his valuations
+            const garyCalculationsUpdated = calculateUnderwriting(
+              formData as UnderwritingFormData,
+              garyEstimatedARV,
+              garyAsIsValue,
+            );
+
             const opinionPrompt = generateGaryOpinionPrompt(
               formData as UnderwritingFormData,
               userCalculations,
-              garyCalculations,
-              aiEstimates,
+              garyCalculationsUpdated,
+              garyAsIsValue, // Pass Gary's as-is value
+              garyEstimatedARV, // Pass Gary's ARV
+              apiAsIsValue, // Pass API's as-is value for comparison
+              aiEstimates.compsUsed,
+              compSelectionState,
             );
 
             garyOpinion = await openRouterClient.generateText(opinionPrompt, {
               systemPrompt: GARY_OPINION_SYSTEM_PROMPT,
-              temperature: 0.7,
+              temperature: 0.7, // Higher temperature for natural, conversational writing
               maxTokens: 1500,
             });
+
+            console.log("Gary's opinion generated successfully");
+
+            // Update garyCalculations for later use
+            garyCalculations = garyCalculationsUpdated;
+
           } else {
-            // Use mock opinion if no API key
+            // Fallback: Use automated calculation if no API key
+            console.log("No OPENROUTER_API_KEY, using automated calculations...");
+            const { calculateARV } = await import("@/lib/rentcast/comps");
+            garyEstimatedARV = calculateARV(aiEstimates.compsUsed, formData.rehab, formData.squareFeet);
+            garyAsIsValue = apiAsIsValue; // Use API value as fallback
             garyOpinion = generateMockGaryOpinion(
               formData as UnderwritingFormData,
               garyCalculations,
               formData.userEstimatedArv,
-              aiEstimates.estimatedARV,
+              garyEstimatedARV,
             );
           }
-        } catch (opinionError) {
-          console.error("Opinion generation error:", opinionError);
+        } catch (garyError: any) {
+          console.error("Gary error:", garyError);
+          // Fallback to automated calculation
+          console.log("Falling back to automated calculation...");
+          const { calculateARV } = await import("@/lib/rentcast/comps");
+          garyEstimatedARV = calculateARV(aiEstimates.compsUsed, formData.rehab, formData.squareFeet);
+          garyAsIsValue = apiAsIsValue;
           garyOpinion = generateMockGaryOpinion(
             formData as UnderwritingFormData,
             garyCalculations,
             formData.userEstimatedArv,
-            aiEstimates.estimatedARV,
+            garyEstimatedARV,
           );
         }
+
+        // Update aiEstimates with Gary's valuations
+        aiEstimates.estimatedARV = garyEstimatedARV;
+        aiEstimates.asIsValue = garyAsIsValue;
+        aiEstimates.apiAsIsValue = apiAsIsValue;
 
         // Step 12: Store submission in database (90-95%)
         sendProgress(controller, 5, "Saving results...", 90);
@@ -341,7 +591,9 @@ export async function POST(request: Request) {
         // Generate report ID and calculate expiration
         const reportId = generateReportId();
         const retentionDays = user.report_retention_days || 14;
-        const expiresAt = new Date(Date.now() + retentionDays * 24 * 60 * 60 * 1000).toISOString();
+        const expiresAt = new Date(
+          Date.now() + retentionDays * 24 * 60 * 60 * 1000,
+        ).toISOString();
 
         const submission = createSubmission({
           userId: user.id,
@@ -350,6 +602,8 @@ export async function POST(request: Request) {
           propertyState: formData.propertyState,
           propertyZip: formData.propertyZip,
           propertyCounty: formData.propertyCounty,
+          propertyLatitude: aiEstimates?.subjectLatitude ?? propertyComps?.subjectLatitude ?? formData.propertyLatitude,
+          propertyLongitude: aiEstimates?.subjectLongitude ?? propertyComps?.subjectLongitude ?? formData.propertyLongitude,
           purchasePrice: formData.purchasePrice,
           rehab: formData.rehab,
           squareFeet: formData.squareFeet,
@@ -369,12 +623,14 @@ export async function POST(request: Request) {
           points: formData.points,
           marketType: formData.marketType,
           additionalDetails: formData.additionalDetails,
-          compLinks: formData.compLinks,
           estimatedArv: aiEstimates.estimatedARV,
           asIsValue: aiEstimates.asIsValue,
           finalScore,
           garyOpinion,
-          propertyComps: aiEstimates.compsUsed,
+          propertyComps: aiEstimates.compsUsed, // ALL comps
+          compSelectionState: compSelectionState
+            ? JSON.stringify(compSelectionState)
+            : null,
           reportId,
           expiresAt,
           ipAddress: ip,
@@ -438,7 +694,7 @@ export async function POST(request: Request) {
         sendError(
           controller,
           "An error occurred while processing your underwriting request",
-          "SERVER_ERROR"
+          "SERVER_ERROR",
         );
         controller.close();
       }
@@ -450,7 +706,7 @@ export async function POST(request: Request) {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
     },
   });
 }

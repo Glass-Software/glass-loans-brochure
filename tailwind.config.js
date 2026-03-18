@@ -44,8 +44,12 @@ module.exports = {
         yellow: "#FBB040",
         "bg-color-dark": "#171C28",
         "body-color": {
-          DEFAULT: "#788293",
-          dark: "#959CB1",
+          DEFAULT: "#4B5563",
+          dark: "#E5E7EB",
+        },
+        "placeholder-color": {
+          DEFAULT: "#9CA3AF",
+          dark: "#6B7280",
         },
         stroke: {
           stroke: "#E3E8EF",
@@ -56,6 +60,13 @@ module.exports = {
           dark: "#1E232E",
           light: "#F0F2F9",
         },
+        // Comp selection & status colors (based on brand primary #4A6CF7)
+        success: "#10B981",           // Green for emphasized comps
+        warning: "#F59E0B",           // Amber for warnings
+        danger: "#EF4444",            // Red for alerts/removed
+        "success-light": "#D1FAE5",   // Light green backgrounds
+        "warning-light": "#FEF3C7",   // Light amber backgrounds
+        "danger-light": "#FEE2E2",    // Light red backgrounds
       },
 
       boxShadow: {

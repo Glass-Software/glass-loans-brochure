@@ -4,10 +4,12 @@ import { createContext, useContext, useState } from "react";
 import {
   UnderwritingFormData,
   UnderwritingResults,
+  PropertyComps,
+  CompSelectionState,
 } from "@/types/underwriting";
 
 interface UnderwritingContextType {
-  // Current step (1-5)
+  // Current step (1-6)
   currentStep: number;
   setCurrentStep: (step: number) => void;
   goToNextStep: () => void;
@@ -18,11 +20,21 @@ interface UnderwritingContextType {
   updateFormData: (data: Partial<UnderwritingFormData>) => void;
   resetFormData: () => void;
 
+  // Comp selection (Step 6)
+  propertyComps: PropertyComps | null;
+  setPropertyComps: (comps: PropertyComps | null) => void;
+  compSelectionState: CompSelectionState[];
+  setCompSelectionState: (state: CompSelectionState[]) => void;
+  updateCompSelection: (compIndex: number, updates: Partial<Omit<CompSelectionState, 'compIndex'>>) => void;
+  getActiveCompsCount: () => number;
+
   // Email state
   email: string | null;
   setEmail: (email: string) => void;
   emailVerified: boolean;
   setEmailVerified: (verified: boolean) => void;
+  verificationCode: string | null;
+  setVerificationCode: (code: string) => void;
 
   // Usage tracking
   usageCount: number;
@@ -66,8 +78,11 @@ export function UnderwritingProvider({
     // Set defaults
     renovationFunds: 0,
   });
+  const [propertyComps, setPropertyComps] = useState<PropertyComps | null>(null);
+  const [compSelectionState, setCompSelectionState] = useState<CompSelectionState[]>([]);
   const [email, setEmailState] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationCode, setVerificationCodeState] = useState<string | null>(null);
   const [usageCount, setUsageCount] = useState(0);
   const [results, setResults] = useState<UnderwritingResults | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,7 +97,7 @@ export function UnderwritingProvider({
   const usageLimit = 3;
 
   const goToNextStep = () => {
-    if (currentStep < 5) {
+    if (currentStep < 6) {
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -99,16 +114,56 @@ export function UnderwritingProvider({
     setFormData((prev) => ({ ...prev, ...data }));
   };
 
+  const updateCompSelection = (
+    compIndex: number,
+    updates: Partial<Omit<CompSelectionState, 'compIndex'>>
+  ) => {
+    setCompSelectionState((prev) => {
+      const newState = [...prev];
+      const existingIndex = newState.findIndex((s) => s.compIndex === compIndex);
+
+      if (existingIndex >= 0) {
+        // Update existing state
+        newState[existingIndex] = { ...newState[existingIndex], ...updates };
+      } else {
+        // Add new state
+        newState.push({
+          compIndex,
+          emphasized: updates.emphasized ?? false,
+          removed: updates.removed ?? false,
+        });
+      }
+
+      return newState;
+    });
+  };
+
+  const getActiveCompsCount = () => {
+    if (!propertyComps) return 0;
+
+    return propertyComps.compsUsed.filter((_, idx) => {
+      const state = compSelectionState.find((s) => s.compIndex === idx);
+      return !state?.removed;
+    }).length;
+  };
+
   const resetFormData = () => {
     setFormData({ renovationFunds: 0 });
+    setPropertyComps(null);
+    setCompSelectionState([]);
     setCurrentStep(1);
     setResults(null);
     setError(null);
     setEmailVerified(false);
+    setVerificationCodeState(null);
   };
 
   const setEmail = (newEmail: string) => {
     setEmailState(newEmail);
+  };
+
+  const setVerificationCode = (code: string) => {
+    setVerificationCodeState(code);
   };
 
   return (
@@ -121,10 +176,18 @@ export function UnderwritingProvider({
         formData,
         updateFormData,
         resetFormData,
+        propertyComps,
+        setPropertyComps,
+        compSelectionState,
+        setCompSelectionState,
+        updateCompSelection,
+        getActiveCompsCount,
         email,
         setEmail,
         emailVerified,
         setEmailVerified,
+        verificationCode,
+        setVerificationCode,
         usageCount,
         setUsageCount,
         usageLimit,

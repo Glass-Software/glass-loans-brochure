@@ -1,0 +1,1064 @@
+// [dotenv@17.3.1] injecting env (14) from .env.local -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+// 🔍 Testing Realie.ai Premium Comparables API
+
+// ============================================================
+// Test Address: 1803 Guest Dr, Nashville, TN 37216
+// ============================================================
+
+// ✅ Geocoded address: 1803 Guest Dr, Nashville, TN 37216, USA
+//    Coordinates: 36.1979167, -86.7078884
+//    Location Type: ROOFTOP
+
+// 🔍 Searching for comparable sales...
+
+Search Parameters:
+  Location: 36.1979167, -86.7078884
+  Radius: 5 miles
+  Bedrooms: 3-5
+  Sqft: 800-2000
+  Property Type: house
+  Time Frame: 12 months
+============================================================
+
+[Realie] Request URL: https://app.realie.ai/api/public/premium/comparables/?latitude=36.1979167&longitude=-86.7078884&radius=5&timeFrame=12&sqftMin=800&sqftMax=2000&bedsMin=3&bedsMax=5&propertyType=house&maxResults=10
+[Realie] Request params: {
+  latitude: 36.1979167,
+  longitude: -86.7078884,
+  radius: 5,
+  bedsMin: 3,
+  bedsMax: 5,
+  sqftMin: 800,
+  sqftMax: 2000,
+  propertyType: 'house',
+  timeFrame: 12,
+  maxResults: 10
+}
+[Realie] API Response: {
+  "comparables": [
+    {
+      "_id": "6722efb68b929669038a9d38",
+      "fipsState": "47",
+      "fipsCounty": "037",
+      "county": "DAVIDSON",
+      "parcelId": "073-01-0-102-00",
+      "address": "4017 IVY DR",
+      "city": "NASHVILLE",
+      "zipCode": "37216",
+      "state": "TN",
+      "ownerName": "ELEY, DARGAN",
+      "siteCensusTract": "470370115.004010",
+      "legalDesc": "LOT 48 SEC 3 MOSS ROSE HGTS",
+      "subdivision": null,
+      "totalAssessedValue": 133975,
+      "assessedYear": 2025,
+      "taxValue": 4359.55,
+      "taxYear": 2025,
+      "neighborhood": null,
+      "acres": 0.33,
+      "depthSize": 1770,
+      "frontage": 700,
+      "landArea": 14375,
+      "basementType": "B",
+      "buildingArea": 1768,
+      "wallType": "B",
+      "fireplaceCount": 1,
+      "floorType": null,
+      "foundationType": null,
+      "garageCount": 3,
+      "garageType": "D",
+      "buildingCount": 0,
+      "stories": null,
+      "totalBathrooms": 2,
+      "totalBedrooms": 4,
+      "poolCode": null,
+      "roofType": "T",
+      "roofStyle": null,
+      "constructionType": null,
+      "yearBuilt": 1952,
+      "zoningCode": "RS10",
+      "lenderName": "GUILD MORTGAGE CO",
+      "ownerAddressLine1": "4017 IVY DR",
+      "ownerCity": "NASHVILLE",
+      "ownerState": "TN",
+      "ownerZipCode": "37216",
+      "ownerResCount": 0,
+      "ownerComCount": 0,
+      "ownerOriginCode": "3",
+      "buyerIDCode": "UW",
+      "buyerVestingCode": "AV",
+      "recordingDate": "20251003",
+      "transferDate": "20251003",
+      "transferPrice": 723600,
+      "secTwnRng": null,
+      "blockNum": null,
+      "lotNum": "48",
+      "jurisdiction": null,
+      "districtNum": null,
+      "citySection": "3",
+      "landLot": null,
+      "lotCode": null,
+      "phaseNum": null,
+      "tractNum": null,
+      "totalBuildingValue": 379600,
+      "totalLandValue": 156300,
+      "totalMarketValue": 535900,
+      "marketValueYear": 2024,
+      "taxRateCodeArea": "USD",
+      "useCode": "1001",
+      "totalLienCount": 1,
+      "totalLienBalance": 506520,
+      "totalFinancingHistCount": 1,
+      "LTVCurrentEstCombined": 68.6874,
+      "LTVCurrentEstRange": 4,
+      "equityCurrentEstBal": 230908,
+      "equityCurrentEstRange": 5,
+      "LTVPurchase": 70,
+      "forecloseCode": null,
+      "forecloseRecordDate": null,
+      "forecloseFileDate": null,
+      "forecloseCaseNum": null,
+      "auctionDate": null,
+      "modelValue": 694713,
+      "modelValueMin": 611347,
+      "modelValueMax": 778078,
+      "siteId": "319234136",
+      "ownerParcelCount": 1,
+      "longitude": -86.70805760902907,
+      "latitude": 36.21286173222633,
+      "location": {
+        "type": "Point",
+        "coordinates": [
+          -86.70805760902907,
+          36.21286173222633
+        ]
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -86.7077634,
+                36.2128799
+              ],
+              [
+                -86.7082036,
+                36.2126495
+              ],
+              [
+                -86.7083846,
+                36.2128492
+              ],
+              [
+                -86.7083911,
+                36.2128563
+              ],
+              [
+                -86.7078787,
+                36.2130523
+              ],
+              [
+                -86.7078456,
+                36.213065
+              ],
+              [
+                -86.7078122,
+                36.2130067
+              ],
+              [
+                -86.7077756,
+                36.2129498
+              ],
+              [
+                -86.7077756,
+                36.2129497
+              ],
+              [
+                -86.7077359,
+                36.2128943
+              ],
+              [
+                -86.7077634,
+                36.2128799
+              ]
+            ]
+          ]
+        ]
+      },
+      "transferDateObject": "2025-10-03T00:00:00.000Z",
+      "residential": true,
+      "condo": false,
+      "pool": false,
+      "zipCodePlusFour": "37216-2917",
+      "unitNumber": null,
+      "streetNumber": "4017",
+      "street": "IVY DR",
+      "streetType": "DR",
+      "addressUnit": null,
+      "addressFormal": "4017 IVY DRIVE",
+      "addressFull": "4017 IVY DR, NASHVILLE, TN 37216",
+      "state_parcelId": "TN-DAVIDSON-073-01-0-102-00",
+      "state_parcelIdSTD": "TN-DAVIDSON-07301010200",
+      "cityUSPS": "NASHVILLE",
+      "addressFullUSPS": "4017 IVY DR, NASHVILLE, TN 37216",
+      "addressRaw": "4017 IVY DR",
+      "assessments": [
+        {
+          "assessedYear": 2022,
+          "totalAssessedValue": 103775,
+          "totalBuildingValue": 258800,
+          "totalLandValue": 156300,
+          "totalMarketValue": 415100,
+          "taxValue": 3931,
+          "taxYear": 2022
+        },
+        {
+          "assessedYear": 2024,
+          "totalAssessedValue": 103775,
+          "totalBuildingValue": 258800,
+          "totalLandValue": 156300,
+          "totalMarketValue": 415100,
+          "marketValueYear": 2021,
+          "taxValue": 3376.84,
+          "taxYear": 2024
+        }
+      ],
+      "countyUSPS": "DAVIDSON",
+      "fireplace": true,
+      "garage": true,
+      "ownerAddressFull": "4017 IVY DR, NASHVILLE, TN 37216",
+      "ownerZipCodePlusFour": "372162917",
+      "streetDirectionPrefix": null,
+      "streetDirectionSuffix": null,
+      "streetName": "IVY",
+      "transfers": [
+        {
+          "transferDate": "20170428",
+          "transferDateObject": "2017-04-28T00:00:00.000Z",
+          "transferPrice": 311000,
+          "grantee": "CARTER, BRETT; CARTER, CAMILLE",
+          "grantor": null,
+          "recordingDate": "20170501",
+          "bookNum": null,
+          "pageNum": null,
+          "transferDocType": "WD",
+          "transferDocNum": "20170501-0042434"
+        }
+      ],
+      "unitNumberStripped": null,
+      "ownershipStartDate": "20251003",
+      "bookNum": null,
+      "pageNum": null,
+      "transferDocNum": "20251003-0079193",
+      "transferDocType": "WD",
+      "assessedBuildingValue": 94900,
+      "assessedLandValue": 39075,
+      "grantee": "ELEY, DARGAN",
+      "grantor": "CARTER, BRETT; CARTER, CAMILLE",
+      "internal_id": "073-01-0-102-00"
+    },
+    {
+      "_id": "6722ef4b8b9296690387b3bb",
+      "fipsState": "47",
+      "fipsCounty": "037",
+      "county": "DAVIDSON",
+      "parcelId": "060-02-0-016-00",
+      "address": "3141 RICHMOND HILL DR",
+      "city": "NASHVILLE",
+      "zipCode": "37207",
+      "state": "TN",
+      "ownerName": "TANYA FEARS REVOCABLE LIVING TRUST; FEARS, TANYA",
+      "siteCensusTract": "470370109.042007",
+      "legalDesc": "PT LOT 39 SEC 1 PARKWOOD ESTATES",
+      "subdivision": null,
+      "totalAssessedValue": 51150,
+      "assessedYear": 2025,
+      "taxValue": 1664.42,
+      "taxYear": 2025,
+      "neighborhood": null,
+      "acres": 0.31,
+      "depthSize": 1250,
+      "frontage": 900,
+      "landArea": 13504,
+      "basementType": "I",
+      "buildingArea": 1879,
+      "wallType": "B",
+      "fireplaceCount": null,
+      "floorType": null,
+      "foundationType": "S",
+      "garageCount": 1,
+      "garageType": "C",
+      "buildingCount": 0,
+      "stories": null,
+      "totalBathrooms": 2,
+      "totalBedrooms": 3,
+      "poolCode": null,
+      "roofType": "O",
+      "roofStyle": null,
+      "constructionType": null,
+      "yearBuilt": 1961,
+      "zoningCode": "RS7.5",
+      "lenderName": "PACIFIC UNION FINANCIAL LLC",
+      "ownerAddressLine1": "3141 RICHMOND HILL DR",
+      "ownerCity": "NASHVILLE",
+      "ownerState": "TN",
+      "ownerZipCode": "37207",
+      "ownerResCount": 0,
+      "ownerComCount": 0,
+      "ownerOriginCode": "3",
+      "buyerIDCode": "SW",
+      "buyerVestingCode": "AV",
+      "recordingDate": "20251002",
+      "transferDate": "20251002",
+      "transferPrice": 150000,
+      "secTwnRng": null,
+      "blockNum": null,
+      "lotNum": "39",
+      "jurisdiction": null,
+      "districtNum": null,
+      "citySection": "1",
+      "landLot": null,
+      "lotCode": "P",
+      "phaseNum": null,
+      "tractNum": null,
+      "totalBuildingValue": 159600,
+      "totalLandValue": 45000,
+      "totalMarketValue": 204600,
+      "marketValueYear": 2024,
+      "taxRateCodeArea": "USD",
+      "useCode": "1001",
+      "totalLienCount": 1,
+      "totalLienBalance": 106803,
+      "totalFinancingHistCount": 2,
+      "LTVCurrentEstCombined": 33.5257,
+      "LTVCurrentEstRange": 1,
+      "equityCurrentEstBal": 211768,
+      "equityCurrentEstRange": 5,
+      "LTVPurchase": 98.1887,
+      "forecloseCode": null,
+      "forecloseRecordDate": null,
+      "forecloseFileDate": null,
+      "forecloseCaseNum": null,
+      "auctionDate": null,
+      "modelValue": 316743,
+      "modelValueMin": 278733,
+      "modelValueMax": 354752,
+      "siteId": "319128328",
+      "ownerParcelCount": 1,
+      "longitude": -86.78090445535707,
+      "latitude": 36.23564536004616,
+      "location": {
+        "type": "Point",
+        "coordinates": [
+          -86.78090445535707,
+          36.23564536004616
+        ]
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -86.7807264,
+                36.2356508
+              ],
+              [
+                -86.7807475,
+                36.2354595
+              ],
+              [
+                -86.781095,
+                36.2354787
+              ],
+              [
+                -86.781082,
+                36.2356485
+              ],
+              [
+                -86.7810885,
+                36.2356485
+              ],
+              [
+                -86.7810845,
+                36.2356885
+              ],
+              [
+                -86.7810771,
+                36.2357634
+              ],
+              [
+                -86.7810751,
+                36.2357741
+              ],
+              [
+                -86.7810721,
+                36.2357827
+              ],
+              [
+                -86.7810715,
+                36.2357843
+              ],
+              [
+                -86.7810658,
+                36.2357942
+              ],
+              [
+                -86.7810585,
+                36.2358031
+              ],
+              [
+                -86.7810491,
+                36.2358108
+              ],
+              [
+                -86.7810386,
+                36.2358172
+              ],
+              [
+                -86.7810268,
+                36.2358222
+              ],
+              [
+                -86.7810143,
+                36.2358259
+              ],
+              [
+                -86.7810014,
+                36.2358276
+              ],
+              [
+                -86.7809882,
+                36.2358277
+              ],
+              [
+                -86.7807086,
+                36.2358114
+              ],
+              [
+                -86.7807264,
+                36.2356508
+              ]
+            ]
+          ]
+        ]
+      },
+      "transferDateObject": "2025-10-02T00:00:00.000Z",
+      "residential": true,
+      "condo": false,
+      "pool": false,
+      "zipCodePlusFour": "37207-2847",
+      "unitNumber": null,
+      "streetNumber": "3141",
+      "street": "RICHMOND HILL DR",
+      "streetType": "DR",
+      "addressUnit": null,
+      "addressFormal": "3141 RICHMOND HILL DRIVE",
+      "addressFull": "3141 RICHMOND HILL DR, NASHVILLE, TN 37207",
+      "state_parcelId": "TN-DAVIDSON-060-02-0-016-00",
+      "state_parcelIdSTD": "TN-DAVIDSON-06002001600",
+      "cityUSPS": "NASHVILLE",
+      "addressFullUSPS": "3141 RICHMOND HILL DR, NASHVILLE, TN 37207",
+      "addressRaw": "3141 RICHMOND HILL DR",
+      "assessments": [
+        {
+          "assessedYear": 2022,
+          "totalAssessedValue": 51150,
+          "totalBuildingValue": 159600,
+          "totalLandValue": 45000,
+          "totalMarketValue": 204600,
+          "taxValue": 1937.56,
+          "taxYear": 2022
+        },
+        {
+          "assessedYear": 2024,
+          "totalAssessedValue": 51150,
+          "totalBuildingValue": 159600,
+          "totalLandValue": 45000,
+          "totalMarketValue": 204600,
+          "marketValueYear": 2021,
+          "taxValue": 1664.42,
+          "taxYear": 2024
+        }
+      ],
+      "countyUSPS": "DAVIDSON",
+      "fireplace": null,
+      "garage": true,
+      "ownerAddressFull": "3141 RICHMOND HILL DR, NASHVILLE, TN 37207",
+      "ownerZipCodePlusFour": "372072847",
+      "streetDirectionPrefix": null,
+      "streetDirectionSuffix": null,
+      "streetName": "RICHMOND HILL",
+      "transfers": [
+        {
+          "transferDate": "20141223",
+          "transferDateObject": "2014-12-23T00:00:00.000Z",
+          "transferPrice": 150000,
+          "grantee": "FEARS, TANYA R",
+          "grantor": null,
+          "recordingDate": "20141230",
+          "bookNum": null,
+          "pageNum": null,
+          "transferDocType": "WD",
+          "transferDocNum": "201412300118673"
+        }
+      ],
+      "unitNumberStripped": null,
+      "ownershipStartDate": "20141223",
+      "bookNum": null,
+      "pageNum": null,
+      "transferDocNum": "20251002-0078655",
+      "transferDocType": "IT",
+      "assessedBuildingValue": 39900,
+      "assessedLandValue": 11250,
+      "grantee": "TANYA FEARS REVOCABLE LIVING TRUST; FEARS, TANYA",
+      "grantor": "FEARS, TANYA R",
+      "internal_id": "060-02-0-016-00"
+    },
+    {
+      "_id": "6722ef1c8b92966903862a89",
+      "fipsState": "47",
+      "fipsCounty": "037",
+      "county": "DAVIDSON",
+      "parcelId": "071-15-0-438-00",
+      "address": "1212 STAINBACK AVE",
+      "city": "NASHVILLE",
+      "zipCode": "37207",
+      "state": "TN",
+      "ownerName": "GIANGIULIO, BRIAN; SALTZ, ALEXANDRA",
+      "siteCensusTract": "470370118.002002",
+      "legalDesc": "PT LOT 109 SHARPE & HORNS 1ST ADDN",
+      "subdivision": null,
+      "totalAssessedValue": 141650,
+      "assessedYear": 2025,
+      "taxValue": 4609.29,
+      "taxYear": 2025,
+      "neighborhood": null,
+      "acres": 0.11,
+      "depthSize": 1680,
+      "frontage": 320,
+      "landArea": 4792,
+      "basementType": null,
+      "buildingArea": 1750,
+      "wallType": null,
+      "fireplaceCount": 1,
+      "floorType": null,
+      "foundationType": "B",
+      "garageCount": 3,
+      "garageType": "A",
+      "buildingCount": 2,
+      "stories": 2,
+      "totalBathrooms": 2,
+      "totalBedrooms": 3,
+      "poolCode": null,
+      "roofType": "P",
+      "roofStyle": null,
+      "constructionType": "F",
+      "yearBuilt": 1930,
+      "zoningCode": "SP",
+      "lenderName": "PRIMIS MORTGAGE CO",
+      "ownerAddressLine1": "1016 TREATY OAKS DR",
+      "ownerCity": "NASHVILLE",
+      "ownerState": "TN",
+      "ownerZipCode": "37209",
+      "ownerResCount": 1,
+      "ownerComCount": 0,
+      "ownerOriginCode": "3",
+      "buyerIDCode": "MC",
+      "buyerVestingCode": "AV",
+      "recordingDate": "20251003",
+      "transferDate": "20251002",
+      "transferPrice": 975000,
+      "secTwnRng": null,
+      "blockNum": null,
+      "lotNum": "109",
+      "jurisdiction": null,
+      "districtNum": null,
+      "citySection": null,
+      "landLot": null,
+      "lotCode": "P",
+      "phaseNum": null,
+      "tractNum": null,
+      "totalBuildingValue": 416600,
+      "totalLandValue": 150000,
+      "totalMarketValue": 566600,
+      "marketValueYear": 2024,
+      "taxRateCodeArea": "USD",
+      "useCode": "1001",
+      "totalLienCount": 1,
+      "totalLienBalance": 940875,
+      "totalFinancingHistCount": 1,
+      "LTVCurrentEstCombined": 98.2508,
+      "LTVCurrentEstRange": 10,
+      "equityCurrentEstBal": 16751,
+      "equityCurrentEstRange": 1,
+      "LTVPurchase": 96.5,
+      "forecloseCode": null,
+      "forecloseRecordDate": null,
+      "forecloseFileDate": null,
+      "forecloseCaseNum": null,
+      "auctionDate": null,
+      "modelValue": 737785,
+      "modelValueMin": 641872,
+      "modelValueMax": 833697,
+      "siteId": "319149872",
+      "ownerParcelCount": 1,
+      "longitude": -86.76506420608659,
+      "latitude": 36.19286325215445,
+      "location": {
+        "type": "Point",
+        "coordinates": [
+          -86.76506420608659,
+          36.19286325215445
+        ]
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -86.7647943,
+                36.1928446
+              ],
+              [
+                -86.7648024,
+                36.1927903
+              ],
+              [
+                -86.7648026,
+                36.1927903
+              ],
+              [
+                -86.7648363,
+                36.1927934
+              ],
+              [
+                -86.7653279,
+                36.1928382
+              ],
+              [
+                -86.7653292,
+                36.1928384
+              ],
+              [
+                -86.7653294,
+                36.1928384
+              ],
+              [
+                -86.7653396,
+                36.1928393
+              ],
+              [
+                -86.7653413,
+                36.1928395
+              ],
+              [
+                -86.765328,
+                36.1929235
+              ],
+              [
+                -86.765326,
+                36.1929361
+              ],
+              [
+                -86.7653243,
+                36.1929359
+              ],
+              [
+                -86.7653141,
+                36.192935
+              ],
+              [
+                -86.7653134,
+                36.1929349
+              ],
+              [
+                -86.765313,
+                36.1929349
+              ],
+              [
+                -86.7647871,
+                36.1928872
+              ],
+              [
+                -86.7647892,
+                36.1928746
+              ],
+              [
+                -86.7647943,
+                36.1928446
+              ]
+            ]
+          ]
+        ]
+      },
+      "transferDateObject": "2025-10-02T00:00:00.000Z",
+      "residential": true,
+      "condo": false,
+      "pool": false,
+      "zipCodePlusFour": "37207-5724",
+      "unitNumber": null,
+      "streetNumber": "1212",
+      "street": "STAINBACK AVE",
+      "streetType": "AVE",
+      "addressUnit": null,
+      "addressFormal": "1212 STAINBACK AVENUE",
+      "addressFull": "1212 STAINBACK AVE, NASHVILLE, TN 37207",
+      "state_parcelId": "TN-DAVIDSON-071-15-0-438-00",
+      "state_parcelIdSTD": "TN-DAVIDSON-07115043800",
+      "cityUSPS": "NASHVILLE",
+      "addressFullUSPS": "1212 STAINBACK AVE, NASHVILLE, TN 37207",
+      "addressRaw": "1212 STAINBACK AVE",
+      "assessments": [
+        {
+          "assessedYear": 2022,
+          "totalAssessedValue": 109700,
+          "totalBuildingValue": 288800,
+          "totalLandValue": 150000,
+          "totalMarketValue": 438800,
+          "taxValue": 4155.44,
+          "taxYear": 2022
+        },
+        {
+          "assessedYear": 2024,
+          "totalAssessedValue": 109700,
+          "totalBuildingValue": 288800,
+          "totalLandValue": 150000,
+          "totalMarketValue": 438800,
+          "marketValueYear": 2021,
+          "taxValue": 3569.64,
+          "taxYear": 2024
+        }
+      ],
+      "countyUSPS": "DAVIDSON",
+      "fireplace": true,
+      "garage": true,
+      "ownerAddressFull": "1016 TREATY OAKS DR, NASHVILLE, TN 37209",
+      "ownerZipCodePlusFour": "372092574",
+      "streetDirectionPrefix": null,
+      "streetDirectionSuffix": null,
+      "streetName": "STAINBACK",
+      "transfers": [
+        {
+          "transferDate": "20190329",
+          "transferDateObject": "2019-03-29T00:00:00.000Z",
+          "transferPrice": 380000,
+          "grantee": "WOOD II, CHARLES NORWOOD; WOOD, BRITTANY ALISE",
+          "grantor": null,
+          "recordingDate": "20190401",
+          "bookNum": null,
+          "pageNum": null,
+          "transferDocType": "WD",
+          "transferDocNum": "20190401-0029195"
+        }
+      ],
+      "unitNumberStripped": null,
+      "ownershipStartDate": "20251002",
+      "bookNum": null,
+      "pageNum": null,
+      "transferDocNum": "20251003-0079145",
+      "transferDocType": "WD",
+      "assessedBuildingValue": 104150,
+      "assessedLandValue": 37500,
+      "grantee": "GIANGIULIO, BRIAN; SALTZ, ALEXANDRA",
+      "grantor": "WOOD II, CHARLES NORWOOD; WOOD, BRITTANY ALISE",
+      "internal_id": "071-15-0-438-00"
+    },
+    {
+      "_id": "6722f3ae8b92966903a3ea0e",
+      "fipsState": "47",
+      "fipsCounty": "037",
+      "county": "DAVIDSON",
+      "parcelId": "083-12-0-008-00",
+      "address": "2434 CHAPMAN DR",
+      "city": "NASHVILLE",
+      "zipCode": "37206",
+      "state": "TN",
+      "ownerName": "PERRY, ALLEN",
+      "siteCensusTract": "470370116.005006",
+      "legalDesc": "LOT 139 SEC 2 EASTLAND ACRES",
+      "subdivision": null,
+      "totalAssessedValue": 81475,
+      "assessedYear": 2025,
+      "taxValue": 2651.2,
+      "taxYear": 2025,
+      "neighborhood": null,
+      "acres": 0.41,
+      "depthSize": 2420,
+      "frontage": 740,
+      "landArea": 17860,
+      "basementType": "B",
+      "buildingArea": 1369,
+      "wallType": "B",
+      "fireplaceCount": 1,
+      "floorType": null,
+      "foundationType": null,
+      "garageCount": 0,
+      "garageType": "G",
+      "buildingCount": 0,
+      "stories": null,
+      "totalBathrooms": 1,
+      "totalBedrooms": 3,
+      "poolCode": null,
+      "roofType": "H",
+      "roofStyle": null,
+      "constructionType": null,
+      "yearBuilt": 1953,
+      "zoningCode": "R10",
+      "lenderName": "ACE MORTGAGE FUNDING INC",
+      "ownerAddressLine1": "4618 LEALAND LN",
+      "ownerCity": "NASHVILLE",
+      "ownerState": "TN",
+      "ownerZipCode": "37220",
+      "ownerResCount": 6,
+      "ownerComCount": 1,
+      "ownerOriginCode": "3",
+      "buyerIDCode": "ID",
+      "buyerVestingCode": "AV",
+      "recordingDate": "20251003",
+      "transferDate": "20251002",
+      "transferPrice": 580000,
+      "secTwnRng": null,
+      "blockNum": null,
+      "lotNum": "139",
+      "jurisdiction": null,
+      "districtNum": null,
+      "citySection": "2",
+      "landLot": null,
+      "lotCode": null,
+      "phaseNum": null,
+      "tractNum": null,
+      "totalBuildingValue": 150900,
+      "totalLandValue": 175000,
+      "totalMarketValue": 325900,
+      "marketValueYear": 2024,
+      "taxRateCodeArea": "USD",
+      "useCode": "1001",
+      "totalLienCount": 1,
+      "totalLienBalance": 27757,
+      "totalFinancingHistCount": 2,
+      "LTVCurrentEstCombined": 0,
+      "LTVCurrentEstRange": 1,
+      "equityCurrentEstBal": 616594,
+      "equityCurrentEstRange": 10,
+      "LTVPurchase": 0,
+      "forecloseCode": null,
+      "forecloseRecordDate": null,
+      "forecloseFileDate": null,
+      "forecloseCaseNum": null,
+      "auctionDate": null,
+      "modelValue": 481999,
+      "modelValueMin": 409699,
+      "modelValueMax": 554298,
+      "siteId": "319256270",
+      "ownerParcelCount": 7,
+      "longitude": -86.72133406349029,
+      "latitude": 36.176635556306806,
+      "location": {
+        "type": "Point",
+        "coordinates": [
+          -86.72133406349029,
+          36.176635556306806
+        ]
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [
+                -86.720923,
+                36.1767395
+              ],
+              [
+                -86.7209239,
+                36.1765395
+              ],
+              [
+                -86.7216773,
+                36.1765289
+              ],
+              [
+                -86.721737,
+                36.176528
+              ],
+              [
+                -86.7217409,
+                36.1766621
+              ],
+              [
+                -86.7217443,
+                36.1767346
+              ],
+              [
+                -86.720923,
+                36.1767395
+              ]
+            ]
+          ]
+        ]
+      },
+      "transferDateObject": "2025-10-02T00:00:00.000Z",
+      "residential": true,
+      "condo": false,
+      "pool": false,
+      "zipCodePlusFour": "37206-1518",
+      "unitNumber": null,
+      "streetNumber": "2434",
+      "street": "CHAPMAN DR",
+      "streetType": "DR",
+      "addressUnit": null,
+      "addressFormal": "2434 CHAPMAN DRIVE",
+      "addressFull": "2434 CHAPMAN DR, NASHVILLE, TN 37206",
+      "state_parcelId": "TN-DAVIDSON-083-12-0-008-00",
+      "state_parcelIdSTD": "TN-DAVIDSON-08312000800",
+      "cityUSPS": "NASHVILLE",
+      "addressFullUSPS": "2434 CHAPMAN DR, NASHVILLE, TN 37206",
+      "addressRaw": "2434 CHAPMAN DR",
+      "assessments": [
+        {
+          "assessedYear": 2022,
+          "totalAssessedValue": 81475,
+          "totalBuildingValue": 150900,
+          "totalLandValue": 175000,
+          "totalMarketValue": 325900,
+          "taxValue": 3086.27,
+          "taxYear": 2022
+        },
+        {
+          "assessedYear": 2024,
+          "totalAssessedValue": 81475,
+          "totalBuildingValue": 150900,
+          "totalLandValue": 175000,
+          "totalMarketValue": 325900,
+          "marketValueYear": 2021,
+          "taxValue": 2651.2,
+          "taxYear": 2024
+        }
+      ],
+      "countyUSPS": "DAVIDSON",
+      "fireplace": true,
+      "garage": false,
+      "ownerAddressFull": "4618 LEALAND LN, NASHVILLE, TN 37220",
+      "ownerZipCodePlusFour": "372201037",
+      "streetDirectionPrefix": null,
+      "streetDirectionSuffix": null,
+      "streetName": "CHAPMAN",
+      "transfers": [],
+      "unitNumberStripped": null,
+      "ownershipStartDate": "20251002",
+      "bookNum": null,
+      "pageNum": null,
+      "transferDocNum": "20251003-0079125",
+      "transferDocType": "WD",
+      "assessedBuildingValue": 37725,
+      "assessedLandValue": 43750,
+      "grantee": "PERRY, ALLEN",
+      "grantor": "JONES, WILLIAM; JONES, SUE",
+      "internal_id": "083-12-0-008-00"
+    },
+    {
+      "_id": "6722f3318b92966903a216e7",
+      "fipsState": "47",
+      "fipsCounty": "037",
+      "county": "DAVIDSON",
+      "parcelId": "071-08-0-206-00",
+      "address": "529 WESLEY AVE",
+      "city": "NASHVILLE",
+      "zipCode": "37207",
+      "state": "TN",
+      "ownerName": "HAYES, KERRY",
+      "siteCensusTract": "470370113.003004",
+      "legalDesc": "LOT 77 SEC 1 JOYWOOD HGTS",
+      "subdivision": null,
+      "totalAssessedValue": 82625,
+      "assessedYear": 2025,
+      "taxValue": 2688.62,
+      "taxYear": 2025,
+      "neighborhood": null,
+      "acres": 0.22,
+      "depthSize": 1600,
+      "frontage": 600,
+      "landArea": 9583,
+      "basementType": "B",
+      "buildingArea": 1152,
+      "wallType": null,
+      "fireplaceCount": null,
+      "floorType": null,
+      "foundationType": "K",
+      "garageCount": 0,
+      "garageType": null,
+      "buildingCount": 0,
+      "stories": null,
+      "totalBathrooms": 1,
+      "totalBedrooms": 3,
+      "poolCode": null,
+      "roofType": "T",
+      "roofStyle": null,
+      "constructionType": "F",
+      "yearBuilt": 1950,
+      "zoningCode": "RS10",
+      "lenderName": "FIFTH THIRD BANK NA",
+      "ownerAddressLine1": "529 WESLEY AVE",
+      "ownerCity": "NASHVILLE",
+      "ownerState": "TN",
+      "ownerZipCode": "37207",
+      "ownerResCount": 0,
+      "ownerComCount": 0,
+      "ownerOriginCode": "3",
+      "buyerIDCode": "UM",
+      "buyerVestingCode": "TC",
+      "recordingDate": "20251001",
+      "transferDate": "20251001",
+      "transferPrice": 435000,
+      "secTwnRng": null,
+      "blockNum": null,
+      "lotNum": "77",
+      "jurisdiction": null,
+      "districtNum": null,
+      "citySection": "1",
+      "landLot": null,
+      "lotCode": null,
+      "phaseNum": null,
+      "tractNum": null,
+      "totalBuildingValue": 247400,
+      "totalLandValue": 83100,
+      "totalMarketValue": 330500,
+      "marketValueYear": 2024,
+      "taxRateCodeArea": "USD",
+      "useCode": "1001",
+      "totalLienCount": 1,
+      "totalLienBalance": 270000,
+      "totalFinancingHistCount": 1,
+      "LTVCurrentEstCombined": 62.9299,
+      "LTVCurrentEstRange": 4,
+      "equityCurrentEstBal": 159049,
+      "equityCurrentEstRange": 4,
+      "LTVPurchase": 62.069,
+      "forecloseCode": null,
+      "forecloseRecordDate": null,
+      "forecloseFileDate": null,
+      "forecloseCaseNum": null,
+      "auctionDate": null,
+      "modelValue": 424438,
+      "modelValueMin": 377749,
+      "modelValueMax": 471126,
+      "siteId": "319133394",
+      "ownerParcelCount": 1,
+      "longitude": -86.75429571316117,
+      "latitude": 36.20644687627359,
+      "location": {
+        "type": "Point",
+        "coordinates": [
+          -86.75429571316117,
+          36.20644687627359
+        ]
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+  
+
+... [1310 lines truncated] ...

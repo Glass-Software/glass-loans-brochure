@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { validateEmail } from "@/lib/email/abstractapi";
-import { normalizeEmail } from "@/lib/email/normalization";
+// import { validateEmail } from "@/lib/email/abstractapi"; // COMMENTED OUT: Using half our quota, restore if needed
+import { normalizeEmail, isValidEmailFormat, isDisposableEmail } from "@/lib/email/normalization";
 import {
   findUserByNormalizedEmail,
   createUser,
@@ -26,16 +26,20 @@ export async function POST(request: Request) {
       );
     }
 
-    // Step 1: Validate email quality (optional AbstractAPI + basic checks)
-    // This checks format, deliverability, and blocks disposable emails
-    const validation = await validateEmail(email);
+    // Step 1: Validate email quality (Basic validation - AbstractAPI commented out)
+    // const validation = await validateEmail(email);
 
-    if (!validation.isValid) {
+    // Basic validation without Abstract API
+    if (!isValidEmailFormat(email)) {
       return NextResponse.json(
-        {
-          error: validation.reason || "Invalid email address",
-          suggestedEmail: validation.suggestedEmail,
-        },
+        { error: "Invalid email format" },
+        { status: 400 },
+      );
+    }
+
+    if (isDisposableEmail(email)) {
+      return NextResponse.json(
+        { error: "Disposable email addresses are not allowed" },
         { status: 400 },
       );
     }

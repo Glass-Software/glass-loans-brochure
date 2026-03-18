@@ -34,7 +34,7 @@ export default function ScoreCard({ score, calculations }: ScoreCardProps) {
         <div className="mb-4 inline-flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5">
           <div className="text-center">
             <div className={`text-5xl font-bold ${scoreColor}`}>{score}</div>
-            <div className="text-sm text-body-color">out of 100</div>
+            <div className="text-sm text-body-color dark:text-body-color-dark">out of 100</div>
           </div>
         </div>
         <h3 className={`text-2xl font-bold ${scoreColor}`}>{scoreLabel}</h3>
@@ -97,7 +97,7 @@ function MetricCard({
     <div className={`rounded-sm border p-4 ${statusColors[status]}`}>
       <div className="mb-1 flex items-center gap-2">
         <div className={`h-2 w-2 rounded-full ${dotColors[status]}`} />
-        <span className="text-xs font-medium text-body-color">{label}</span>
+        <span className="text-xs font-medium text-body-color dark:text-body-color-dark">{label}</span>
       </div>
       <div className="text-lg font-bold text-dark dark:text-white">{value}</div>
     </div>

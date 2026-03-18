@@ -4,10 +4,13 @@ import { getSubmissionById, getSubmissionByReportId } from "@/lib/db/queries";
 import { calculateUnderwriting } from "@/lib/underwriting/calculations";
 import CalculationBreakdown from "@/components/Underwriting/CalculationBreakdown";
 import GaryOpinion from "@/components/Underwriting/GaryOpinion";
+import ScoreMetricsComparison from "@/components/Underwriting/ScoreMetricsComparison";
+import CompsMapSection from "@/components/Underwriting/CompsMapSection";
 import type {
   UnderwritingFormData,
   CalculatedResults,
-  BatchDataEnrichedEstimates
+  PropertyComps,
+  CompSelectionState,
 } from "@/types/underwriting";
 
 export const metadata: Metadata = {
@@ -50,6 +53,8 @@ export default async function ResultsPage({
     propertyState: submission.property_state || undefined,
     propertyZip: submission.property_zip || undefined,
     propertyCounty: submission.property_county || undefined,
+    propertyLatitude: submission.property_latitude || undefined,
+    propertyLongitude: submission.property_longitude || undefined,
     purchasePrice: submission.purchase_price,
     rehab: submission.rehab,
     squareFeet: submission.square_feet,
@@ -69,29 +74,73 @@ export default async function ResultsPage({
     points: submission.points,
     marketType: submission.market_type as any,
     additionalDetails: submission.additional_details || undefined,
-    compLinks: submission.comp_links
-      ? JSON.parse(submission.comp_links)
-      : undefined,
   };
 
-  // Reconstruct AI estimates with full BatchDataEnrichedEstimates type
-  const aiEstimates: BatchDataEnrichedEstimates = {
+  // Reconstruct property comps
+  let parsedComps: any[] = [];
+  try {
+    parsedComps = submission.ai_property_comps
+      ? JSON.parse(submission.ai_property_comps)
+      : [];
+    // Ensure it's an array
+    if (!Array.isArray(parsedComps)) {
+      console.error("ai_property_comps is not an array:", parsedComps);
+      parsedComps = [];
+    }
+  } catch (error) {
+    console.error("Failed to parse ai_property_comps:", error);
+    parsedComps = [];
+  }
+
+  const propertyComps: PropertyComps = {
     estimatedARV: submission.estimated_arv || 0,
     asIsValue: submission.as_is_value || 0,
-    compsUsed: submission.ai_property_comps
-      ? JSON.parse(submission.ai_property_comps)
-      : [],
+    compsUsed: Array.isArray(parsedComps) ? parsedComps : [],
     marketAnalysis: "",
-    batchDataUsed: true,
-    valuationMethod: "batchdata",
+    confidence: "medium",
   };
 
-  // Recalculate metrics using Gary's ARV estimate
-  const calculations = calculateUnderwriting(
+  // Parse comp selection state (if available)
+  let compSelectionState: CompSelectionState[] = [];
+  try {
+    compSelectionState = submission.comp_selection_state
+      ? JSON.parse(submission.comp_selection_state)
+      : [];
+    if (!Array.isArray(compSelectionState)) {
+      console.error("comp_selection_state is not an array:", compSelectionState);
+      compSelectionState = [];
+    }
+  } catch (error) {
+    console.error("Failed to parse comp_selection_state:", error);
+    compSelectionState = [];
+  }
+
+  // Calculate Gary's analysis (using Gary's ARV and As-Is estimates)
+  const garyCalculations = calculateUnderwriting(
     formData,
-    aiEstimates.estimatedARV,
-    aiEstimates.asIsValue
+    propertyComps.estimatedARV,
+    propertyComps.asIsValue
   );
+
+  // Calculate user's metrics (using user's ARV and As-Is estimates)
+  const userCalculations = calculateUnderwriting(
+    formData,
+    formData.userEstimatedArv,
+    formData.userEstimatedAsIsValue
+  );
+
+  // Get property coordinates for map
+  // Priority: 1) Subject property coords from DB, 2) First comp with valid coords, 3) null (hide map)
+  const firstCompWithCoords = propertyComps.compsUsed?.find(
+    comp => comp.latitude != null && comp.longitude != null
+  );
+
+  const propertyCoordinates =
+    formData.propertyLatitude != null && formData.propertyLongitude != null
+      ? { lat: formData.propertyLatitude, lng: formData.propertyLongitude }
+      : firstCompWithCoords
+        ? { lat: firstCompWithCoords.latitude, lng: firstCompWithCoords.longitude }
+        : null;
 
   return (
     <section className="overflow-hidden py-16 md:py-20 lg:py-28">
@@ -114,63 +163,38 @@ export default async function ResultsPage({
         )}
 
         <div className="mx-auto max-w-5xl">
-          {/* Score Card */}
-          <div className="mb-8 rounded-sm bg-white p-8 shadow-three dark:bg-gray-dark">
-            <div className="text-center">
-              <h1 className="mb-4 text-3xl font-bold text-dark dark:text-white">
-                Gary&apos;s Underwriting Analysis
-              </h1>
-              <p className="mb-6 text-body-color">{formData.propertyAddress}</p>
+          {/* Section 1: Score & Metrics Comparison */}
+          <ScoreMetricsComparison
+            propertyAddress={formData.propertyAddress}
+            score={submission.final_score}
+            userCalculations={userCalculations}
+            garyCalculations={garyCalculations}
+            userAsIsValue={formData.userEstimatedAsIsValue}
+            garyAsIsValue={propertyComps.asIsValue}
+          />
 
-              <div className="mb-6 inline-flex h-32 w-32 items-center justify-center rounded-full bg-primary/10">
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-primary">
-                    {submission.final_score}
-                  </div>
-                  <div className="text-sm text-body-color">/ 100</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <div className="rounded-sm bg-gray-50 p-4 dark:bg-gray-900/20">
-                  <div className="text-sm text-body-color">ARV</div>
-                  <div className="text-lg font-semibold text-dark dark:text-white">
-                    ${aiEstimates.estimatedARV.toLocaleString()}
-                  </div>
-                </div>
-                <div className="rounded-sm bg-gray-50 p-4 dark:bg-gray-900/20">
-                  <div className="text-sm text-body-color">Loan-to-ARV</div>
-                  <div className="text-lg font-semibold text-dark dark:text-white">
-                    {calculations.loanToArv.toFixed(1)}%
-                  </div>
-                </div>
-                <div className="rounded-sm bg-gray-50 p-4 dark:bg-gray-900/20">
-                  <div className="text-sm text-body-color">Borrower Profit</div>
-                  <div className="text-lg font-semibold text-dark dark:text-white">
-                    ${calculations.borrowerProfit.toLocaleString()}
-                  </div>
-                </div>
-                <div className="rounded-sm bg-gray-50 p-4 dark:bg-gray-900/20">
-                  <div className="text-sm text-body-color">Loan Underwater?</div>
-                  <div className="text-lg font-semibold text-dark dark:text-white">
-                    {calculations.isLoanUnderwater ? "Yes" : "No"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Gary's Opinion */}
+          {/* Section 2: Gary's Full Opinion */}
           <div className="mb-8">
             <GaryOpinion opinion={submission.gary_opinion || ""} />
           </div>
 
-          {/* Detailed Calculation Breakdown */}
+          {/* Section 3: Comps with Map */}
+          {propertyComps.compsUsed && propertyComps.compsUsed.length > 0 && propertyCoordinates && (
+            <CompsMapSection
+              propertyComps={propertyComps}
+              propertyCoordinates={propertyCoordinates}
+              propertyAddress={formData.propertyAddress}
+              compSelectionState={compSelectionState}
+            />
+          )}
+
+          {/* Section 4: Detailed Calculations */}
           <div className="mb-8">
             <CalculationBreakdown
               formData={formData}
-              aiEstimates={aiEstimates}
-              calculations={calculations}
+              propertyComps={propertyComps}
+              calculations={garyCalculations}
+              hideComps={true}
             />
           </div>
 

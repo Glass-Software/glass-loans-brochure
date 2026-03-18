@@ -138,8 +138,12 @@ export default function Step1PropertyDetails() {
       // Convert suggestion to Place object
       const place = await suggestion.placePrediction.toPlace();
 
-      // Fetch address components
-      await place.fetchFields({ fields: ['addressComponents'] });
+      // Fetch address components AND location (coordinates)
+      await place.fetchFields({ fields: ['addressComponents', 'location'] });
+
+      // Extract coordinates
+      const latitude = place.location?.lat() ?? null;
+      const longitude = place.location?.lng() ?? null;
 
       if (place.addressComponents) {
         // Convert to format our parser expects
@@ -150,15 +154,20 @@ export default function Step1PropertyDetails() {
         }));
 
         const mockPlace = { address_components: addressComponents };
-        const locationData = parseGooglePlaceAddress(mockPlace as any);
+        const locationData = parseGooglePlaceAddress(
+          mockPlace as any,
+          latitude !== null && longitude !== null ? { lat: latitude, lng: longitude } : undefined
+        );
 
-        // Update form with parsed data
+        // Update form with parsed data INCLUDING coordinates
         updateFormData({
           propertyAddress: locationData.streetAddress || "",
           propertyCity: locationData.city || undefined,
           propertyState: locationData.state || undefined,
           propertyZip: locationData.zip || undefined,
           propertyCounty: locationData.county || undefined,
+          propertyLatitude: locationData.latitude || undefined,
+          propertyLongitude: locationData.longitude || undefined,
         });
       }
 
@@ -255,7 +264,7 @@ export default function Step1PropertyDetails() {
   };
 
   const inputClass =
-    "border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-dark placeholder:text-body-color outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white dark:placeholder:text-body-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none";
+    "border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-dark placeholder:text-placeholder-color outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white dark:placeholder:text-placeholder-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none";
   const labelClass = "mb-3 block text-sm font-medium text-dark dark:text-white";
   const errorClass = "mt-1 text-sm text-red-600 dark:text-red-400";
 
@@ -324,7 +333,7 @@ export default function Step1PropertyDetails() {
             {errors.propertyAddress && (
               <p className={errorClass}>{errors.propertyAddress}</p>
             )}
-            <p className="mt-1 text-xs text-body-color">
+            <p className="mt-1 text-xs text-body-color dark:text-body-color-dark">
               Start typing and select an address from the dropdown
             </p>
           </div>
@@ -403,7 +412,7 @@ export default function Step1PropertyDetails() {
               Purchase Price *
             </label>
             <div className="relative">
-              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color dark:text-body-color-dark">
                 $
               </span>
               <input
@@ -427,7 +436,7 @@ export default function Step1PropertyDetails() {
               Rehab Budget *
             </label>
             <div className="relative">
-              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color dark:text-body-color-dark">
                 $
               </span>
               <input
@@ -540,7 +549,7 @@ export default function Step1PropertyDetails() {
               className={inputClass}
             >
               <option value="">Select property type...</option>
-              <option value="SFR">Single Family Residence (SFR)</option>
+              <option value="Single Family">Single Family</option>
               <option value="Condo">Condo</option>
               <option value="Townhouse">Townhouse</option>
               <option value="Multi-Family">Multi-Family</option>

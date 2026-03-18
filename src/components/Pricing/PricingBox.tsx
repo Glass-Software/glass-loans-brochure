@@ -20,7 +20,7 @@ const PricingBox = (props: {
         <div className="flex items-center justify-between">
           <h3 className="price mb-2 text-[32px] font-bold text-black dark:text-white">
             $<span className="amount">{displayPrice}</span>
-            <span className="time text-lg font-medium text-body-color">
+            <span className="time text-lg font-medium text-body-color dark:text-body-color-dark">
               /{duration}
             </span>
           </h3>
@@ -28,7 +28,7 @@ const PricingBox = (props: {
             {packageName}
           </h4>
         </div>
-        <p className="mb-7 text-base text-body-color">{subtitle}</p>
+        <p className="mb-7 text-base text-body-color dark:text-body-color-dark">{subtitle}</p>
         <div className="mb-8 border-b border-body-color border-opacity-10 pb-8 dark:border-white dark:border-opacity-10">
           <button
             onClick={() => openContactModal(packageName)}

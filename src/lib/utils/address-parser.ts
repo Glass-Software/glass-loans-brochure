@@ -9,21 +9,25 @@ export interface ParsedLocationData {
   zip: string | null;
   county: string | null;          // County name (e.g., "Davidson County")
   country: string | null;
+  latitude: number | null;        // Latitude coordinate
+  longitude: number | null;       // Longitude coordinate
 }
 
 /**
  * Extracts structured location data from Google Places address_components.
  *
  * @param place - Google Places PlaceResult object
- * @returns ParsedLocationData with city, state, zip, or null for missing components
+ * @param geometry - Optional geometry object with lat/lng coordinates
+ * @returns ParsedLocationData with city, state, zip, coordinates, or null for missing components
  *
  * @example
  * const place = autocomplete.getPlace();
- * const location = parseGooglePlaceAddress(place);
- * // { streetAddress: "1234 Main St", city: "Nashville", state: "TN", stateFullName: "Tennessee", zip: "37201", county: "Davidson County", country: "US" }
+ * const location = parseGooglePlaceAddress(place, { lat: 36.1627, lng: -86.7816 });
+ * // { streetAddress: "1234 Main St", city: "Nashville", state: "TN", stateFullName: "Tennessee", zip: "37201", county: "Davidson County", country: "US", latitude: 36.1627, longitude: -86.7816 }
  */
 export function parseGooglePlaceAddress(
-  place: google.maps.places.PlaceResult
+  place: google.maps.places.PlaceResult,
+  geometry?: { lat: number; lng: number }
 ): ParsedLocationData {
   const result: ParsedLocationData = {
     streetAddress: null,
@@ -33,6 +37,8 @@ export function parseGooglePlaceAddress(
     zip: null,
     county: null,
     country: null,
+    latitude: geometry?.lat ?? null,
+    longitude: geometry?.lng ?? null,
   };
 
   // Safety check

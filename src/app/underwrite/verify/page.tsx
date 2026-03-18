@@ -42,7 +42,7 @@ export default async function VerifyPage({ searchParams }: VerifyPageProps) {
               <h1 className="mb-4 text-2xl font-bold text-dark dark:text-white">
                 Invalid Verification Link
               </h1>
-              <p className="mb-6 text-body-color">
+              <p className="mb-6 text-body-color dark:text-body-color-dark">
                 This verification link is missing required information.
               </p>
               <a
@@ -85,7 +85,7 @@ export default async function VerifyPage({ searchParams }: VerifyPageProps) {
               <h1 className="mb-4 text-2xl font-bold text-dark dark:text-white">
                 Verification Link Expired
               </h1>
-              <p className="mb-6 text-body-color">
+              <p className="mb-6 text-body-color dark:text-body-color-dark">
                 This verification link has expired or is invalid. Verification
                 links are valid for 24 hours.
               </p>

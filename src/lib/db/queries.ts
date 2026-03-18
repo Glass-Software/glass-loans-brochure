@@ -41,6 +41,16 @@ export function findUserByNormalizedEmail(
 }
 
 /**
+ * Find verified user by normalized email
+ */
+export function findVerifiedUserByEmail(normalizedEmail: string): User | null {
+  return queryOne<User>(
+    "SELECT * FROM users WHERE normalized_email = ? AND email_verified = 1 LIMIT 1",
+    [normalizedEmail],
+  );
+}
+
+/**
  * Find user by verification token
  */
 export function findUserByVerificationToken(token: string): User | null {
@@ -61,16 +71,17 @@ export function findUserByVerificationToken(token: string): User | null {
 export function createUser(
   email: string,
   normalizedEmail: string,
+  marketingConsent: boolean = false,
 ): { user: User; token: string } {
   const token = crypto.randomBytes(32).toString("hex");
   const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   const result = execute(
     `
-      INSERT INTO users (email, normalized_email, verification_token, verification_token_expires)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO users (email, normalized_email, verification_token, verification_token_expires, marketing_consent)
+      VALUES (?, ?, ?, ?, ?)
     `,
-    [email, normalizedEmail, token, tokenExpires],
+    [email, normalizedEmail, token, tokenExpires, marketingConsent ? 1 : 0],
   );
 
   const user = queryOne<User>("SELECT * FROM users WHERE id = ?", [
@@ -78,6 +89,24 @@ export function createUser(
   ])!;
 
   return { user, token };
+}
+
+/**
+ * Update marketing consent for a user
+ */
+export function updateMarketingConsent(
+  userId: number,
+  marketingConsent: boolean,
+): void {
+  execute(
+    `
+      UPDATE users
+      SET marketing_consent = ?,
+          updated_at = DATETIME('now')
+      WHERE id = ?
+    `,
+    [marketingConsent ? 1 : 0, userId],
+  );
 }
 
 /**
@@ -237,6 +266,8 @@ export interface UnderwritingSubmission {
   property_state: string | null;
   property_zip: string | null;
   property_county: string | null;
+  property_latitude: number | null;
+  property_longitude: number | null;
   purchase_price: number;
   rehab: number;
   square_feet: number;
@@ -263,6 +294,7 @@ export interface UnderwritingSubmission {
   final_score: number | null;
   gary_opinion: string | null;
   ai_property_comps: string | null; // JSON stored as text
+  comp_selection_state: string | null; // JSON string of CompSelectionState[]
   report_id: string | null; // Unique ID for shareable report links
   expires_at: string | null; // When the report expires and should be deleted
   ip_address: string | null;
@@ -277,6 +309,8 @@ export interface CreateSubmissionData {
   propertyState?: string;
   propertyZip?: string;
   propertyCounty?: string;
+  propertyLatitude?: number;
+  propertyLongitude?: number;
   purchasePrice: number;
   rehab: number;
   squareFeet: number;
@@ -296,12 +330,12 @@ export interface CreateSubmissionData {
   points: number;
   marketType: string;
   additionalDetails?: string;
-  compLinks?: string[];
   estimatedArv: number; // Gary's ARV estimate
   asIsValue: number;
   finalScore: number;
   garyOpinion: string;
   propertyComps?: any;
+  compSelectionState?: string; // JSON string of CompSelectionState[]
   reportId: string; // Unique ID for shareable report links
   expiresAt: string; // When the report expires (ISO string)
   ipAddress?: string;
@@ -318,15 +352,17 @@ export function createSubmission(
     `
       INSERT INTO underwriting_submissions (
         user_id, property_address, property_city, property_state, property_zip, property_county,
+        property_latitude, property_longitude,
         purchase_price, rehab, square_feet, bedrooms, bathrooms, year_built, property_type,
         property_condition, renovation_per_sf, user_estimated_as_is_value, user_estimated_arv, interest_rate, months,
         loan_at_purchase, renovation_funds, closing_costs_percent, points,
-        market_type, additional_details, comp_links, estimated_arv, as_is_value,
+        market_type, additional_details, estimated_arv, as_is_value,
         final_score, gary_opinion, ai_property_comps,
+        comp_selection_state,
         report_id, expires_at,
         ip_address, recaptcha_score
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `,
     [
@@ -336,6 +372,8 @@ export function createSubmission(
       data.propertyState || null,
       data.propertyZip || null,
       data.propertyCounty || null,
+      data.propertyLatitude ?? null,
+      data.propertyLongitude ?? null,
       data.purchasePrice,
       data.rehab,
       data.squareFeet,
@@ -355,12 +393,12 @@ export function createSubmission(
       data.points,
       data.marketType,
       data.additionalDetails || null,
-      data.compLinks ? JSON.stringify(data.compLinks) : null,
       data.estimatedArv,
       data.asIsValue,
       data.finalScore,
       data.garyOpinion,
       data.propertyComps ? JSON.stringify(data.propertyComps) : null,
+      data.compSelectionState || null,
       data.reportId,
       data.expiresAt,
       data.ipAddress || null,

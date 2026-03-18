@@ -285,6 +285,117 @@ try {
 console.log("");
 
 // =============================================================================
+// Migration 010: Add Realie Cache Tables
+// =============================================================================
+console.log("🔍 Checking Migration 010: Add Realie Cache Tables");
+
+try {
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>;
+  const hasRealieCache = tables.some(t => t.name === 'realie_comps_cache');
+
+  if (!hasRealieCache) {
+    console.log("⏳ Applying Migration 010...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/010_add_realie_cache.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 010 completed: Realie cache tables created");
+  } else {
+    console.log("✅ Migration 010 already applied (Realie cache tables exist)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 010 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
+// Migration 011: Add Comp Selection State
+// =============================================================================
+console.log("🔍 Checking Migration 011: Add Comp Selection State");
+
+try {
+  const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string; type: string }>;
+  const hasCompSelection = submissionColumns.some(col => col.name === "comp_selection_state");
+
+  if (!hasCompSelection) {
+    console.log("⏳ Applying Migration 011...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/011_add_comp_selection.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 011 completed: comp_selection_state column added");
+  } else {
+    console.log("✅ Migration 011 already applied (comp_selection_state exists)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 011 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
+// Migration 012: Add Marketing Consent
+// =============================================================================
+console.log("🔍 Checking Migration 012: Add Marketing Consent");
+
+try {
+  const userColumns = db.pragma("table_info(users)") as Array<{ name: string; type: string }>;
+  const hasMarketingConsent = userColumns.some(col => col.name === "marketing_consent");
+
+  if (!hasMarketingConsent) {
+    console.log("⏳ Applying Migration 012...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/012_add_marketing_consent.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 012 completed: marketing_consent column added");
+  } else {
+    console.log("✅ Migration 012 already applied (marketing_consent exists)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 012 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+// =============================================================================
+// Migration 013: Property Coordinates
+// =============================================================================
+console.log("🔍 Checking Migration 013: Property Coordinates");
+
+try {
+  const submissionColumns = db.pragma("table_info(underwriting_submissions)") as Array<{ name: string }>;
+  const hasPropertyLatitude = submissionColumns.some(col => col.name === "property_latitude");
+  const hasPropertyLongitude = submissionColumns.some(col => col.name === "property_longitude");
+
+  if (!hasPropertyLatitude || !hasPropertyLongitude) {
+    console.log("⏳ Applying Migration 013...");
+    const migrationSql = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/db/migrations/013_add_property_coordinates.sqlite.sql"),
+      "utf8"
+    );
+    db.exec(migrationSql);
+    console.log("✅ Migration 013 completed: property_latitude and property_longitude columns added");
+  } else {
+    console.log("✅ Migration 013 already applied (property coordinates exist)");
+  }
+} catch (error: any) {
+  console.error("❌ Migration 013 failed:", error.message);
+  db.close();
+  process.exit(1);
+}
+
+console.log("");
+
+// =============================================================================
 // Verification & Summary
 // =============================================================================
 console.log("🔍 Verifying final schema...\n");
@@ -320,6 +431,10 @@ try {
   console.log("   • Migration 007: Property details ✅");
   console.log("   • Migration 008: User as-is value & county ✅");
   console.log("   • Migration 009: Email verification code ✅");
+  console.log("   • Migration 010: Realie cache tables ✅");
+  console.log("   • Migration 011: Comp selection state ✅");
+  console.log("   • Migration 012: Marketing consent ✅");
+  console.log("   • Migration 013: Property coordinates ✅");
   console.log("\n🎉 Database is up to date and ready for use!");
 
 } catch (error: any) {

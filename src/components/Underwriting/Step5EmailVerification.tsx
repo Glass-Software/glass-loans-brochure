@@ -14,10 +14,17 @@ export default function Step5EmailVerification() {
     isSubmitting,
     setError,
     goToPreviousStep,
+    goToNextStep,
     setProgressStep,
     setProgressStatus,
     setProgressPercent,
     setIsProcessing,
+    setPropertyComps,
+    setCompSelectionState,
+    setEmail: setContextEmail,
+    setEmailVerified,
+    setVerificationCode: setContextVerificationCode,
+    setUsageCount,
   } = useUnderwriting();
 
   const { executeRecaptcha } = useGoogleReCaptcha();
@@ -27,6 +34,7 @@ export default function Step5EmailVerification() {
   const [verificationCode, setVerificationCode] = useState(["", "", "", "", "", ""]);
   const [codeError, setCodeError] = useState("");
   const [sendingCode, setSendingCode] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   // Refs for code inputs
   const codeInputRefs = [
@@ -49,6 +57,12 @@ export default function Step5EmailVerification() {
       return;
     }
 
+    // Validate marketing consent (REQUIRED)
+    if (!marketingConsent) {
+      setEmailError("You must agree to receive marketing emails to continue");
+      return;
+    }
+
     setEmailError("");
     setSendingCode(true);
 
@@ -56,7 +70,7 @@ export default function Step5EmailVerification() {
       const response = await fetch("/api/underwrite/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, marketingConsent }),
       });
 
       const data = await response.json();
@@ -123,109 +137,87 @@ export default function Step5EmailVerification() {
     setIsProcessing(true);
     setError(null);
     setCodeError("");
+    setProgressStep(1);
+    setProgressStatus("Verifying your email...");
+    setProgressPercent(10);
 
     try {
-      // Get reCAPTCHA token
-      if (!executeRecaptcha) {
-        throw new Error("reCAPTCHA not available");
-      }
-
-      const recaptchaToken = await executeRecaptcha("underwriting_submit");
-
-      // Start streaming fetch
-      const response = await fetch("/api/underwrite/submit", {
+      // Step 1: Verify email code
+      const verifyResponse = await fetch("/api/underwrite/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
           verificationCode: code,
-          recaptchaToken,
-          formData,
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to process underwriting");
+      if (!verifyResponse.ok) {
+        const errorData = await verifyResponse.json();
+        throw new Error(errorData.error || "Invalid verification code");
       }
 
-      // Check if we got a streaming response
-      const contentType = response.headers.get("content-type");
-      if (!contentType?.includes("text/event-stream")) {
-        throw new Error("Unexpected response format");
+      const verifyData = await verifyResponse.json();
+
+      // Update context with verified email, verification code, and usage count
+      setContextEmail(email);
+      setContextVerificationCode(code);
+      setEmailVerified(true);
+      setUsageCount(verifyData.user.usageCount);
+
+      setProgressStatus("Fetching comparable properties...");
+      setProgressPercent(30);
+
+      // Step 2: Fetch comps
+      const compsResponse = await fetch("/api/underwrite/fetch-comps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formData }),
+      });
+
+      if (!compsResponse.ok) {
+        const errorData = await compsResponse.json();
+        throw new Error(errorData.error || "Failed to fetch comps");
       }
 
-      // Read the stream
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      const compsData = await compsResponse.json();
 
-      if (!reader) {
-        throw new Error("Stream reader not available");
+      if (!compsData.success || !compsData.propertyComps) {
+        throw new Error("No comps data received");
       }
 
-      let buffer = "";
-      let reportId: string | null = null;
+      setProgressStatus("Loading comp selection...");
+      setProgressPercent(80);
 
-      while (true) {
-        const { done, value } = await reader.read();
+      // Store comps in context
+      setPropertyComps(compsData.propertyComps);
 
-        if (done) {
-          break;
-        }
+      // Initialize selection state (all normal by default)
+      const initialState = compsData.propertyComps.compsUsed.map((_: any, idx: number) => ({
+        compIndex: idx,
+        emphasized: false,
+        removed: false,
+      }));
+      setCompSelectionState(initialState);
 
-        buffer += decoder.decode(value, { stream: true });
+      setProgressPercent(100);
+      setProgressStatus("Complete!");
 
-        // Process complete lines (events are separated by \n\n)
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (!line.trim() || !line.startsWith("data: ")) {
-            continue;
-          }
-
-          try {
-            const jsonStr = line.substring(6); // Remove "data: " prefix
-            const event = JSON.parse(jsonStr);
-
-            if (event.type === "progress") {
-              // Update progress state
-              setProgressStep(event.step);
-              setProgressStatus(event.status);
-              setProgressPercent(event.progress);
-            } else if (event.type === "complete") {
-              // Processing complete
-              setProgressPercent(100);
-              setProgressStatus("Complete!");
-
-              if (event.data?.reportId) {
-                reportId = event.data.reportId;
-              }
-            } else if (event.type === "error") {
-              // Error occurred
-              if (event.data?.code === "INVALID_CODE") {
-                setCodeError(event.status || "Invalid verification code");
-              } else {
-                setError(event.status || "An error occurred");
-              }
-              return;
-            }
-          } catch (parseError) {
-            console.error("Failed to parse event:", parseError);
-          }
-        }
-      }
-
-      // Redirect to report
-      if (reportId) {
-        router.push(`/underwrite/results/${reportId}`);
-      } else {
-        throw new Error("Report ID not received");
-      }
+      // Short delay before proceeding to Step 6
+      setTimeout(() => {
+        setIsProcessing(false);
+        goToNextStep();
+      }, 500);
     } catch (error: any) {
-      setError(error.message || "An error occurred while processing your request");
+      console.error("Verification error:", error);
+      if (error.message.includes("verification code")) {
+        setCodeError(error.message);
+      } else {
+        setError(error.message || "An error occurred while processing your request");
+      }
+      setIsProcessing(false);
     } finally {
       setIsSubmitting(false);
-      setIsProcessing(false);
       // Reset progress state
       setTimeout(() => {
         setProgressStep(0);
@@ -236,7 +228,7 @@ export default function Step5EmailVerification() {
   };
 
   const inputClass =
-    "border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-dark placeholder:text-body-color outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white dark:placeholder:text-body-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none";
+    "border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-dark placeholder:text-placeholder-color outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white dark:placeholder:text-placeholder-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none";
   const labelClass = "mb-3 block text-sm font-medium text-dark dark:text-white";
   const errorClass = "mt-1 text-sm text-red-600 dark:text-red-400";
 
@@ -245,10 +237,10 @@ export default function Step5EmailVerification() {
       <div className="w-full px-4">
         <div className="mb-8">
           <div className="mb-6 rounded-sm bg-blue-50 p-4 dark:bg-blue-900/20">
-            <p className="text-sm text-body-color">
+            <p className="text-sm text-body-color dark:text-body-color-dark">
               <strong>Final Step:</strong> Verify your email to receive your AI-powered underwriting analysis from Gary.
             </p>
-            <p className="mt-2 text-xs text-body-color">
+            <p className="mt-2 text-xs text-body-color dark:text-body-color-dark">
               You get <strong>3 free analyses</strong> per verified email address.
             </p>
           </div>
@@ -258,7 +250,7 @@ export default function Step5EmailVerification() {
               <label htmlFor="email" className={labelClass}>
                 Email Address *
               </label>
-              <div className="flex gap-3">
+              <div className="mb-4 flex gap-3">
                 <input
                   type="email"
                   id="email"
@@ -270,13 +262,30 @@ export default function Step5EmailVerification() {
                 />
                 <button
                   type="submit"
-                  disabled={sendingCode}
+                  disabled={sendingCode || !marketingConsent}
                   className="whitespace-nowrap rounded-sm bg-primary px-6 py-3 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50"
                 >
                   {sendingCode ? "Sending..." : "Send Code"}
                 </button>
               </div>
               {emailError && <p className={errorClass}>{emailError}</p>}
+
+              <div className="mt-4 flex items-start">
+                <input
+                  type="checkbox"
+                  id="marketingConsent"
+                  checked={marketingConsent}
+                  onChange={(e) => setMarketingConsent(e.target.checked)}
+                  required
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <label
+                  htmlFor="marketingConsent"
+                  className="ml-3 text-sm text-body-color dark:text-body-color-dark"
+                >
+                  <span className="font-semibold text-dark dark:text-white">*</span> I agree to receive marketing emails from Glass Loans about new products, features, and special offers. You can unsubscribe at any time.
+                </label>
+              </div>
             </form>
           ) : (
             <div>

@@ -49,7 +49,7 @@ export default function Step3LoanTerms() {
   };
 
   const inputClass =
-    "border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-dark placeholder:text-body-color outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white dark:placeholder:text-body-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none";
+    "border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-dark placeholder:text-placeholder-color outline-none focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-white dark:placeholder:text-placeholder-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none";
   const labelClass = "mb-3 block text-sm font-medium text-dark dark:text-white";
   const errorClass = "mt-1 text-sm text-red-600 dark:text-red-400";
 
@@ -106,7 +106,7 @@ export default function Step3LoanTerms() {
               Loan at Purchase *
             </label>
             <div className="relative">
-              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color dark:text-body-color-dark">
                 $
               </span>
               <input
@@ -130,7 +130,7 @@ export default function Step3LoanTerms() {
               Renovation Funds
             </label>
             <div className="relative">
-              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color dark:text-body-color-dark">
                 $
               </span>
               <input
@@ -145,7 +145,7 @@ export default function Step3LoanTerms() {
             {errors.renovationFunds && (
               <p className={errorClass}>{errors.renovationFunds}</p>
             )}
-            <p className="mt-1 text-xs text-body-color">
+            <p className="mt-1 text-xs text-body-color dark:text-body-color-dark">
               Additional funds provided for renovations (defaults to $0)
             </p>
           </div>

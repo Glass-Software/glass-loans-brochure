@@ -533,37 +533,56 @@ export class BatchDataClient {
       maxAreaPercent?: number; // Percentage: +20 means "120% of subject sqft"
       minYearBuilt?: number; // Relative: -10 means "subject year - 10"
       maxYearBuilt?: number; // Relative: +10 means "subject year + 10"
+      minStories?: number; // Relative: 0 means exact match
+      maxStories?: number; // Relative: 0 means exact match
+      saleRecencyMonths?: number; // Number of months back for sale recency (default: 6)
+      propertyType?: string; // Property type (e.g., "Single Family", "Condo", "Townhouse", "Multi-Family")
     },
   ): Promise<BatchDataSearchResponse> {
-    // First, verify the subject address to get its coordinates for distance calculation
-    let subjectCoordinates: { latitude: number; longitude: number } | undefined;
-    try {
-      const verifiedAddress = await this.verifyAddress(subjectAddress);
-      if (verifiedAddress.latitude && verifiedAddress.longitude) {
-        subjectCoordinates = {
-          latitude: verifiedAddress.latitude,
-          longitude: verifiedAddress.longitude,
-        };
-        console.log(`[BatchData] Subject coordinates: ${subjectCoordinates.latitude}, ${subjectCoordinates.longitude}`);
-      }
-    } catch (error) {
-      console.warn(`[BatchData] Could not verify subject address for distance calculation:`, error);
-      // Continue without coordinates - distances will be 0
-    }
+    // Calculate sale recency filter based on months parameter (default: 6 months)
+    const monthsBack = options?.saleRecencyMonths ?? 6;
+    const dateThreshold = new Date();
+    dateThreshold.setMonth(dateThreshold.getMonth() - monthsBack);
+    const minSaleDate = dateThreshold.toISOString().split('T')[0]; // Format: YYYY-MM-DD
 
-    const searchCriteria = {
+    const searchCriteria: any = {
       compAddress: {
         street: subjectAddress.street,
         city: subjectAddress.city,
         state: subjectAddress.state,
         zip: subjectAddress.zip,
       },
+      general: {
+        propertyTypeCategory: {
+          equals: "Residential",
+        },
+      },
       building: {
         livingAreaSquareFeet: {
           min: 1, // CRITICAL: Only return comps with valid square footage
         },
       },
+      sale: {
+        lastSale: {
+          saleDate: {
+            min: minSaleDate, // Tier-based: 6 months (Tier 1) or 12 months (Tier 2/3)
+          },
+        },
+      },
+      foreclosure: {
+        status: {
+          notInList: ["Pre-Foreclosure", "Foreclosure", "REO"],
+        },
+      },
     };
+
+    // Only add propertyTypeDetail filter for Condo, Townhouse, Multi-Family
+    // Skip for Single Family to avoid omitting results unnecessarily
+    if (options?.propertyType && options.propertyType !== "Single Family") {
+      searchCriteria.general.propertyTypeDetail = {
+        inList: [options.propertyType],
+      };
+    }
 
     const searchOptions: any = {};
 
@@ -621,7 +640,19 @@ export class BatchDataClient {
         searchOptions.maxYearBuilt = options.maxYearBuilt;
     }
 
-    return this.searchProperties(searchCriteria, searchOptions, subjectCoordinates);
+    // Stories filter (relative values)
+    if (
+      options?.minStories !== undefined ||
+      options?.maxStories !== undefined
+    ) {
+      searchOptions.useStories = true;
+      if (options.minStories !== undefined)
+        searchOptions.minStories = options.minStories;
+      if (options.maxStories !== undefined)
+        searchOptions.maxStories = options.maxStories;
+    }
+
+    return this.searchProperties(searchCriteria, searchOptions, undefined);
   }
 }
 

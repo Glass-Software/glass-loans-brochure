@@ -7,9 +7,9 @@ export type RenovationLevel =
   | "Light ≤$30/SF"
   | "Medium $31-50/SF"
   | "Heavy >$50/SF";
-export type MarketType = "Primary" | "Secondary" | "Tertiary";
+export type MarketType = "Urban" | "Suburban" | "Rural";
 
-export type PropertyType = "SFR" | "Condo" | "Townhouse" | "Multi-Family";
+export type PropertyType = "Single Family" | "Condo" | "Townhouse" | "Multi-Family";
 
 export interface UnderwritingFormData {
   // Step 1: Property Details
@@ -18,6 +18,8 @@ export interface UnderwritingFormData {
   propertyState?: string;             // 2-letter state code (e.g., "TN")
   propertyZip?: string;               // ZIP code (e.g., "37201")
   propertyCounty?: string;            // County name (e.g., "Davidson County")
+  propertyLatitude?: number;          // Latitude coordinate for comp searches
+  propertyLongitude?: number;         // Longitude coordinate for comp searches
   purchasePrice: number;
   rehab: number;
   squareFeet: number;
@@ -43,71 +45,71 @@ export interface UnderwritingFormData {
   // Step 4: Market Details
   marketType: MarketType;
   additionalDetails?: string;
-  compLinks?: string[]; // Optional: up to 3 comparable property addresses
 }
 
 // ============================================================================
-// AI Estimate Types
+// Property Comparables Types
 // ============================================================================
 
 export interface PropertyComparable {
   address: string;
   price: number;
   sqft: number;
+  bedrooms: number;
+  bathrooms: number;
+  yearBuilt?: number;
   distance?: string;
   soldDate?: string;
-  bedrooms?: number;
-  bathrooms?: number;
   pricePerSqft?: number;
+  listingUrl?: string; // Google search URL for the property
+  correlation?: number; // AVM correlation score (0-1) - only present for AVM comps
+  latitude?: number; // Coordinates for map display
+  longitude?: number;
 }
 
-export interface AIPropertyEstimates {
+// Comp selection state for Step 6
+export interface CompSelectionState {
+  compIndex: number;      // Index in compsUsed array
+  emphasized: boolean;    // Green highlight - highly relevant
+  removed: boolean;       // Excluded from calculation
+}
+
+// PropertyComparable with selection state
+export interface PropertyComparableWithState extends PropertyComparable {
+  selectionState?: {
+    emphasized: boolean;
+    removed: boolean;
+  };
+}
+
+export interface AVMMetadata {
+  source: 'rentcast_avm' | 'user_estimate' | 'fallback';
+  confidence?: {
+    low: number;
+    high: number;
+    range: number;
+    percentRange: number;
+  };
+  subjectCoordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  timestamp: string;
+  fallbackReason?: string;
+  avmComparables?: PropertyComparable[]; // Comps used by AVM for as-is valuation (for transparency)
+}
+
+export interface PropertyComps {
   estimatedARV: number; // Gary's ARV estimate
-  asIsValue: number; // For underwater day 1 check
-  compsUsed: PropertyComparable[];
+  asIsValue: number; // Gary's as-is value estimate
+  apiAsIsValue?: number; // API's as-is value (Third Party Valuation)
+  compsUsed: PropertyComparable[]; // ALL comps (including user-removed ones)
   marketAnalysis: string;
   confidence?: "high" | "medium" | "low";
-}
-
-// ============================================================================
-// BatchData Enhanced Types
-// ============================================================================
-
-export interface RiskFlag {
-  severity: "critical" | "warning" | "info";
-  code: string;
-  message: string;
-}
-
-export interface BatchDataEnrichedEstimates extends AIPropertyEstimates {
-  // Existing fields from AIPropertyEstimates
-  estimatedARV: number;
-  asIsValue: number;
-  compsUsed: PropertyComparable[];
-  marketAnalysis: string;
-
-  // New BatchData fields
-  batchDataUsed?: boolean;
-  subjectPropertyDetails?: {
-    propertyType: string;
-    bedrooms: number;
-    bathrooms: number;
-    yearBuilt: number;
-    taxAssessedValue: number;
-    lastSalePrice: number | null;
-    lastSaleDate: string | null;
-  };
-  compTier?: 1 | 2 | 3;
-  compDerivedValue?: number;
-  avmValue?: number;
-  avmConfidence?: number;
-  valuationMethod?: "batchdata" | "ai_fallback" | "heuristic";
-  riskFlags?: RiskFlag[];
-  pricePerSqftStats?: {
-    meanPricePerSqft?: number;
-    medianPricePerSqft?: number;
-    stdDevPricePerSqft?: number;
-  };
+  avmMetadata?: AVMMetadata; // Optional AVM data for transparency
+  userEstimatedAsIsValue?: number; // Preserve user's estimate for comparison
+  subjectLatitude?: number; // Subject property latitude for map display
+  subjectLongitude?: number; // Subject property longitude for map display
 }
 
 // ============================================================================
@@ -159,8 +161,8 @@ export interface UnderwritingResults {
   // User inputs (for display)
   formData: UnderwritingFormData;
 
-  // AI estimates (can be BatchData or AI fallback)
-  aiEstimates: BatchDataEnrichedEstimates;
+  // Property comps (from Realie)
+  propertyComps: PropertyComps;
 
   // Calculated metrics
   calculations: CalculatedResults;
@@ -177,6 +179,9 @@ export interface UnderwritingResults {
   // Report sharing
   reportId?: string; // Unique ID for shareable report links
   expiresAt?: string; // ISO date string when the report expires
+
+  // Comp selection state (from Step 6)
+  compSelectionState?: CompSelectionState[];
 }
 
 // ============================================================================
@@ -197,8 +202,10 @@ export interface VerifyEmailResponse {
 
 export interface SubmitUnderwritingRequest {
   email: string;
+  verificationCode: string;
   recaptchaToken: string;
   formData: UnderwritingFormData;
+  compSelectionState?: CompSelectionState[]; // From Step 6
 }
 
 export interface SubmitUnderwritingResponse {
@@ -220,8 +227,10 @@ export interface SubmitUnderwritingResponse {
 // ============================================================================
 
 export interface UnderwritingContextState {
-  currentStep: number; // 1-5
+  currentStep: number; // 1-6
   formData: Partial<UnderwritingFormData>;
+  propertyComps: PropertyComps | null; // Fetched comps from Step 5
+  compSelectionState: CompSelectionState[]; // User's comp selections from Step 6
   results: UnderwritingResults | null;
   isSubmitting: boolean;
   error: string | null;

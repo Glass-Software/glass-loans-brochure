@@ -49,7 +49,6 @@ const testFormData = {
   // Step 4: Market Details
   marketType: "Primary" as const,
   additionalDetails: "Test submission via script",
-  compLinks: ["1904 avalon ave, nashville, tn 37216"],
 };
 
 const testEmail = "hervey711@gmail.com";

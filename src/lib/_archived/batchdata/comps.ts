@@ -20,7 +20,6 @@ interface CompSearchOptions {
   maxTier?: 1 | 2 | 3; // Max tier to attempt
   marketType?: MarketType; // Primary/Secondary/Tertiary for market-aware distances
   rehabBudget?: number; // Rehab budget for percentile-based ARV calculation
-  userProvidedCompAddresses?: string[]; // User-provided comp addresses (additive)
   userPropertyData?: {
     // User-provided values override BatchData lookup
     bedrooms?: number;
@@ -54,64 +53,6 @@ export interface CompSearchResult {
 }
 
 /**
- * Fetch user-provided comparable properties
- * These are ADDITIVE to BatchData search results, not replacements
- */
-async function fetchUserProvidedComps(
-  client: any,
-  compAddresses: string[],
-  subjectAddress: { street: string; city: string; state: string; zip: string }
-): Promise<any[]> {
-  if (!compAddresses || compAddresses.length === 0) {
-    return [];
-  }
-
-  console.log(`[User Comps] Fetching ${compAddresses.length} user-provided comps...`);
-
-  const userComps: any[] = [];
-
-  for (const address of compAddresses) {
-    try {
-      // Attempt to look up the property
-      const property = await client.lookupProperty(address);
-
-      // Convert to comp format
-      const comp = {
-        address: property.address.standardizedAddress,
-        propertyType: property.propertyType,
-        bedrooms: property.bedrooms,
-        bathrooms: property.bathrooms,
-        squareFeet: property.squareFeet,
-        yearBuilt: property.yearBuilt,
-        lotSize: property.lotSize,
-        lastSaleDate: property.lastSaleDate,
-        lastSalePrice: property.lastSalePrice,
-        distance: 0, // User comps don't have distance calculation
-        avm: property.avm,
-        taxAssessedValue: property.taxAssessedValue,
-        preForeclosure: property.preForeclosure,
-        pricePerSqft: property.squareFeet > 0 && property.lastSalePrice > 0
-          ? property.lastSalePrice / property.squareFeet
-          : 0,
-        taxAssessmentRatio: property.taxAssessedValue > 0 && property.lastSalePrice > 0
-          ? property.lastSalePrice / property.taxAssessedValue
-          : 0,
-        isUserProvided: true, // Flag to identify user-provided comps
-      };
-
-      userComps.push(comp);
-      console.log(`[User Comps] ✓ Fetched: ${comp.address}`);
-    } catch (error: any) {
-      console.error(`[User Comps] ✗ Failed to fetch ${address}: ${error.message}`);
-      // Continue with other comps - don't fail entire search
-    }
-  }
-
-  console.log(`[User Comps] Successfully fetched ${userComps.length}/${compAddresses.length} user-provided comps`);
-  return userComps;
-}
-
-/**
  * Execute 3-tier comp search strategy with market-aware distance scaling
  *
  * Distance tiers by market type:
@@ -139,27 +80,15 @@ export async function searchComparables(
     maxTier = 3,
     marketType = "Primary",
     rehabBudget = 0,
-    userProvidedCompAddresses = [],
     userPropertyData
   } = options;
   const client = getBatchDataClient();
 
-  // Step 1: Fetch user-provided comps first (if any)
-  const subjectAddress = {
-    street: subjectProperty.address.streetNumber + " " + subjectProperty.address.streetName,
-    city: subjectProperty.address.city,
-    state: subjectProperty.address.state,
-    zip: subjectProperty.address.zipCode,
-  };
-
-  const userComps = await fetchUserProvidedComps(client, userProvidedCompAddresses, subjectAddress);
-
-  // Step 2: Run tiered BatchData search
   // Tier 1: Tight search
   const tier1Radius = getRadiusForMarketAndTier(marketType, 1);
   console.log(`Starting Tier 1 comp search (${tier1Radius}mi, tight criteria, ${marketType} market)...`);
   const tier1Start = Date.now();
-  let tier1Result = await searchTier(client, subjectProperty, 1, marketType, rehabBudget, userPropertyData);
+  const tier1Result = await searchTier(client, subjectProperty, 1, marketType, rehabBudget, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -167,11 +96,8 @@ export async function searchComparables(
     Date.now() - tier1Start
   );
 
-  // Merge user comps with tier 1 results
-  tier1Result = mergeUserComps(tier1Result, userComps, rehabBudget, userPropertyData?.squareFeet ?? subjectProperty.squareFeet);
-
   if (tier1Result.comps.length >= minComps) {
-    console.log(`Tier 1 found ${tier1Result.comps.length} comps (${userComps.length} user-provided) - using these`);
+    console.log(`Tier 1 found ${tier1Result.comps.length} comps - using these`);
     return tier1Result;
   }
 
@@ -183,7 +109,7 @@ export async function searchComparables(
     `Tier 1 found only ${tier1Result.comps.length} comps, expanding to Tier 2 (${tier2Radius}mi)...`
   );
   const tier2Start = Date.now();
-  let tier2Result = await searchTier(client, subjectProperty, 2, marketType, rehabBudget, userPropertyData);
+  const tier2Result = await searchTier(client, subjectProperty, 2, marketType, rehabBudget, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -191,11 +117,8 @@ export async function searchComparables(
     Date.now() - tier2Start
   );
 
-  // Merge user comps with tier 2 results
-  tier2Result = mergeUserComps(tier2Result, userComps, rehabBudget, userPropertyData?.squareFeet ?? subjectProperty.squareFeet);
-
   if (tier2Result.comps.length >= minComps) {
-    console.log(`Tier 2 found ${tier2Result.comps.length} comps (${userComps.length} user-provided) - using these`);
+    console.log(`Tier 2 found ${tier2Result.comps.length} comps - using these`);
     return tier2Result;
   }
 
@@ -207,7 +130,7 @@ export async function searchComparables(
     `Tier 2 found only ${tier2Result.comps.length} comps, expanding to Tier 3 (${tier3Radius}mi)...`
   );
   const tier3Start = Date.now();
-  let tier3Result = await searchTier(client, subjectProperty, 3, marketType, rehabBudget, userPropertyData);
+  const tier3Result = await searchTier(client, subjectProperty, 3, marketType, rehabBudget, userPropertyData);
   trackAPIUsage(
     "/property/search",
     true,
@@ -215,42 +138,8 @@ export async function searchComparables(
     Date.now() - tier3Start
   );
 
-  // Merge user comps with tier 3 results
-  tier3Result = mergeUserComps(tier3Result, userComps, rehabBudget, userPropertyData?.squareFeet ?? subjectProperty.squareFeet);
-
-  console.log(`Tier 3 found ${tier3Result.comps.length} comps (${userComps.length} user-provided, maximum reach)`);
+  console.log(`Tier 3 found ${tier3Result.comps.length} comps (maximum reach)`);
   return tier3Result;
-}
-
-/**
- * Merge user-provided comps with BatchData search results
- * User comps are ADDITIVE, not replacements
- */
-function mergeUserComps(
-  searchResult: CompSearchResult,
-  userComps: any[],
-  rehabBudget: number,
-  subjectSqft: number
-): CompSearchResult {
-  if (userComps.length === 0) {
-    return searchResult;
-  }
-
-  // Merge all comps (BatchData + user-provided)
-  const allComps = [...searchResult.allComps, ...userComps];
-  const comps = [...searchResult.comps, ...userComps];
-
-  // Recalculate comp-derived value with all comps
-  const compDerivedValue = calculateCompDerivedValue(comps, subjectSqft, rehabBudget);
-  const medianPricePerSqft = calculateMedianPricePerSqft(comps);
-
-  return {
-    ...searchResult,
-    allComps,
-    comps,
-    compDerivedValue,
-    medianPricePerSqft,
-  };
 }
 
 /**
@@ -317,7 +206,13 @@ async function searchTier(
     zip: subject.address.zipCode,
   };
 
-  const response = await client.getComparableProperties(subjectAddress, options);
+  // Add property type to options for apples-to-apples comparison
+  const optionsWithPropertyType = {
+    ...options,
+    propertyType: subject.propertyType,
+  };
+
+  const response = await client.getComparableProperties(subjectAddress, optionsWithPropertyType);
 
   // Cache BEFORE filtering (preserve raw data)
   cacheComps(subject.address.standardizedAddress, searchHash, tier, response);
@@ -415,6 +310,25 @@ function buildCompSearchOptions(
   if (yearBuilt) {
     options.minYearBuilt = -10; // Subject year - 10
     options.maxYearBuilt = 10;  // Subject year + 10
+  }
+
+  // Stories (ALL tiers - relative values)
+  // Tier 1: Exact match, Tier 2+: ±1 story
+  if (tier === 1) {
+    options.minStories = 0;  // Exact match
+    options.maxStories = 0;  // Exact match
+  } else {
+    options.minStories = -1; // Subject stories - 1
+    options.maxStories = 1;  // Subject stories + 1
+  }
+
+  // Sale recency (tier-based)
+  // Tier 1: 6 months (freshest comps)
+  // Tier 2 & 3: 12 months (expanded time window)
+  if (tier === 1) {
+    options.saleRecencyMonths = 6;
+  } else {
+    options.saleRecencyMonths = 12;
   }
 
   return options;

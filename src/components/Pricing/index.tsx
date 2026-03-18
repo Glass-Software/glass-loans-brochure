@@ -12,7 +12,7 @@ const Pricing = () => {
       <div className="container">
         <SectionTitle
           title="Simple and Affordable Pricing"
-          paragraph="We believe in a setting pricing plan that makes our product a no brainer for your business"
+          paragraph="We believe in a setting pricing plan that makes our product a no brainer for your business."
           center
           width="665px"
         />
@@ -46,21 +46,21 @@ const Pricing = () => {
           <PricingBox
             packageName="Lite"
             monthlyPrice="395"
-            annualPrice="3,950"
+            annualPrice="4,266"
             isMonthly={isMonthly}
             subtitle="0-25 Loans"
           />
           <PricingBox
             packageName="Basic"
             monthlyPrice="695"
-            annualPrice="6,950"
+            annualPrice="7,506"
             isMonthly={isMonthly}
             subtitle="25-75 Loans"
           />
           <PricingBox
             packageName="Plus"
             monthlyPrice="1,295"
-            annualPrice="12,950"
+            annualPrice="13,986"
             isMonthly={isMonthly}
             subtitle="75-150 Loans"
           />

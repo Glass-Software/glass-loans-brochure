@@ -19,7 +19,7 @@ const SignupPage = () => {
                 <h3 className="mb-3 text-center text-2xl font-bold text-black dark:text-white sm:text-3xl">
                   Create your account
                 </h3>
-                <p className="mb-11 text-center text-base font-medium text-body-color">
+                <p className="mb-11 text-center text-base font-medium text-body-color dark:text-body-color-dark">
                   It’s totally free and super easy
                 </p>
                 <button className="border-stroke dark:text-body-color-dark dark:shadow-two mb-6 flex w-full items-center justify-center rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-body-color outline-none transition-all duration-300 hover:border-primary hover:bg-primary/5 hover:text-primary dark:border-transparent dark:bg-[#2C303B] dark:hover:border-primary dark:hover:bg-primary/5 dark:hover:text-primary dark:hover:shadow-none">
@@ -75,7 +75,7 @@ const SignupPage = () => {
                 </button>
                 <div className="mb-8 flex items-center justify-center">
                   <span className="hidden h-[1px] w-full max-w-[60px] bg-body-color/50 sm:block"></span>
-                  <p className="w-full px-5 text-center text-base font-medium text-body-color">
+                  <p className="w-full px-5 text-center text-base font-medium text-body-color dark:text-body-color-dark">
                     Or, register with your email
                   </p>
                   <span className="hidden h-[1px] w-full max-w-[60px] bg-body-color/50 sm:block"></span>
@@ -129,7 +129,7 @@ const SignupPage = () => {
                   <div className="mb-8 flex">
                     <label
                       htmlFor="checkboxLabel"
-                      className="flex cursor-pointer select-none text-sm font-medium text-body-color"
+                      className="flex cursor-pointer select-none text-sm font-medium text-body-color dark:text-body-color-dark"
                     >
                       <div className="relative">
                         <input
@@ -176,7 +176,7 @@ const SignupPage = () => {
                     </button>
                   </div>
                 </form>
-                <p className="text-center text-base font-medium text-body-color">
+                <p className="text-center text-base font-medium text-body-color dark:text-body-color-dark">
                   Already using Startup?{" "}
                   <Link href="/signin" className="text-primary hover:underline">
                     Sign in

@@ -27,7 +27,7 @@ export default function GaryOpinion({ opinion }: GaryOpinionProps) {
           <h3 className="text-xl font-bold text-dark dark:text-white">
             Gary&apos;s Opinion
           </h3>
-          <p className="text-sm text-body-color">
+          <p className="text-sm text-body-color dark:text-body-color-dark">
             Senior Underwriter, Glass Loans
           </p>
         </div>

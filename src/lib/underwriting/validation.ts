@@ -11,13 +11,13 @@ export const RenovationLevelSchema = z
   .min(0, "Renovation per square foot cannot be negative");
 
 // Market Type enum
-export const MarketTypeSchema = z.enum(["Primary", "Secondary", "Tertiary"], {
+export const MarketTypeSchema = z.enum(["Urban", "Suburban", "Rural"], {
   errorMap: () => ({ message: "Please select a valid market type" }),
 });
 
 // Property Type enum
 export const PropertyTypeSchema = z.enum(
-  ["SFR", "Condo", "Townhouse", "Multi-Family"],
+  ["Single Family", "Condo", "Townhouse", "Multi-Family"],
   {
     errorMap: () => ({ message: "Please select a valid property type" }),
   },
@@ -114,10 +114,6 @@ export const Step3Schema = z.object({
 export const Step4Schema = z.object({
   marketType: MarketTypeSchema,
   additionalDetails: z.string().max(2000, "Details are too long").optional(),
-  compLinks: z
-    .array(z.string().min(5, "Address must be at least 5 characters"))
-    .max(3, "Maximum 3 comparable properties allowed")
-    .optional(),
 });
 
 // Complete form validation schema
@@ -151,10 +147,6 @@ export const UnderwritingFormSchema = z
     points: z.number().min(0, "Points cannot be negative"),
     marketType: MarketTypeSchema,
     additionalDetails: z.string().max(2000).optional(),
-    compLinks: z
-      .array(z.string().min(5))
-      .max(3)
-      .optional(),
   })
   .refine(
     (data) => data.loanAtPurchase <= data.purchasePrice * 1.5,

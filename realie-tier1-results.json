@@ -1,0 +1,15 @@
+{
+  "testAddress": "1803 Guest Dr, Nashville, TN 37216",
+  "searchParams": {
+    "latitude": 36.1979167,
+    "longitude": -86.7078884,
+    "radius": 1,
+    "bedsMin": 4,
+    "sqftMin": 1508,
+    "sqftMax": 2262,
+    "timeFrame": 6,
+    "maxResults": 50
+  },
+  "totalComps": 0,
+  "comparables": []
+}

@@ -17,7 +17,7 @@ export default function ResultsPanel({ results }: ResultsPanelProps) {
     <div className="space-y-8">
       {/* Header with usage info */}
       <div className="text-center">
-        <p className="text-sm text-body-color">
+        <p className="text-sm text-body-color dark:text-body-color-dark">
           Analysis {usageCount} of {usageLimit} • Submitted{" "}
           {new Date(results.submittedAt).toLocaleDateString()}
         </p>
@@ -32,7 +32,7 @@ export default function ResultsPanel({ results }: ResultsPanelProps) {
       </div>
 
       {/* Data Source Badge */}
-      {results.aiEstimates.batchDataUsed ? (
+      {results.propertyComps.compsUsed?.length > 0 ? (
         <div className="rounded-sm border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
           <div className="flex items-start gap-2">
             <svg className="h-5 w-5 flex-shrink-0 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
@@ -40,14 +40,12 @@ export default function ResultsPanel({ results }: ResultsPanelProps) {
             </svg>
             <div>
               <p className="font-medium text-green-800 dark:text-green-300">
-                ✓ Verified Market Data
+                ✓ {results.propertyComps.compsUsed?.length || 0} Comparable Sales
               </p>
               <p className="mt-1 text-sm text-green-700 dark:text-green-400">
-                Analysis based on {results.aiEstimates.compsUsed.length} real comparable sales
-                {results.aiEstimates.compTier === 1 && " within 0.5 miles (tight search)"}
-                {results.aiEstimates.compTier === 2 && " within 1 mile (moderate search)"}
-                {results.aiEstimates.compTier === 3 && " within 2 miles (expanded search)"}.
-                {results.aiEstimates.avmValue && ` Professional valuation: $${results.aiEstimates.avmValue.toLocaleString()} (${results.aiEstimates.avmConfidence}% confidence)`}
+                Analysis based on real market data •{" "}
+                {results.propertyComps.confidence === "high" ? "High" :
+                 results.propertyComps.confidence === "medium" ? "Medium" : "Low"} Confidence
               </p>
             </div>
           </div>
@@ -60,10 +58,10 @@ export default function ResultsPanel({ results }: ResultsPanelProps) {
             </svg>
             <div>
               <p className="font-medium text-yellow-800 dark:text-yellow-300">
-                ⚠ AI Estimates
+                ⚠ Estimated Values
               </p>
               <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-400">
-                Market data was unavailable for this property. These estimates are AI-generated and should be verified with an independent appraisal.
+                Limited market data available. These estimates should be verified with an independent appraisal.
               </p>
             </div>
           </div>
@@ -79,7 +77,7 @@ export default function ResultsPanel({ results }: ResultsPanelProps) {
       {/* Detailed Calculations */}
       <CalculationBreakdown
         formData={results.formData}
-        aiEstimates={results.aiEstimates}
+        propertyComps={results.propertyComps}
         calculations={results.calculations}
       />
 
@@ -89,7 +87,7 @@ export default function ResultsPanel({ results }: ResultsPanelProps) {
           <h3 className="mb-2 text-lg font-semibold text-dark dark:text-white">
             Want More Analyses?
           </h3>
-          <p className="mb-4 text-body-color">
+          <p className="mb-4 text-body-color dark:text-body-color-dark">
             You&apos;ve used all 3 free underwriting analyses. Contact us to discuss your lending needs.
           </p>
           <a
@@ -103,7 +101,7 @@ export default function ResultsPanel({ results }: ResultsPanelProps) {
 
       {/* Disclaimer */}
       <div className="rounded-sm border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
-        <p className="text-xs text-body-color">
+        <p className="text-xs text-body-color dark:text-body-color-dark">
           <strong>Disclaimer:</strong> This AI-powered analysis is for informational purposes only and does not constitute a loan approval or commitment. Glass Loans assumes no liability for lending decisions made based on this tool. Actual loan terms and approval are subject to full underwriting review, appraisal, and borrower qualifications. Users accept full responsibility for their investment decisions.
         </p>
       </div>

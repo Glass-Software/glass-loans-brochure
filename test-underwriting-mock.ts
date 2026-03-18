@@ -52,7 +52,6 @@ async function testUnderwritingMock() {
       // Step 4: Market Details
       marketType: 'Primary',
       additionalDetails: 'Test property for enhanced mock server',
-      compLinks: []
     };
 
     console.log('\n📋 Test Property:');

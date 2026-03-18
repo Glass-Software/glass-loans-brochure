@@ -47,7 +47,7 @@ export default function ProgressIndicator() {
           <h3 className="text-xl font-semibold text-dark dark:text-white">
             Processing Your Underwriting
           </h3>
-          <p className="mt-2 text-sm text-body-color">
+          <p className="mt-2 text-sm text-body-color dark:text-body-color-dark">
             Gary is analyzing your property...
           </p>
         </div>
@@ -55,7 +55,7 @@ export default function ProgressIndicator() {
         {/* Progress Bar */}
         <div className="mb-6">
           <div className="mb-2 flex justify-between text-sm">
-            <span className="text-body-color">{progressStatus}</span>
+            <span className="text-body-color dark:text-body-color-dark">{progressStatus}</span>
             <span className="font-medium text-primary">{progressPercent}%</span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
@@ -130,7 +130,7 @@ export default function ProgressIndicator() {
         </div>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-xs text-body-color">
+        <p className="mt-6 text-center text-xs text-body-color dark:text-body-color-dark">
           This usually takes 8-15 seconds. Please don&apos;t close this window.
         </p>
       </div>

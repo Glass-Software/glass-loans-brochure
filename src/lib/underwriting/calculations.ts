@@ -1,7 +1,9 @@
 import {
   UnderwritingFormData,
-  AIPropertyEstimates,
+  PropertyComps,
   CalculatedResults,
+  PropertyComparable,
+  CompSelectionState,
 } from "@/types/underwriting";
 
 /**
@@ -208,4 +210,57 @@ export function formatNumber(value: number, decimals: number = 0): string {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(value);
+}
+
+/**
+ * Calculate ARV using weighted median based on comp selection (from Step 6)
+ * Emphasized comps get 3x weight in the median calculation
+ */
+export function calculateWeightedARVFromComps(
+  comps: PropertyComparable[],
+  compSelectionState: CompSelectionState[],
+  formData: UnderwritingFormData
+): number {
+  if (comps.length === 0) {
+    throw new Error("At least one comp required for ARV calculation");
+  }
+
+  // Calculate price per sqft and weight for each comp
+  const compsWithWeights = comps.map((c, idx) => {
+    const state = compSelectionState.find((s) => s.compIndex === idx);
+    const weight = state?.emphasized ? 3.0 : 1.0;
+    return {
+      pricePerSqft: c.price / c.sqft,
+      weight,
+    };
+  });
+
+  // Sort by price per sqft
+  compsWithWeights.sort((a, b) => a.pricePerSqft - b.pricePerSqft);
+
+  // Calculate total weight
+  const totalWeight = compsWithWeights.reduce((sum, c) => sum + c.weight, 0);
+  const halfWeight = totalWeight / 2;
+
+  // Find weighted median (comp where cumulative weight crosses 50% threshold)
+  let cumulativeWeight = 0;
+  let medianPricePerSqft = compsWithWeights[0].pricePerSqft;
+
+  for (const comp of compsWithWeights) {
+    cumulativeWeight += comp.weight;
+    if (cumulativeWeight >= halfWeight) {
+      medianPricePerSqft = comp.pricePerSqft;
+      break;
+    }
+  }
+
+  // Apply to subject property square footage
+  return Math.round(medianPricePerSqft * formData.squareFeet);
+}
+
+/**
+ * Format $/sqft to 2 decimal places
+ */
+export function formatPricePerSqft(price: number, sqft: number): string {
+  return (price / sqft).toFixed(2);
 }

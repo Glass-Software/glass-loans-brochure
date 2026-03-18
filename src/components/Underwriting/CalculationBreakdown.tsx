@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   UnderwritingFormData,
-  BatchDataEnrichedEstimates,
+  PropertyComps,
   CalculatedResults,
   getRenovationLevel,
 } from "@/types/underwriting";
@@ -15,14 +15,16 @@ import {
 
 interface CalculationBreakdownProps {
   formData: UnderwritingFormData;
-  aiEstimates: BatchDataEnrichedEstimates;
+  propertyComps: PropertyComps;
   calculations: CalculatedResults;
+  hideComps?: boolean;
 }
 
 export default function CalculationBreakdown({
   formData,
-  aiEstimates,
+  propertyComps,
   calculations,
+  hideComps = false,
 }: CalculationBreakdownProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -97,105 +99,6 @@ export default function CalculationBreakdown({
               value={formatPercentage(formData.closingCostsPercent)}
             />
             <Row label="Points" value={formatPercentage(formData.points)} />
-          </Section>
-
-          {/* ARV & As-Is Value Comparison */}
-          <Section title="ARV & As-Is Value Comparison">
-            <div className="space-y-4">
-              {/* ARV Comparison */}
-              <div>
-                <div className="mb-2 text-sm font-medium text-dark dark:text-white">
-                  After Repair Value (ARV)
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
-                    <div className="text-xs text-gray-700 dark:text-gray-300">Your Estimate</div>
-                    <div className="mt-1 text-lg font-semibold text-dark dark:text-white">
-                      {formatCurrency(formData.userEstimatedArv)}
-                    </div>
-                  </div>
-                  <div className="rounded bg-primary/10 p-3 dark:bg-primary/20">
-                    <div className="text-xs text-gray-700 dark:text-gray-300">
-                      Gary&apos;s Analysis
-                    </div>
-                    <div className="mt-1 text-lg font-semibold text-dark dark:text-white">
-                      {formatCurrency(aiEstimates.estimatedARV)}
-                    </div>
-                  </div>
-                </div>
-                {Math.abs(
-                  formData.userEstimatedArv - aiEstimates.estimatedARV,
-                ) /
-                  aiEstimates.estimatedARV >
-                  0.1 && (
-                  <div className="rounded-l-4 border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 mt-2 border-l-4 p-2">
-                    <p className="text-yellow-700 dark:text-yellow-400 text-xs">
-                      ⚠️ Your ARV estimate differs by{" "}
-                      {(
-                        (Math.abs(
-                          formData.userEstimatedArv - aiEstimates.estimatedARV,
-                        ) /
-                          aiEstimates.estimatedARV) *
-                        100
-                      ).toFixed(1)}
-                      % from Gary&apos;s analysis
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* As-Is Value Comparison */}
-              <div>
-                <div className="mb-2 text-sm font-medium text-dark dark:text-white">
-                  As-Is Value (Current Condition)
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
-                    <div className="text-xs text-gray-700 dark:text-gray-300">Your Estimate</div>
-                    <div className="mt-1 text-lg font-semibold text-dark dark:text-white">
-                      {formatCurrency(formData.userEstimatedAsIsValue)}
-                    </div>
-                  </div>
-                  <div className="rounded bg-primary/10 p-3 dark:bg-primary/20">
-                    <div className="text-xs text-gray-700 dark:text-gray-300">
-                      Gary&apos;s Analysis
-                    </div>
-                    <div className="mt-1 text-lg font-semibold text-dark dark:text-white">
-                      {formatCurrency(aiEstimates.asIsValue)}
-                    </div>
-                  </div>
-                </div>
-                {Math.abs(
-                  formData.userEstimatedAsIsValue - aiEstimates.asIsValue,
-                ) /
-                  aiEstimates.asIsValue >
-                  0.1 && (
-                  <div className="rounded-l-4 border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 mt-2 border-l-4 p-2">
-                    <p className="text-yellow-700 dark:text-yellow-400 text-xs">
-                      ⚠️ Your as-is estimate differs by{" "}
-                      {(
-                        (Math.abs(
-                          formData.userEstimatedAsIsValue -
-                            aiEstimates.asIsValue,
-                        ) /
-                          aiEstimates.asIsValue) *
-                        100
-                      ).toFixed(1)}
-                      % from Gary&apos;s analysis
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Market Analysis */}
-              {aiEstimates.marketAnalysis && (
-                <div className="mt-3 rounded bg-blue-50 p-3 dark:bg-blue-900/20">
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
-                    {aiEstimates.marketAnalysis}
-                  </p>
-                </div>
-              )}
-            </div>
           </Section>
 
           {/* Financial Calculations */}
@@ -435,12 +338,12 @@ export default function CalculationBreakdown({
           </Section>
 
           {/* Property Comps */}
-          {aiEstimates.compsUsed && aiEstimates.compsUsed.length > 0 && (
+          {!hideComps && propertyComps.compsUsed && propertyComps.compsUsed.length > 0 && (
             <Section
-              title={`Property Comparables (${aiEstimates.compsUsed.length} comps${aiEstimates.compTier ? `, Tier ${aiEstimates.compTier}` : ""})`}
+              title={`Property Comparables (${propertyComps.compsUsed.length} comps)`}
             >
               <div className="space-y-3">
-                {aiEstimates.compsUsed.map((comp: any, index: number) => (
+                {propertyComps.compsUsed.map((comp: any, index: number) => (
                   <div
                     key={index}
                     className="rounded bg-gray-200 p-3 text-sm dark:bg-gray-900"
@@ -493,75 +396,9 @@ export default function CalculationBreakdown({
                         </span>
                       )}
                     </div>
-
-                    {/* Valuation metrics */}
-                    {(comp.avmValue || comp.taxAssessedValue) && (
-                      <div className="mt-2 border-t border-gray-300 pt-2 text-xs text-gray-700 dark:border-gray-700 dark:text-gray-300">
-                        {comp.avmValue && (
-                          <span className="mr-4">
-                            <strong>AVM:</strong>{" "}
-                            {formatCurrency(comp.avmValue)} (
-                            {comp.avmConfidence?.toFixed(0) || 0}% conf)
-                          </span>
-                        )}
-                        {comp.taxAssessedValue && (
-                          <span>
-                            <strong>Tax Assessed:</strong>{" "}
-                            {formatCurrency(comp.taxAssessedValue)}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Warnings */}
-                    {comp.isPotentialFlip && (
-                      <div className="mt-2 rounded bg-orange-100 px-2 py-1 text-xs text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
-                        🔨 <strong>Potential Flip:</strong> Sale price is{" "}
-                        {(
-                          (comp.price / comp.taxAssessedValue - 1) *
-                          100
-                        ).toFixed(0)}
-                        % above tax assessment (likely renovated)
-                      </div>
-                    )}
-
-                    {comp.isOutlier && comp.outlierReason && (
-                      <div className="mt-2 text-xs text-yellow-800 dark:text-yellow-300">
-                        ⚠️ <strong>Flagged:</strong> {comp.outlierReason}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
-
-              {/* Summary stats */}
-              {aiEstimates.pricePerSqftStats && (
-                <div className="mt-4 rounded bg-blue-50 p-3 text-sm dark:bg-blue-900/20">
-                  <div className="font-medium text-dark dark:text-white">
-                    Price/sqft Statistics:
-                  </div>
-                  <div className="mt-1 flex gap-4 text-gray-700 dark:text-gray-300">
-                    <span>
-                      Mean: $
-                      {aiEstimates.pricePerSqftStats.meanPricePerSqft?.toFixed(
-                        2,
-                      ) || "N/A"}
-                    </span>
-                    <span>
-                      Median: $
-                      {aiEstimates.pricePerSqftStats.medianPricePerSqft?.toFixed(
-                        2,
-                      ) || "N/A"}
-                    </span>
-                    <span>
-                      Std Dev: $
-                      {aiEstimates.pricePerSqftStats.stdDevPricePerSqft?.toFixed(
-                        2,
-                      ) || "N/A"}
-                    </span>
-                  </div>
-                </div>
-              )}
             </Section>
           )}
         </div>

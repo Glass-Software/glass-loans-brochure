@@ -58,10 +58,10 @@ const Contact = () => {
               </h2>
 
               <div className="mb-12">
-                <p className="text-base font-medium text-body-color">
+                <p className="text-base font-medium text-body-color dark:text-body-color-dark">
                   Phone: <Link href="tel:+14693712202">(469) 371-2202</Link>
                 </p>
-                <p className="text-base font-medium text-body-color">
+                <p className="text-base font-medium text-body-color dark:text-body-color-dark">
                   Address: 1108 McKennie Ave. Suite 011 Nashville, TN 37206
                 </p>
               </div>

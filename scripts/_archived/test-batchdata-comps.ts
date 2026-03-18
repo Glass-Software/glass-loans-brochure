@@ -16,32 +16,33 @@ import { getBatchDataClient } from "../src/lib/batchdata/client";
 
 // Test address - modify as needed
 const testAddress = {
-  street: "2316 Fernwood Drive",
+  street: "1803 Guest Dr",
   city: "Nashville",
   state: "TN",
-  zip: "37216",
+  zip: "",
 };
 
-// Comp search options (Tier 1: exact bed/bath match, tight sqft)
+// Comp search options (Tier 1: exact bed match, tight sqft)
 const searchOptions = {
   distanceMiles: 1, // 1 mile radius for tight comps
   minBedrooms: 0, // Exact match (Tier 1)
   maxBedrooms: 0, // Exact match (Tier 1)
-  minBathrooms: 0, // Exact match (Tier 1)
-  maxBathrooms: 0, // Exact match (Tier 1)
   minAreaPercent: -10, // 90% of subject sqft (Tier 1: ±10%)
   maxAreaPercent: 10, // 110% of subject sqft (Tier 1: ±10%)
   minYearBuilt: -10, // Subject year - 10
   maxYearBuilt: 10, // Subject year + 10
+  saleRecencyMonths: 6, // Tier 1: Last 6 months only
+  propertyType: "Single Family", // Options: "Single Family", "Condo", "Townhouse", "Multi-Family"
+  take: 3, // Limit to 3 results for testing
 };
 
 async function testBatchDataComps() {
   console.log("🔍 Testing BatchData Comparable Sales Search\n");
-  console.log("=" .repeat(60));
+  console.log("=".repeat(60));
   console.log("Test Address:");
   console.log(`  ${testAddress.street}`);
   console.log(`  ${testAddress.city}, ${testAddress.state} ${testAddress.zip}`);
-  console.log("=" .repeat(60) + "\n");
+  console.log("=".repeat(60) + "\n");
 
   try {
     const client = getBatchDataClient();
@@ -50,36 +51,52 @@ async function testBatchDataComps() {
     console.log("Searching for comparable sales...");
     console.log("Search options:");
     console.log(`  Radius: ${searchOptions.distanceMiles} miles`);
-    console.log(`  Bed range: ${searchOptions.minBedrooms} to ${searchOptions.maxBedrooms} (relative)`);
-    console.log(`  Bath range: ${searchOptions.minBathrooms} to ${searchOptions.maxBathrooms} (relative)`);
-    console.log(`  Size range: ${searchOptions.minAreaPercent}% to ${searchOptions.maxAreaPercent}% (relative)`);
+    console.log(
+      `  Bed range: ${searchOptions.minBedrooms} to ${searchOptions.maxBedrooms} (relative)`,
+    );
 
-    const compResult = await client.getComparableProperties(testAddress, searchOptions);
+    console.log(
+      `  Size range: ${searchOptions.minAreaPercent}% to ${searchOptions.maxAreaPercent}% (relative)`,
+    );
+
+    console.log(
+      `  Sale recency: Last ${searchOptions.saleRecencyMonths} months`,
+    );
+    console.log(`  Property type: ${searchOptions.propertyType} only`);
+    console.log(`  Foreclosures: Excluded`);
+
+    const compResult = await client.getComparableProperties(
+      testAddress,
+      searchOptions,
+    );
 
     console.log("\n\n✅ Comp search complete!");
     console.log(`  Total comps found: ${compResult.properties.length}`);
 
     if (compResult.properties.length > 0) {
-      console.log("\n" + "=" .repeat(60));
+      console.log("\n" + "=".repeat(60));
       console.log("COMPARABLE PROPERTIES");
-      console.log("=" .repeat(60) + "\n");
+      console.log("=".repeat(60) + "\n");
 
       compResult.properties.forEach((comp, index) => {
-        const pricePerSqft = comp.squareFeet > 0 ? comp.lastSalePrice / comp.squareFeet : 0;
+        const pricePerSqft =
+          comp.squareFeet > 0 ? comp.lastSalePrice / comp.squareFeet : 0;
 
         console.log(`${index + 1}. ${comp.address}`);
         console.log(`   Price: $${comp.lastSalePrice.toLocaleString()}`);
         console.log(`   Size: ${comp.squareFeet.toLocaleString()} sqft`);
         console.log(`   Price/sqft: $${pricePerSqft.toFixed(2)}`);
-        console.log(`   Bed/Bath: ${comp.bedrooms} bed, ${comp.bathrooms} bath`);
+        console.log(
+          `   Bed/Bath: ${comp.bedrooms} bed, ${comp.bathrooms} bath`,
+        );
         console.log(`   Sale Date: ${comp.lastSaleDate || "Unknown"}`);
         console.log(`   Distance: ${comp.distance} miles\n`);
       });
 
       // Calculate median price per sqft
       const pricesPerSqft = compResult.properties
-        .filter(c => c.squareFeet > 0 && c.lastSalePrice > 0)
-        .map(c => c.lastSalePrice / c.squareFeet)
+        .filter((c) => c.squareFeet > 0 && c.lastSalePrice > 0)
+        .map((c) => c.lastSalePrice / c.squareFeet)
         .sort((a, b) => a - b);
 
       if (pricesPerSqft.length > 0) {
@@ -89,12 +106,14 @@ async function testBatchDataComps() {
             ? (pricesPerSqft[mid - 1] + pricesPerSqft[mid]) / 2
             : pricesPerSqft[mid];
 
-        console.log("=" .repeat(60));
+        console.log("=".repeat(60));
         console.log("SUMMARY STATISTICS");
-        console.log("=" .repeat(60));
+        console.log("=".repeat(60));
         console.log(`  Median Price/sqft: $${median.toFixed(2)}`);
         console.log(`  Min Price/sqft: $${pricesPerSqft[0].toFixed(2)}`);
-        console.log(`  Max Price/sqft: $${pricesPerSqft[pricesPerSqft.length - 1].toFixed(2)}`);
+        console.log(
+          `  Max Price/sqft: $${pricesPerSqft[pricesPerSqft.length - 1].toFixed(2)}`,
+        );
       }
     } else {
       console.log("\n⚠️  No comparable properties found.");

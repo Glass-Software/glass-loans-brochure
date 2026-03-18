@@ -34,7 +34,7 @@ const AboutSectionTwo = () => {
                 <h3 className="mb-4 text-xl font-bold text-black dark:text-white sm:text-2xl lg:text-xl xl:text-2xl">
                   Tyler Hervey | Chief Technology Officer
                 </h3>
-                <p className="text-base font-medium leading-relaxed text-body-color sm:text-lg sm:leading-relaxed">
+                <p className="text-base font-medium leading-relaxed text-body-color dark:text-body-color-dark sm:text-lg sm:leading-relaxed">
                   Tyler Hervey is a technical entrepreneur with an enterprise
                   software background, having built digital platforms and
                   websites for companies including Interpublic Group and Kaseya.
@@ -48,14 +48,14 @@ const AboutSectionTwo = () => {
                 <h3 className="mb-4 text-xl font-bold text-black dark:text-white sm:text-2xl lg:text-xl xl:text-2xl">
                   Will Coleman | Chief Operating Officer
                 </h3>
-                <p className="text-base font-medium leading-relaxed text-body-color sm:text-lg sm:leading-relaxed">
+                <p className="text-base font-medium leading-relaxed text-body-color dark:text-body-color-dark sm:text-lg sm:leading-relaxed">
                   Will brings over a decade of experience in real estate
                   investing across Texas and Tennessee. He is the founder of
                   UrbanGate Capital, a private real estate debt fund with five
                   years of operating history, specializing in investor capital
                   formation and private lending.
                 </p>
-                <p className="text-base font-medium leading-relaxed text-body-color sm:text-lg sm:leading-relaxed">
+                <p className="text-base font-medium leading-relaxed text-body-color dark:text-body-color-dark sm:text-lg sm:leading-relaxed">
                   His background includes roles as a Credit Analyst at City Bank
                   and Director of Finance at Rand Capital, a commercial mortgage
                   brokerage.

@@ -4,9 +4,23 @@
  */
 
 import { UnderwritingFormData } from "@/types/underwriting";
+import { getBatchDataClient } from "./client";
 import { searchComparables } from "./comps";
 import { calculateValuation } from "./valuation";
 import { detectRiskFlags } from "./risk";
+
+/**
+ * Map internal property types to BatchData API expected values
+ */
+function mapPropertyTypeToBatchData(propertyType: string): string {
+  const mapping: Record<string, string> = {
+    "SFR": "Single Family",
+    "Condo": "Condo",
+    "Townhouse": "Townhouse",
+    "Multi-Family": "Multi-Family"
+  };
+  return mapping[propertyType] || "Single Family";
+}
 
 /**
  * Main entry point: Get property estimates using BatchData
@@ -41,7 +55,7 @@ export async function getBatchDataPropertyEstimates(
         longitude: 0, // Not needed for comp search
         validated: true,
       },
-      propertyType: formData.propertyType,
+      propertyType: mapPropertyTypeToBatchData(formData.propertyType),
       bedrooms: formData.bedrooms,
       bathrooms: formData.bathrooms,
       squareFeet: formData.squareFeet,
@@ -55,6 +69,28 @@ export async function getBatchDataPropertyEstimates(
       preForeclosure: false,
     };
 
+    // Step 1.5: Verify the address (fail fast if invalid, save API calls)
+    console.log("Step 1.5: Verifying subject property address...");
+    const client = getBatchDataClient();
+    try {
+      const verifiedAddress = await client.verifyAddress({
+        street: formData.propertyAddress,
+        city: formData.propertyCity,
+        state: formData.propertyState,
+        zip: formData.propertyZip,
+      });
+
+      // Update subject property with validated coordinates
+      if (verifiedAddress.latitude && verifiedAddress.longitude) {
+        subjectProperty.address.latitude = verifiedAddress.latitude;
+        subjectProperty.address.longitude = verifiedAddress.longitude;
+        console.log(`[Verified] Address coordinates: ${verifiedAddress.latitude}, ${verifiedAddress.longitude}`);
+      }
+    } catch (error: any) {
+      // Address validation failed - return error to user immediately
+      throw new Error(`Invalid property address: ${error.message}`);
+    }
+
     // Step 2: Search for comparable sales (3-tier strategy with caching)
     // Use user-provided property details and market type for comp search
     console.log("Step 2: Searching for comparable sales...");
@@ -62,7 +98,6 @@ export async function getBatchDataPropertyEstimates(
       subjectProperty,
       marketType: formData.marketType,
       rehabBudget: formData.rehab, // Pass rehab budget for percentile-based ARV
-      userProvidedCompAddresses: formData.compLinks || [], // User-provided comps (additive)
       userPropertyData: {
         bedrooms: formData.bedrooms,
         bathrooms: formData.bathrooms,

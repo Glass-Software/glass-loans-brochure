@@ -69,7 +69,6 @@ async function testUnderwritingProduction() {
       // Step 4: Market Details
       marketType: 'Primary',
       additionalDetails: 'Production test - Phoenix SFR flip',
-      compLinks: []
     };
 
     console.log('\n📋 Test Property (REAL):');
