@@ -2,6 +2,19 @@
 
 This document contains important information for Claude (AI assistant) when working on this codebase.
 
+## Important: Fly.io App Name
+
+**Production App Name:** `glass-loans-brochure-modified-misty-thunder-1484`
+
+All Fly.io commands must use the `-a` flag with this full app name:
+```bash
+fly ssh console -a glass-loans-brochure-modified-misty-thunder-1484
+fly logs -a glass-loans-brochure-modified-misty-thunder-1484
+fly deploy
+```
+
+(Note: `fly deploy` reads the app name from `fly.toml` automatically)
+
 ## Database Migrations
 
 ### Overview
@@ -17,7 +30,7 @@ npx tsx scripts/migrate.ts
 **Production (Fly.io):**
 ```bash
 # SSH into the Fly.io instance
-fly ssh console
+fly ssh console -a glass-loans-brochure-modified-misty-thunder-1484
 
 # Run migrations
 npx tsx scripts/migrate.ts
@@ -32,7 +45,7 @@ npx tsx scripts/migrate.ts
 - **Migration Files:** Located in `src/lib/db/migrations/`
 - **Naming Convention:** `XXX_description.sqlite.sql` (e.g., `011_add_comp_selection.sqlite.sql`)
 
-### Current Migrations (as of Migration 012)
+### Current Migrations (as of Migration 013)
 
 1. **001_initial_schema.sqlite.sql** - Initial database schema (users, underwriting_submissions)
 2. **002_add_usage_limit.sqlite.sql** - Add usage tracking
@@ -46,6 +59,7 @@ npx tsx scripts/migrate.ts
 10. **010_add_realie_cache.sqlite.sql** - Realie API cache tables
 11. **011_add_comp_selection.sqlite.sql** - Comp selection state (JSON column)
 12. **012_add_marketing_consent.sqlite.sql** - Marketing consent flag
+13. **013_add_property_coordinates.sqlite.sql** - Property latitude/longitude coordinates
 
 ### Adding New Migrations
 
@@ -114,7 +128,7 @@ When adding a new migration:
 ### Troubleshooting
 
 **Migration fails on production:**
-1. SSH into Fly.io: `fly ssh console`
+1. SSH into Fly.io: `fly ssh console -a glass-loans-brochure-modified-misty-thunder-1484`
 2. Check database exists: `ls -la /data/glass-loans.db`
 3. Check disk space: `df -h`
 4. View migration output for specific error
@@ -190,6 +204,6 @@ When deploying to production:
 
 ```bash
 # On Fly.io
-fly ssh console
+fly ssh console -a glass-loans-brochure-modified-misty-thunder-1484
 cp /data/glass-loans.db /data/glass-loans.db.backup-$(date +%Y%m%d)
 ```
