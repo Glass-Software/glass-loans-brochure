@@ -161,7 +161,7 @@ export default function Step6CompSelection() {
         mapRef.current = null;
       }
     };
-  }, [propertyComps, formData]);
+  }, [propertyComps, formData, compSelectionState]);
 
   // Update marker colors when selection state changes
   useEffect(() => {
@@ -369,7 +369,7 @@ export default function Step6CompSelection() {
             <strong>Emphasize</strong> comps that match your finished property
           </li>
           <li>
-            <strong>Remove</strong> comps that aren't comparable
+            <strong>Remove</strong> comps that aren&apos;t comparable
           </li>
           <li>
             Leave others as <strong>Normal</strong>

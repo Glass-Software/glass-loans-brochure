@@ -47,18 +47,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log("🔍 Fetching comps for:", formData.propertyAddress);
-
     // Fetch comparable properties using the provider chain
     // This will try RentCast → Realie → AI → Heuristic fallback
     const propertyComps = await getPropertyEstimates(formData);
-
-    console.log(
-      `✅ Fetched ${propertyComps.compsUsed.length} comps for ${formData.propertyAddress}`
-    );
-    console.log(
-      `   ARV: $${propertyComps.estimatedARV.toLocaleString()}, As-Is: $${propertyComps.asIsValue.toLocaleString()}`
-    );
 
     // Return comps
     return NextResponse.json({

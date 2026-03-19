@@ -146,11 +146,11 @@ export function calculateUnderwriting(
 
 /**
  * Calculate final underwriting score (0-100)
- * Based on weighted scoring rubric:
+ * Based on weighted scoring rubric (LENDER-FOCUSED):
  * - 40%: Loan Leverage Metrics (LTV, LARV, LTC)
- * - 30%: Borrower Profit
- * - 20%: Stress-Tested Profit (10% ARV reduction)
- * - 10%: Day-One Underwater Check
+ * - 10%: Borrower Profit (reduced - borrower profit matters but isn't primary concern)
+ * - 20%: Stress-Tested Profit (5% ARV reduction)
+ * - 30%: Collateral Protection / Day-One Underwater Check (increased - lender safety critical)
  */
 export function calculateFinalScore(
   calculated: CalculatedResults,
@@ -160,17 +160,17 @@ export function calculateFinalScore(
   // Uses pre-calculated leverageScore (1-10 scale, averaged from LTV, LARV, LTC)
   const leveragePoints = (calculated.leverageScore / 10) * 40;
 
-  // Component 2: Borrower Profit (30 points max)
+  // Component 2: Borrower Profit (10 points max) - REDUCED from 30%
   // Uses pre-calculated profitScore (1-10 scale)
-  const profitPoints = (calculated.profitScore / 10) * 30;
+  const profitPoints = (calculated.profitScore / 10) * 10;
 
   // Component 3: Stress-Tested Profit (20 points max)
   // Uses pre-calculated stressScore (1-10 scale)
   const stressPoints = (calculated.stressScore / 10) * 20;
 
-  // Component 4: Day-One Underwater Check (10 points max)
+  // Component 4: Collateral Protection / Underwater Check (30 points max) - INCREASED from 10%
   // Uses pre-calculated underwaterScore (1-10 scale)
-  const underwaterPoints = (calculated.underwaterScore / 10) * 10;
+  const underwaterPoints = (calculated.underwaterScore / 10) * 30;
 
   // Sum all weighted components
   const finalScore = Math.round(

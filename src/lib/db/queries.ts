@@ -199,16 +199,24 @@ export function generateVerificationCode(
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const codeExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
 
-  execute(
-    `
-      UPDATE users
-      SET verification_code = ?,
-          code_expires_at = ?,
-          updated_at = DATETIME('now')
-      WHERE id = ?
-    `,
-    [code, codeExpires, userId],
-  );
+  try {
+    execute(
+      `
+        UPDATE users
+        SET verification_code = ?,
+            code_expires_at = ?,
+            updated_at = DATETIME('now')
+        WHERE id = ?
+      `,
+      [code, codeExpires, userId],
+    );
+  } catch (error: any) {
+    // If column doesn't exist, provide helpful error message
+    if (error.message?.includes("no such column: verification_code")) {
+      throw new Error("Database migration 009 not applied. Run: npx tsx scripts/migrate.ts");
+    }
+    throw error;
+  }
 
   const user = queryOne<User>("SELECT * FROM users WHERE id = ?", [userId])!;
 

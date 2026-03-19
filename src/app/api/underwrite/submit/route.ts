@@ -72,7 +72,7 @@ function sendProgress(
 function sendComplete(controller: ReadableStreamDefaultController, data: any) {
   const event: ProgressEvent = {
     type: "complete",
-    step: 5,
+    step: 6,
     status: "Analysis complete!",
     progress: 100,
     timestamp: new Date().toISOString(),
@@ -161,10 +161,6 @@ export async function POST(request: Request) {
           return;
         }
 
-        console.log(
-          "reCAPTCHA verified with score:",
-          recaptchaVerification.score,
-        );
 
         // Step 4: Get client IP for rate limiting
         const forwarded = request.headers.get("x-forwarded-for");
@@ -224,16 +220,10 @@ export async function POST(request: Request) {
         // Step 8: Process comps and comp selection (25-50%)
         sendProgress(controller, 2, "Processing comp selections...", 25);
 
-        console.log("Processing comp selection...");
-
         let aiEstimates;
 
         // Comps are now fetched in Step 5 and passed from frontend
         if (propertyComps && compSelectionState) {
-          console.log(
-            `[Server] Using comps from Step 6 (${propertyComps.compsUsed.length} total comps)`,
-          );
-
           // Filter comps based on user selection (remove comps marked as "removed")
           const activeComps = propertyComps.compsUsed.filter(
             (comp: any, idx: number) => {
@@ -242,10 +232,6 @@ export async function POST(request: Request) {
               );
               return !state?.removed;
             },
-          );
-
-          console.log(
-            `[Server] ${activeComps.length} active comps after filtering (${propertyComps.compsUsed.length - activeComps.length} removed)`,
           );
 
           // Validate minimum comps
@@ -276,10 +262,6 @@ export async function POST(request: Request) {
             formData as UnderwritingFormData,
           );
 
-          console.log(
-            `[Server] Recalculated ARV: $${recalculatedARV.toLocaleString()} (was: $${propertyComps.estimatedARV.toLocaleString()})`,
-          );
-
           aiEstimates = {
             estimatedARV: recalculatedARV,
             asIsValue: propertyComps.asIsValue,
@@ -299,7 +281,6 @@ export async function POST(request: Request) {
           );
         } else {
           // Fallback: Fetch comps if not provided (backward compatibility)
-          console.log("[Server] No comps provided, fetching from providers...");
           sendProgress(controller, 2, "Researching property comps...", 25);
 
           try {
@@ -321,9 +302,6 @@ export async function POST(request: Request) {
                   formData as UnderwritingFormData,
                 );
                 aiEstimates = result;
-                console.log(
-                  `[Server] ${result.providerUsed} returned ${aiEstimates.compsUsed.length} comps`,
-                );
                 sendProgress(
                   controller,
                   2,
@@ -376,7 +354,6 @@ export async function POST(request: Request) {
                   formData as UnderwritingFormData,
                 );
 
-                console.log("Calling OpenRouter for property estimates...");
                 const aiResponse =
                   await openRouterClient.generateJSON<PropertyEstimationResponse>(
                     estimationPrompt,
@@ -394,8 +371,6 @@ export async function POST(request: Request) {
                   valuationMethod: "ai_fallback",
                   compTier: 3, // Mark as lowest confidence
                 };
-
-                console.log("AI estimates received successfully");
               } else {
                 // Ultimate fallback: Simple heuristics
                 console.warn(
@@ -432,26 +407,20 @@ export async function POST(request: Request) {
           }
         }
 
-        // Step 9: Calculate all metrics TWICE (user ARV vs Gary ARV) (50-65%)
+        // Step 9: Calculate preliminary metrics for scoring (50-60%)
         sendProgress(controller, 3, "Calculating loan metrics...", 50);
 
-        console.log("Calculating underwriting metrics...");
-        const userCalculations = calculateUnderwriting(
-          formData as UnderwritingFormData,
-          formData.userEstimatedArv,
-          aiEstimates.asIsValue,
-        );
-
+        // Calculate preliminary Gary calculations (will be recalculated after Gary's analysis)
         let garyCalculations = calculateUnderwriting(
           formData as UnderwritingFormData,
           aiEstimates.estimatedARV,
           aiEstimates.asIsValue,
         );
 
-        // Step 10: Calculate final score (use Gary's calculations for scoring)
+        // Step 10: Calculate preliminary final score (60-65%)
         sendProgress(controller, 3, "Calculating final score...", 60);
 
-        const finalScore = calculateFinalScore(
+        let finalScore = calculateFinalScore(
           garyCalculations,
           formData as UnderwritingFormData,
         );
@@ -460,11 +429,10 @@ export async function POST(request: Request) {
         sendProgress(
           controller,
           4,
-          "Calculating property valuations...",
+          "Gary is analyzing comparable sales...",
           65,
         );
 
-        console.log("Gary Call 1: Calculating valuations...");
         let garyAsIsValue: number;
         let garyEstimatedARV: number;
         let garyOpinion: string;
@@ -479,7 +447,6 @@ export async function POST(request: Request) {
               compSelectionState,
             );
 
-            console.log("Calling OpenRouter for Gary's valuations (temp 0.15)...");
             const valuationResponse = await openRouterClient.generateJSON<{
               asIsValue: number;
               estimatedARV: number;
@@ -492,10 +459,6 @@ export async function POST(request: Request) {
             garyAsIsValue = valuationResponse.asIsValue;
             garyEstimatedARV = valuationResponse.estimatedARV;
 
-            console.log(`Gary's As-Is: $${garyAsIsValue.toLocaleString()}`);
-            console.log(`Gary's ARV: $${garyEstimatedARV.toLocaleString()}`);
-            console.log(`API As-Is: $${apiAsIsValue.toLocaleString()}`);
-
             // Validate values are reasonable (basic sanity check)
             if (garyAsIsValue <= 0 || garyEstimatedARV <= 0) {
               throw new Error("Invalid valuations from Gary (values must be positive)");
@@ -507,19 +470,17 @@ export async function POST(request: Request) {
             sendProgress(
               controller,
               4,
-              `Valuations calculated: ARV $${(garyEstimatedARV / 1000).toFixed(0)}k`,
+              `Gary calculated ARV: $${(garyEstimatedARV / 1000).toFixed(0)}k`,
               75,
             );
 
             // CALL 2: Get opinion from Gary (higher temperature for natural writing)
             sendProgress(
               controller,
-              4,
-              "Writing underwriting opinion...",
+              5,
+              "Gary is writing your underwriting report...",
               80,
             );
-
-            console.log("Gary Call 2: Writing opinion (temp 0.7)...");
 
             // Recalculate Gary's metrics using his valuations
             const garyCalculationsUpdated = calculateUnderwriting(
@@ -528,15 +489,22 @@ export async function POST(request: Request) {
               garyAsIsValue,
             );
 
+            // Recalculate final score based on Gary's actual valuations (not preliminary AI estimates)
+            finalScore = calculateFinalScore(
+              garyCalculationsUpdated,
+              formData as UnderwritingFormData,
+            );
+
             const opinionPrompt = generateGaryOpinionPrompt(
               formData as UnderwritingFormData,
-              userCalculations,
+              garyCalculationsUpdated,
               garyCalculationsUpdated,
               garyAsIsValue, // Pass Gary's as-is value
               garyEstimatedARV, // Pass Gary's ARV
               apiAsIsValue, // Pass API's as-is value for comparison
               aiEstimates.compsUsed,
               compSelectionState,
+              finalScore, // Pass recalculated score based on Gary's valuations
             );
 
             garyOpinion = await openRouterClient.generateText(opinionPrompt, {
@@ -544,8 +512,6 @@ export async function POST(request: Request) {
               temperature: 0.7, // Higher temperature for natural, conversational writing
               maxTokens: 1500,
             });
-
-            console.log("Gary's opinion generated successfully");
 
             // Update garyCalculations for later use
             garyCalculations = garyCalculationsUpdated;
@@ -556,6 +522,15 @@ export async function POST(request: Request) {
             const { calculateARV } = await import("@/lib/rentcast/comps");
             garyEstimatedARV = calculateARV(aiEstimates.compsUsed, formData.rehab, formData.squareFeet);
             garyAsIsValue = apiAsIsValue; // Use API value as fallback
+
+            // Recalculate with automated valuations
+            garyCalculations = calculateUnderwriting(
+              formData as UnderwritingFormData,
+              garyEstimatedARV,
+              garyAsIsValue,
+            );
+            finalScore = calculateFinalScore(garyCalculations, formData as UnderwritingFormData);
+
             garyOpinion = generateMockGaryOpinion(
               formData as UnderwritingFormData,
               garyCalculations,
@@ -570,6 +545,15 @@ export async function POST(request: Request) {
           const { calculateARV } = await import("@/lib/rentcast/comps");
           garyEstimatedARV = calculateARV(aiEstimates.compsUsed, formData.rehab, formData.squareFeet);
           garyAsIsValue = apiAsIsValue;
+
+          // Recalculate with fallback valuations
+          garyCalculations = calculateUnderwriting(
+            formData as UnderwritingFormData,
+            garyEstimatedARV,
+            garyAsIsValue,
+          );
+          finalScore = calculateFinalScore(garyCalculations, formData as UnderwritingFormData);
+
           garyOpinion = generateMockGaryOpinion(
             formData as UnderwritingFormData,
             garyCalculations,
@@ -583,10 +567,8 @@ export async function POST(request: Request) {
         aiEstimates.asIsValue = garyAsIsValue;
         aiEstimates.apiAsIsValue = apiAsIsValue;
 
-        // Step 12: Store submission in database (90-95%)
-        sendProgress(controller, 5, "Saving results...", 90);
-
-        console.log("Storing submission...");
+        // Step 12: Store submission in database (85-95%)
+        sendProgress(controller, 6, "Saving your report...", 85);
 
         // Generate report ID and calculate expiration
         const reportId = generateReportId();
@@ -641,7 +623,7 @@ export async function POST(request: Request) {
         incrementUsageCount(user.id);
 
         // Step 14: Send email with report link (90-95%)
-        sendProgress(controller, 5, "Sending report link to your email...", 95);
+        sendProgress(controller, 6, "Sending report link to your email...", 95);
 
         const sgMail = (await import("@sendgrid/mail")).default;
 

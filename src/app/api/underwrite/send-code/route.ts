@@ -90,7 +90,18 @@ export async function POST(request: Request) {
     // Step 4: Generate and send verification code
     const { code } = generateVerificationCode(user.id);
 
-    await sendVerificationCodeEmail(email, code);
+    try {
+      await sendVerificationCodeEmail(email, code);
+    } catch (emailError: any) {
+      console.error("SendGrid email error:", emailError);
+      console.error("SendGrid error details:", {
+        message: emailError.message,
+        code: emailError.code,
+        statusCode: emailError.response?.statusCode,
+        body: emailError.response?.body,
+      });
+      throw new Error(`Email sending failed: ${emailError.message}`);
+    }
 
     return NextResponse.json({
       success: true,
@@ -98,8 +109,13 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("Send code error:", error);
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      response: error.response?.body,
+    });
     return NextResponse.json(
-      { error: "Failed to send verification code" },
+      { error: "Failed to send verification code", details: error.message },
       { status: 500 },
     );
   }
@@ -109,6 +125,11 @@ export async function POST(request: Request) {
  * Send 6-digit verification code via SendGrid
  */
 async function sendVerificationCodeEmail(email: string, code: string) {
+  console.log("Attempting to send email:", {
+    to: email,
+    from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
+  });
+
   const msg = {
     to: email,
     from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
@@ -159,5 +180,14 @@ Glass Loans Team
     `,
   };
 
-  await sgMail.send(msg);
+  try {
+    const result = await sgMail.send(msg);
+    console.log("Email sent successfully:", {
+      to: email,
+      statusCode: result[0]?.statusCode,
+    });
+  } catch (error: any) {
+    console.error("sgMail.send failed:", error);
+    throw error;
+  }
 }

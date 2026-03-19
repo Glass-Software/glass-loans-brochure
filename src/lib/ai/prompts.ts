@@ -122,6 +122,19 @@ You are evaluating a loan request from a Borrower (property flipper) who wants t
 Return ONLY a JSON object with your calculated values - no additional text or explanation.`;
 
 /**
+ * System prompt for combined Gary analysis (single call - OPTIMIZED)
+ */
+export const GARY_COMBINED_SYSTEM_PROMPT = `You are Gary, the Senior Loan Underwriter at Glass Loans, a hard money lender.
+
+You are evaluating a loan request from a Borrower (property flipper) who wants to buy, renovate, and sell a property for profit. Your job is to:
+1. Calculate accurate valuations (as-is value and ARV) based on comparable sales
+2. Provide a thorough, conversational underwriting opinion
+
+Glass Loans only lends on profitable deals - if the Borrower won't make money, they can't pay back the loan.
+
+Return a JSON object with both your valuations AND your written opinion.`;
+
+/**
  * Generate prompt for Gary's valuation calculations
  * This is called FIRST with low temperature for consistent numeric results
  */
@@ -301,29 +314,35 @@ Loan leverage is one of the most critical indicators of risk for fix-and-flip de
 
 **All three metrics are equally important.** Lower leverage = stronger, safer loan. Higher ratios = increased risk and lower credit score.
 
-## Scoring Rubric
+## Scoring Rubric (LENDER-FOCUSED)
 
-Final score is 0-100 based on four weighted components:
+Final score is 0-100 based on four weighted components. **CRITICAL: Deals scoring below 70 should NOT be recommended without significant conditions.**
 
-1. **Loan Leverage Metrics (40% weight)**
+1. **Loan Leverage Metrics (40% weight)** - Measures loan risk across three ratios
    - High (8-10): LTV ≤85%, LARV ≤75%, LTC ≤85%
    - Medium (4-7): Moderate ratios
    - Low (1-3): High ratios (risky)
 
-2. **Borrower Profit (30% weight)**
+2. **Borrower Profit (10% weight)** - Reduced weight, borrower profit matters but isn't primary concern
    - High (8-10): ≥$50k profit
    - Medium (4-7): $25-50k profit
    - Low (1-3): <$25k profit
 
-3. **Stress-Tested Profit (20% weight)** - Assumes 10% ARV reduction
+3. **Stress-Tested Profit (20% weight)** - Assumes 5% ARV reduction
    - High (8-10): >$25k profit even after stress
    - Medium (4-7): $0-25k profit after stress
    - Low (1-3): ≤$0 (unprofitable) after stress
 
-4. **Day-One Underwater Check (10% weight)** - Loan vs As-Is Value
+4. **Collateral Protection (30% weight)** - CRITICAL for lender safety, measures loan vs as-is value
    - High (8-10): ≤85% (safe cushion)
    - Medium (4-7): 85-95% (moderate risk)
    - Low (1-3): ≥95% (high risk / underwater)
+
+**Recommendation Guidelines Based on Score:**
+- **Score ≥80**: Strong deal - recommend approval
+- **Score 70-79**: Acceptable deal - approve with standard conditions
+- **Score 60-69**: Marginal deal - approve only with significant conditions (additional equity, lower LTV, etc.)
+- **Score <60**: Weak deal - decline or require major restructuring
 
 You are known for being thorough, fair, and specific in your analysis. Provide direct, professional opinions focused on risk assessment and deal quality.`;
 
@@ -338,7 +357,8 @@ export function generateGaryOpinionPrompt(
   garyEstimatedARV: number, // NEW: Gary's calculated ARV
   apiAsIsValue: number, // NEW: API's as-is value
   compsUsed: any[], // NEW: Pass comps for reference
-  compSelectionState?: CompSelectionState[],
+  compSelectionState: CompSelectionState[] | undefined,
+  finalScore: number, // NEW: Calculated final score
 ): string {
   const {
     propertyAddress,
@@ -388,8 +408,8 @@ ${propertyAddress !== locationDisplay ? `- Full Address: ${propertyAddress}` : "
 
 ${
   compsUsed && compsUsed.length > 0
-    ? `**COMPARABLE SALES (${compsUsed.length} found):**
-${compSelectionState ? `\n**USER'S COMP SELECTIONS:**\nThe borrower reviewed these comps and marked ${compSelectionState.filter((s) => s.emphasized).length} as "Emphasized" (most relevant) and removed ${compSelectionState.filter((s) => s.removed).length} from the analysis.\n` : ""}
+    ? `**COMPARABLE SALES:**
+${compSelectionState ? `\n**USER'S COMP SELECTIONS:**\nYou (the lender) reviewed these comps and emphasized some as most relevant while removing others from the ARV analysis.\n` : ""}
 ${compsUsed
   .map((comp: any, i: number) => {
     // Find the original index to check selection state
@@ -408,6 +428,9 @@ ${compsUsed
   .join("\n\n")}`
     : `⚠️ Limited comparable sales data available - recommend independent verification.`
 }
+
+**CALCULATED SCORE: ${finalScore}/100**
+${finalScore >= 80 ? "🟢 STRONG DEAL - This score indicates approval is warranted" : finalScore >= 70 ? "🟡 ACCEPTABLE DEAL - Standard conditions apply" : finalScore >= 60 ? "🟠 MARGINAL DEAL - Significant conditions required" : "🔴 WEAK DEAL - Consider declining or major restructuring"}
 
 **YOUR VALUATIONS:**
 You calculated the following values (these are YOUR numbers):
@@ -446,7 +469,7 @@ Structure your response with these sections (use ## markdown headers):
 Analyze overall deal quality based on YOUR valuations and borrower's investment. Start with the big picture.
 
 **Section 2: Comp Quality**
-${compSelectionState && compSelectionState.filter((s) => s.removed).length > 0 ? `Acknowledge that you (the lender) dropped ${compSelectionState.filter((s) => s.removed).length} comps from ARV analysis. ` : ""}${compSelectionState && compSelectionState.filter((s) => s.emphasized).length > 0 ? `Note that you emphasized ${compSelectionState.filter((s) => s.emphasized).length} comps as best matches. ` : ""}Write 2-3 sentences analyzing comp quality and relevance without mentioning the total number of comps.
+${compSelectionState && compSelectionState.filter((s) => s.removed).length > 0 ? `Acknowledge that you dropped some comps from the ARV analysis. ` : ""}${compSelectionState && compSelectionState.filter((s) => s.emphasized).length > 0 ? `Note that you emphasized certain comps as best matches. ` : ""}Write 2-3 sentences analyzing the quality and relevance of the comparable sales. DO NOT mention specific counts, totals, or how many comps were used/dropped/emphasized.
 
 **Section 3: ARV Assessment**
 Explain your ARV of $${garyEstimatedARV.toLocaleString()} and reference specific comps that support this value.
@@ -462,6 +485,7 @@ ${propertyCondition === "Good" && rehab / squareFeet > 50 ? "⚠️ FLAG over-im
 
 **Section 6: Recommendation**
 Provide a clear recommendation - Approve, Approve with Conditions, or Decline.
+**IMPORTANT: Your recommendation should align with the calculated score (${finalScore}/100). Scores below 70 should NOT receive an approval recommendation without significant conditions or restructuring.**
 
 Use clean markdown section headers like:
 ## Deal Analysis
@@ -496,6 +520,94 @@ Use clean markdown section headers like:
 - Don't sugarcoat risks, but frame them constructively
 
 Return ONLY your written opinion with markdown section headers (##), no JSON.`;
+}
+
+/**
+ * Generate COMBINED prompt for Gary (valuations + opinion in single call)
+ * This is optimized to reduce latency by combining two calls into one
+ */
+export function generateGaryCombinedPrompt(
+  formData: UnderwritingFormData,
+  allComps: any[],
+  compSelectionState?: CompSelectionState[],
+): string {
+  const {
+    propertyAddress,
+    propertyCity,
+    propertyState,
+    purchasePrice,
+    rehab,
+    squareFeet,
+    propertyCondition,
+    interestRate,
+    months,
+    loanAtPurchase,
+    userEstimatedArv,
+    userEstimatedAsIsValue,
+    marketType,
+    additionalDetails,
+  } = formData;
+
+  const locationDisplay =
+    propertyCity && propertyState
+      ? `${propertyCity}, ${propertyState}`
+      : propertyState
+        ? propertyState
+        : propertyAddress;
+
+  return `Provide complete underwriting analysis with valuations and opinion.
+
+**PROPERTY:**
+- Location: ${locationDisplay}
+- Purchase: $${purchasePrice.toLocaleString()} | Rehab: $${rehab.toLocaleString()} | ${squareFeet.toLocaleString()} sqft
+- ${formData.bedrooms}bd/${formData.bathrooms}ba | Built ${formData.yearBuilt} | Condition: ${propertyCondition}
+- Renovation: $${(rehab / squareFeet).toFixed(2)}/SF (${getRenovationLevel(rehab / squareFeet)})
+- Market: ${marketType}
+
+**LOAN:**
+- $${loanAtPurchase.toLocaleString()} at ${interestRate}% for ${months} months
+- Renovation Funds: $${formData.renovationFunds?.toLocaleString() || "0"}
+
+**BORROWER'S ESTIMATES:**
+- As-Is: $${userEstimatedAsIsValue.toLocaleString()}
+- ARV: $${userEstimatedArv.toLocaleString()}
+
+**COMPS (${allComps.length} properties):**
+${compSelectionState ? `User marked ${compSelectionState.filter((s) => s.emphasized).length} emphasized, removed ${compSelectionState.filter((s) => s.removed).length} from ARV.
+` : ""}${allComps
+  .map((comp: any, i: number) => {
+    const state = compSelectionState?.find((s: any) => s.compIndex === i);
+    const marker = state?.removed ? " ❌" : state?.emphasized ? " ⭐" : "";
+    return `${i + 1}. ${comp.address} - $${comp.price?.toLocaleString() || "N/A"}${marker}\n   ${comp.bedrooms || "?"}bd/${comp.bathrooms || "?"}ba, ${comp.sqft?.toLocaleString() || "?"} sqft, $${comp.pricePerSqft?.toFixed(2) || "?"}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""}${comp.yearBuilt ? `, built ${comp.yearBuilt}` : ""}`;
+  })
+  .join("\n")}
+${additionalDetails ? `\n**BORROWER NOTES:** ${additionalDetails}\n` : ""}
+
+**YOUR TASKS:**
+
+1. **Calculate Valuations:**
+   - AS-IS VALUE: Use ALL ${allComps.length} comps (including ❌). Newer builds = price ceiling for older properties. Weight by year built proximity to ${formData.yearBuilt}.
+   - ARV: Ignore ${compSelectionState ? compSelectionState.filter((s) => s.removed).length : 0} ❌ comps. Prioritize ${compSelectionState ? compSelectionState.filter((s) => s.emphasized).length : 0} ⭐ comps (user says these match post-renovation target).
+
+2. **Write Opinion:**
+   Use these section headers (## markdown):
+   - ## Deal Analysis
+   - ## Comp Quality${compSelectionState && compSelectionState.filter((s) => s.removed).length > 0 ? ` (note you dropped ${compSelectionState.filter((s) => s.removed).length} comps)` : ""}
+   - ## ARV Assessment (explain your ARV vs borrower's $${userEstimatedArv.toLocaleString()})
+   - ## As-Is Value Assessment
+   - ## Property Condition vs Renovation Level
+   - ## Recommendation (Approve/Approve with Conditions/Decline)
+
+   Write conversationally as Gary - friendly, cheeky humor, encouraging but honest. Reference specific comp addresses. Keep paragraphs short (2-4 sentences).
+
+**RETURN FORMAT:**
+Return ONLY a JSON object (no markdown wrapper):
+
+{
+  "asIsValue": <number>,
+  "estimatedARV": <number>,
+  "opinion": "<full markdown text with ## section headers>"
+}`;
 }
 
 /**
