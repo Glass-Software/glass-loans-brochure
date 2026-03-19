@@ -131,7 +131,7 @@ export default function ProgressIndicator() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-body-color dark:text-body-color-dark">
-          This usually takes 8-15 seconds. Please don&apos;t close this window.
+          This usually takes 30-40 seconds. Please don&apos;t close this window.
         </p>
       </div>
     </div>
