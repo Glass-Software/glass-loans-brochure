@@ -226,7 +226,7 @@ Only use this if the deployment script is unavailable:
 
 1. **Deploy the code:**
    ```bash
-   fly deploy
+   fly deploy --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA"
    ```
 
 2. **Run migrations manually:**
@@ -256,6 +256,24 @@ After deploying:
 - Monitor first few submissions for errors
 - Check logs: `fly logs -a glass-loans-brochure-modified-misty-thunder-1484`
 - Verify Mapbox usage/quotas if changes affect Step 6
+
+### Mapbox API Key Configuration
+
+The Mapbox API key for production is passed as a **build argument** during deployment (not committed to the repository to avoid GitHub secret scanning alerts).
+
+**How it works:**
+1. The `Dockerfile` accepts `NEXT_PUBLIC_MAPBOX_API_KEY` as a build ARG and converts it to ENV
+2. The deployment script (`scripts/deploy.sh`) passes the key via `--build-arg` flag
+3. Next.js embeds the key into the JavaScript bundle during `npm run build`
+
+**Important notes:**
+- The key is a Mapbox **public token** (pk.) which is designed to be client-facing
+- It should be URL-restricted in your Mapbox dashboard to `https://glassloans.io/*`
+- Local development uses the key from `.env.local` (different token restricted to `localhost:3000`)
+- If you need to change the production token, update it in `scripts/deploy.sh`
+
+**Why build-time, not runtime?**
+According to [Next.js documentation](https://nextjs.org/docs/pages/guides/environment-variables), all `NEXT_PUBLIC_` environment variables are "frozen with the value evaluated at build time" and embedded into the client-side bundle. They cannot be changed at runtime.
 
 ## Database Backup
 

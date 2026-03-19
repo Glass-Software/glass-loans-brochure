@@ -11,7 +11,8 @@ echo ""
 
 # Step 1: Deploy
 echo "📦 Deploying to Fly.io..."
-fly deploy
+# Pass Mapbox API key as build arg (not committed to repo for security)
+fly deploy --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA"
 
 echo ""
 echo "✅ Deployment complete!"
