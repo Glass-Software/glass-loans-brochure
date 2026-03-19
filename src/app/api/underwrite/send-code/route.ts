@@ -5,7 +5,7 @@ import {
   findUserByNormalizedEmail,
   createUser,
   generateVerificationCode,
-  // checkRateLimit, // TEMPORARY: Disabled due to database lock causing PU02 errors
+  // checkRateLimit, // Disabled - causes database locking issues
   updateMarketingConsent,
 } from "@/lib/db/queries";
 import sgMail from "@sendgrid/mail";
@@ -36,40 +36,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // TEMPORARY: Rate limiting disabled due to database lock issue causing PU02 errors
-    // The checkRateLimit() function uses synchronous SQLite transactions that hang in production
-    // TODO: Re-enable with async rate limiting or fix database locking issue
-    // Rate limit: 5 requests per hour per IP
-    // console.log("📧 [send-code] Getting IP address for rate limiting...");
-    // const forwarded = request.headers.get("x-forwarded-for");
-    // const ip = forwarded ? forwarded.split(",")[0] : "unknown";
-    // console.log("📧 [send-code] IP address:", ip);
-    //
-    // console.log("📧 [send-code] Calling checkRateLimit...");
-    // let rateLimit: { allowed: boolean; remaining: number };
-    // try {
-    //   rateLimit = checkRateLimit(ip, "/api/underwrite/send-code", 5, 60);
-    //   console.log("📧 [send-code] ✅ Rate limit check completed:", rateLimit);
-    // } catch (rateLimitError: any) {
-    //   console.error("📧 [send-code] ❌ Rate limit check FAILED:", rateLimitError);
-    //   console.error("📧 [send-code] Rate limit error details:", {
-    //     message: rateLimitError.message,
-    //     stack: rateLimitError.stack,
-    //   });
-    //   // Continue without rate limiting if it fails
-    //   rateLimit = { allowed: true, remaining: 5 };
-    //   console.log("📧 [send-code] Continuing without rate limiting due to error");
-    // }
-    //
-    // if (!rateLimit.allowed) {
-    //   console.log("📧 [send-code] ERROR: Rate limit exceeded");
-    //   return NextResponse.json(
-    //     { error: "Too many requests. Please try again later." },
-    //     { status: 429 },
-    //   );
-    // }
-
-    console.log("📧 [send-code] ⚠️ Rate limiting disabled (TODO: fix database locking)");
+    // Rate limiting disabled - causes database locking with concurrent requests
+    console.log("📧 [send-code] Rate limiting disabled");
 
     // Step 1: Validate email quality (Basic validation - AbstractAPI commented out)
     // const validation = await validateEmail(email);

@@ -38,6 +38,10 @@ export function getDatabase(): Database.Database {
   db.pragma("foreign_keys = ON");
   db.pragma("journal_mode = WAL");
 
+  // Set busy timeout to prevent indefinite locking (5 seconds max wait)
+  // If another process holds a lock, we'll get an error instead of hanging forever
+  db.pragma("busy_timeout = 5000");
+
   // Configure WAL checkpointing to prevent corruption
   // Checkpoint every 1000 pages or 5 minutes
   db.pragma("wal_autocheckpoint = 1000");

@@ -27,6 +27,11 @@ RUN npm ci --include=dev --legacy-peer-deps
 # Copy application code
 COPY . .
 
+# Accept build-time ARG and convert to ENV for Next.js build
+# NEXT_PUBLIC_ vars must be available at build time to be embedded in the bundle
+ARG NEXT_PUBLIC_MAPBOX_API_KEY
+ENV NEXT_PUBLIC_MAPBOX_API_KEY=$NEXT_PUBLIC_MAPBOX_API_KEY
+
 # Build application
 RUN npm run build
 
