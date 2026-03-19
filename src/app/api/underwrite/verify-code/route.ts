@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeEmail } from "@/lib/email/normalization";
-import { verifyUserCode } from "@/lib/db/queries";
+import { verifyUserCode, checkRateLimit } from "@/lib/db/queries";
+import { verifyRecaptchaToken } from "@/lib/recaptcha/verify";
 
 /**
  * POST /api/underwrite/verify-code
@@ -20,7 +21,7 @@ import { verifyUserCode } from "@/lib/db/queries";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, verificationCode } = body;
+    const { email, verificationCode, recaptchaToken } = body;
 
     // Validate inputs
     if (!email || typeof email !== "string") {
@@ -34,6 +35,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Verification code is required" },
         { status: 400 }
+      );
+    }
+
+    // Verify reCAPTCHA token (before code verification)
+    if (!recaptchaToken) {
+      return NextResponse.json(
+        { success: false, error: "Security verification required" },
+        { status: 400 }
+      );
+    }
+
+    const recaptchaVerification = await verifyRecaptchaToken(recaptchaToken, 0.5);
+
+    if (!recaptchaVerification.success) {
+      console.warn("reCAPTCHA verification failed:", recaptchaVerification.error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Security verification failed. Please try again.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Rate limiting per IP (fallback protection - 10 attempts per hour)
+    const forwarded = request.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0] : "unknown";
+
+    const rateLimit = checkRateLimit(ip, "/api/underwrite/verify-code", 10, 60);
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Too many verification attempts. Please try again later.",
+        },
+        { status: 429 }
       );
     }
 

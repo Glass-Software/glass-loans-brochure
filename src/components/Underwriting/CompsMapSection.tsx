@@ -78,12 +78,15 @@ export default function CompsMapSection({
 
       const color = state?.emphasized ? "#10B981" : "#4A6CF7";
 
+      // Generate link: use listing URL if available, otherwise search Google
+      const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
+
       const marker = new mapboxgl.Marker({ color })
         .setLngLat([comp.longitude, comp.latitude])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
             `<div style="padding: 8px;">
-              <a href="${comp.listingUrl || '#'}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 4px; color: #2563eb; text-decoration: underline;">${comp.address}</a>
+              <a href="${linkUrl}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 4px; color: #2563eb; text-decoration: underline;">${comp.address}</a>
               <p style="font-size: 14px; color: #374151;">$${comp.price.toLocaleString()}</p>
               <p style="font-size: 14px; color: #374151;">${formatPricePerSqft(comp.price, comp.sqft)}/sqft</p>
               ${state?.emphasized ? '<p style="font-size: 12px; color: #10B981; font-weight: 500; margin-top: 4px;">Emphasized</p>' : ""}
@@ -147,6 +150,9 @@ interface CompCardProps {
 function CompCard({ comp, state }: CompCardProps) {
   const isEmphasized = state?.emphasized || false;
 
+  // Generate link: use listing URL if available, otherwise search Google
+  const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
+
   return (
     <div
       className={`rounded-sm border-2 p-4 transition-all ${
@@ -159,7 +165,7 @@ function CompCard({ comp, state }: CompCardProps) {
         <div className="mb-2 flex items-start justify-between">
           <h4 className="flex-1 font-semibold">
             <a
-              href={comp.listingUrl || '#'}
+              href={linkUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-dark dark:text-white hover:text-primary dark:hover:text-primary hover:underline"

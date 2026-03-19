@@ -20,7 +20,7 @@ export class RentCastAPIError extends Error {
 export class RentCastClient {
   private apiKey: string;
   private baseUrl = "https://api.rentcast.io/v1";
-  private timeout = 30000; // 30 second timeout for slow RentCast API responses
+  private timeout = 15000; // 15 second timeout for RentCast API responses
 
   constructor(config: { apiKey: string }) {
     this.apiKey = config.apiKey;

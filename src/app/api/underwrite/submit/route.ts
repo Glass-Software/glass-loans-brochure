@@ -24,6 +24,99 @@ import {
 import { verifyRecaptchaToken } from "@/lib/recaptcha/verify";
 import type { UnderwritingFormData } from "@/types/underwriting";
 
+/**
+ * Validate propertyComps structure to prevent malicious data injection
+ */
+function validatePropertyComps(propertyComps: any): { valid: boolean; error?: string } {
+  if (!propertyComps) {
+    return { valid: true }; // Optional field
+  }
+
+  // Validate top-level structure
+  if (typeof propertyComps.estimatedARV !== 'number' || propertyComps.estimatedARV <= 0) {
+    return { valid: false, error: "Invalid ARV value" };
+  }
+
+  if (typeof propertyComps.asIsValue !== 'number' || propertyComps.asIsValue <= 0) {
+    return { valid: false, error: "Invalid as-is value" };
+  }
+
+  // Validate compsUsed array
+  if (!Array.isArray(propertyComps.compsUsed)) {
+    return { valid: false, error: "Invalid comps array" };
+  }
+
+  // Limit number of comps (prevent DoS)
+  if (propertyComps.compsUsed.length > 50) {
+    return { valid: false, error: "Too many comps" };
+  }
+
+  // Validate each comp
+  for (const comp of propertyComps.compsUsed) {
+    // Required fields
+    if (!comp.address || typeof comp.address !== 'string') {
+      return { valid: false, error: "Invalid comp address" };
+    }
+
+    if (typeof comp.price !== 'number' || comp.price <= 0 || comp.price > 100000000) {
+      return { valid: false, error: "Invalid comp price" };
+    }
+
+    if (typeof comp.sqft !== 'number' || comp.sqft <= 0 || comp.sqft > 50000) {
+      return { valid: false, error: "Invalid comp square footage" };
+    }
+
+    // Sanitize string fields (max length)
+    comp.address = comp.address.substring(0, 500);
+    if (comp.listingUrl && typeof comp.listingUrl === 'string') {
+      comp.listingUrl = comp.listingUrl.substring(0, 1000);
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate compSelectionState to prevent manipulation
+ */
+function validateCompSelectionState(compSelectionState: any, compsCount: number): { valid: boolean; error?: string } {
+  if (!compSelectionState) {
+    return { valid: true }; // Optional field
+  }
+
+  if (!Array.isArray(compSelectionState)) {
+    return { valid: false, error: "Invalid selection state" };
+  }
+
+  // Count active comps
+  let activeCount = 0;
+
+  for (const state of compSelectionState) {
+    // Validate structure
+    if (typeof state.compIndex !== 'number' ||
+        typeof state.emphasized !== 'boolean' ||
+        typeof state.removed !== 'boolean') {
+      return { valid: false, error: "Invalid selection state structure" };
+    }
+
+    // Validate compIndex is within bounds
+    if (state.compIndex < 0 || state.compIndex >= compsCount) {
+      return { valid: false, error: "Invalid comp index" };
+    }
+
+    if (!state.removed) {
+      activeCount++;
+    }
+  }
+
+  // Validate minimum comps requirement
+  if (activeCount < 3) {
+    return { valid: false, error: "At least 3 comps must be selected" };
+  }
+
+  return { valid: true };
+}
+
 /** AI property estimation response shape for OpenRouter generateJSON */
 type PropertyEstimationResponse = {
   estimatedARV: number;
@@ -139,6 +232,38 @@ export async function POST(request: Request) {
           return;
         }
 
+        // Additional validation: String lengths to prevent DB overflow / DoS
+        if (formData.propertyAddress.length > 500) {
+          sendError(controller, "Property address too long", "INVALID_INPUT");
+          controller.close();
+          return;
+        }
+
+        if (formData.additionalDetails && formData.additionalDetails.length > 5000) {
+          sendError(controller, "Additional details too long", "INVALID_INPUT");
+          controller.close();
+          return;
+        }
+
+        // Additional validation: Numeric ranges
+        if (formData.purchasePrice < 1000 || formData.purchasePrice > 100000000) {
+          sendError(controller, "Invalid purchase price", "INVALID_INPUT");
+          controller.close();
+          return;
+        }
+
+        if (formData.squareFeet < 100 || formData.squareFeet > 50000) {
+          sendError(controller, "Invalid square footage", "INVALID_INPUT");
+          controller.close();
+          return;
+        }
+
+        if (formData.rehab < 0 || formData.rehab > 10000000) {
+          sendError(controller, "Invalid rehab budget", "INVALID_INPUT");
+          controller.close();
+          return;
+        }
+
         // Step 3: Verify reCAPTCHA token (5-15%)
         sendProgress(controller, 1, "Verifying security...", 10);
 
@@ -222,7 +347,30 @@ export async function POST(request: Request) {
 
         let aiEstimates;
 
-        // Comps are now fetched in Step 5 and passed from frontend
+        // Validate propertyComps if provided
+        if (propertyComps) {
+          const compsValidation = validatePropertyComps(propertyComps);
+          if (!compsValidation.valid) {
+            sendError(controller, compsValidation.error || "Invalid comp data", "INVALID_COMPS");
+            controller.close();
+            return;
+          }
+        }
+
+        // Validate compSelectionState if provided
+        if (compSelectionState && propertyComps) {
+          const selectionValidation = validateCompSelectionState(
+            compSelectionState,
+            propertyComps.compsUsed.length
+          );
+          if (!selectionValidation.valid) {
+            sendError(controller, selectionValidation.error || "Invalid selection state", "INVALID_SELECTION");
+            controller.close();
+            return;
+          }
+        }
+
+        // Comps are now fetched in Step 6 and passed from frontend
         if (propertyComps && compSelectionState) {
           // Filter comps based on user selection (remove comps marked as "removed")
           const activeComps = propertyComps.compsUsed.filter(

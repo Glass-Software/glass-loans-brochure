@@ -41,3 +41,8 @@ body.modal-open {
     @apply opacity-100;
   }
 }
+
+/* Hide reCAPTCHA badge */
+.grecaptcha-badge {
+  visibility: hidden;
+}

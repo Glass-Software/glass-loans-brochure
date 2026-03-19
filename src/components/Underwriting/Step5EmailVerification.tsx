@@ -134,21 +134,25 @@ export default function Step5EmailVerification() {
     }
 
     setIsSubmitting(true);
-    setIsProcessing(true);
     setError(null);
     setCodeError("");
-    setProgressStep(1);
-    setProgressStatus("Verifying your email...");
-    setProgressPercent(10);
 
     try {
-      // Step 1: Verify email code
+      // Get reCAPTCHA token
+      if (!executeRecaptcha) {
+        throw new Error("reCAPTCHA not available");
+      }
+
+      const recaptchaToken = await executeRecaptcha("verify_code");
+
+      // Verify email code with reCAPTCHA
       const verifyResponse = await fetch("/api/underwrite/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
           verificationCode: code,
+          recaptchaToken,
         }),
       });
 
@@ -165,49 +169,8 @@ export default function Step5EmailVerification() {
       setEmailVerified(true);
       setUsageCount(verifyData.user.usageCount);
 
-      setProgressStatus("Fetching comparable properties...");
-      setProgressPercent(30);
-
-      // Step 2: Fetch comps
-      const compsResponse = await fetch("/api/underwrite/fetch-comps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formData }),
-      });
-
-      if (!compsResponse.ok) {
-        const errorData = await compsResponse.json();
-        throw new Error(errorData.error || "Failed to fetch comps");
-      }
-
-      const compsData = await compsResponse.json();
-
-      if (!compsData.success || !compsData.propertyComps) {
-        throw new Error("No comps data received");
-      }
-
-      setProgressStatus("Loading comp selection...");
-      setProgressPercent(80);
-
-      // Store comps in context
-      setPropertyComps(compsData.propertyComps);
-
-      // Initialize selection state (all normal by default)
-      const initialState = compsData.propertyComps.compsUsed.map((_: any, idx: number) => ({
-        compIndex: idx,
-        emphasized: false,
-        removed: false,
-      }));
-      setCompSelectionState(initialState);
-
-      setProgressPercent(100);
-      setProgressStatus("Complete!");
-
-      // Short delay before proceeding to Step 6
-      setTimeout(() => {
-        setIsProcessing(false);
-        goToNextStep();
-      }, 500);
+      // Move to next step
+      goToNextStep();
     } catch (error: any) {
       console.error("Verification error:", error);
       if (error.message.includes("verification code")) {
@@ -215,15 +178,8 @@ export default function Step5EmailVerification() {
       } else {
         setError(error.message || "An error occurred while processing your request");
       }
-      setIsProcessing(false);
     } finally {
       setIsSubmitting(false);
-      // Reset progress state
-      setTimeout(() => {
-        setProgressStep(0);
-        setProgressStatus("");
-        setProgressPercent(0);
-      }, 1000);
     }
   };
 

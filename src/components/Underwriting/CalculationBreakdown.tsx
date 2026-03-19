@@ -343,61 +343,62 @@ export default function CalculationBreakdown({
               title={`Property Comparables (${propertyComps.compsUsed.length} comps)`}
             >
               <div className="space-y-3">
-                {propertyComps.compsUsed.map((comp: any, index: number) => (
-                  <div
-                    key={index}
-                    className="rounded bg-gray-200 p-3 text-sm dark:bg-gray-900"
-                  >
-                    <div className="font-medium text-gray-900 dark:text-gray-100">
-                      {comp.listingUrl ? (
+                {propertyComps.compsUsed.map((comp: any, index: number) => {
+                  // Generate link: use listing URL if available, otherwise search Google
+                  const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
+
+                  return (
+                    <div
+                      key={index}
+                      className="rounded bg-gray-200 p-3 text-sm dark:bg-gray-900"
+                    >
+                      <div className="font-medium text-gray-900 dark:text-gray-100">
                         <a
-                          href={comp.listingUrl}
+                          href={linkUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline"
                         >
                           {comp.address} ↗
                         </a>
-                      ) : (
-                        comp.address
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Main stats */}
-                    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-gray-700 dark:text-gray-300">
-                      <span>
-                        <strong>Price:</strong> {formatCurrency(comp.price)}
-                      </span>
-                      <span>
-                        <strong>$/sqft:</strong> $
-                        {comp.pricePerSqft ||
-                          Math.round(comp.price / comp.sqft)}
-                      </span>
-                      <span>
-                        <strong>Size:</strong> {formatNumber(comp.sqft)} sqft
-                      </span>
-                      <span>
-                        <strong>Bed/Bath:</strong> {comp.bedrooms}/
-                        {comp.bathrooms}
-                      </span>
-                      {comp.yearBuilt && (
+                      {/* Main stats */}
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-gray-700 dark:text-gray-300">
                         <span>
-                          <strong>Built:</strong> {comp.yearBuilt}
+                          <strong>Price:</strong> {formatCurrency(comp.price)}
                         </span>
-                      )}
-                      {comp.distance && (
                         <span>
-                          <strong>Distance:</strong> {comp.distance}
+                          <strong>$/sqft:</strong> $
+                          {comp.pricePerSqft ||
+                            Math.round(comp.price / comp.sqft)}
                         </span>
-                      )}
-                      {comp.soldDate && (
-                        <span className="col-span-2">
-                          <strong>Sold:</strong> {comp.soldDate}
+                        <span>
+                          <strong>Size:</strong> {formatNumber(comp.sqft)} sqft
                         </span>
-                      )}
+                        <span>
+                          <strong>Bed/Bath:</strong> {comp.bedrooms}/
+                          {comp.bathrooms}
+                        </span>
+                        {comp.yearBuilt && (
+                          <span>
+                            <strong>Built:</strong> {comp.yearBuilt}
+                          </span>
+                        )}
+                        {comp.distance && (
+                          <span>
+                            <strong>Distance:</strong> {comp.distance}
+                          </span>
+                        )}
+                        {comp.soldDate && (
+                          <span className="col-span-2">
+                            <strong>Sold:</strong> {comp.soldDate}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Section>
           )}

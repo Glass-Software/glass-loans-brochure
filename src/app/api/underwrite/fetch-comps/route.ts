@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UnderwritingFormData } from "@/types/underwriting";
 import { getPropertyEstimates } from "@/lib/comps/provider";
+import { normalizeEmail } from "@/lib/email/normalization";
+import { findVerifiedUserByEmail, checkRateLimit } from "@/lib/db/queries";
+
+// Configure route timeout - 60 seconds max
+export const maxDuration = 60;
 
 /**
  * POST /api/underwrite/fetch-comps
  *
  * Fetches comparable properties for the subject property without generating a full report.
- * This endpoint is called from Step 5 (Email Verification) after the user verifies their code.
- * The comps are then displayed in Step 6 (Comp Selection) for user review.
+ * This endpoint is called from Step 6 (Comp Selection) when the user arrives at the step.
+ * The comps are then displayed on a map for user review.
  *
  * Request body:
  * - formData: UnderwritingFormData - Property and loan details
@@ -20,7 +25,39 @@ import { getPropertyEstimates } from "@/lib/comps/provider";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { formData } = body as { formData: UnderwritingFormData };
+    const { formData, email } = body as { formData: UnderwritingFormData; email?: string };
+
+    // Validate authentication
+    if (!email || typeof email !== 'string') {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    // Verify user is authenticated (email verified in Step 5)
+    const normalizedEmail = normalizeEmail(email);
+    const user = findVerifiedUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "User not verified. Please complete email verification first." },
+        { status: 401 }
+      );
+    }
+
+    // Rate limiting (5 requests per hour per IP)
+    const forwarded = request.headers.get("x-forwarded-for");
+    const ip = forwarded ? forwarded.split(",")[0] : "unknown";
+
+    const rateLimit = checkRateLimit(ip, "/api/underwrite/fetch-comps", 5, 60);
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
 
     // Validate form data
     if (!formData) {

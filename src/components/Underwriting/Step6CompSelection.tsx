@@ -7,6 +7,20 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { formatPricePerSqft } from "@/lib/underwriting/calculations";
 import type { PropertyComparable } from "@/types/underwriting";
 
+/**
+ * Escape HTML special characters to prevent XSS attacks
+ */
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m] || m);
+}
+
 export default function Step6CompSelection() {
   const {
     propertyComps,
@@ -21,12 +35,102 @@ export default function Step6CompSelection() {
     setResults,
     setError,
     email,
+    setPropertyComps,
+    setCompSelectionState,
   } = useUnderwriting();
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const compMarkersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingComps, setIsLoadingComps] = useState(!propertyComps);
+
+  // Fetch comps when component mounts (if not already loaded)
+  useEffect(() => {
+    if (propertyComps) return; // Already loaded
+
+    const fetchCompsWithRetry = async (attempt = 1, maxAttempts = 3) => {
+      setIsLoadingComps(true);
+      setIsProcessing(true);
+      setProgressStep(1);
+
+      const attemptText = attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : "";
+      setProgressStatus(`Fetching comparable properties${attemptText}...`);
+      setProgressPercent(30);
+
+      try {
+        // Add 60 second timeout for comp fetching
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+        const compsResponse = await fetch("/api/underwrite/fetch-comps", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formData, email }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!compsResponse.ok) {
+          const errorData = await compsResponse.json();
+          throw new Error(errorData.error || "Failed to fetch comps");
+        }
+
+        const compsData = await compsResponse.json();
+
+        if (!compsData.success || !compsData.propertyComps) {
+          throw new Error("No comps data received");
+        }
+
+        setProgressStatus("Loading comp selection...");
+        setProgressPercent(80);
+
+        // Store comps in context
+        setPropertyComps(compsData.propertyComps);
+
+        // Initialize selection state (all normal by default)
+        const initialState = compsData.propertyComps.compsUsed.map((_: any, idx: number) => ({
+          compIndex: idx,
+          emphasized: false,
+          removed: false,
+        }));
+        setCompSelectionState(initialState);
+
+        setProgressPercent(100);
+        setProgressStatus("Complete!");
+      } catch (error: any) {
+        console.error(`Fetch comps error (attempt ${attempt}):`, error);
+
+        // Retry logic for timeout/network errors
+        const isRetryable = error.name === "AbortError" || error.message.includes("timeout") || error.message.includes("network");
+
+        if (isRetryable && attempt < maxAttempts) {
+          // Exponential backoff: 2s, 4s
+          const delay = Math.pow(2, attempt) * 1000;
+          setProgressStatus(`Retrying in ${delay / 1000}s...`);
+
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return fetchCompsWithRetry(attempt + 1, maxAttempts);
+        }
+
+        // Final failure
+        setError(error.message || "Failed to fetch comparable properties. Please try refreshing the page.");
+      } finally {
+        setIsLoadingComps(false);
+        setIsProcessing(false);
+        // Reset progress
+        setTimeout(() => {
+          setProgressStep(0);
+          setProgressStatus("");
+          setProgressPercent(0);
+        }, 1000);
+      }
+    };
+
+    fetchCompsWithRetry();
+  }, [propertyComps, formData, setPropertyComps, setCompSelectionState, setIsProcessing, setProgressStep, setProgressStatus, setProgressPercent, setError]);
 
   // Expose comp update function to window for map marker clicks
   useEffect(() => {
@@ -112,10 +216,13 @@ export default function Step6CompSelection() {
       const isRemoved = state?.removed || false;
       const isNormal = !isEmphasized && !isRemoved;
 
+      // Generate link: use listing URL if available, otherwise search Google
+      const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
+
       // Create interactive popup with action buttons
       const popupHTML = `
         <div style="padding: 12px; min-width: 220px;">
-          <a href="${comp.listingUrl || '#'}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #2563eb; text-decoration: underline;">${comp.address}</a>
+          <a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #2563eb; text-decoration: underline;">${escapeHtml(comp.address)}</a>
           <p style="font-size: 12px; margin-bottom: 4px; color: #374151;">$${comp.price.toLocaleString()} • $${formatPricePerSqft(comp.price, comp.sqft)}/sqft</p>
           <p style="font-size: 12px; margin-bottom: 12px; color: #6b7280;">${comp.bedrooms} bed • ${comp.bathrooms} bath • ${comp.sqft.toLocaleString()} sqft</p>
           <div class="flex gap-1">
@@ -150,12 +257,14 @@ export default function Step6CompSelection() {
       marker.getElement().style.cursor = 'pointer';
 
       markersRef.current.push(marker);
+      compMarkersRef.current.set(idx, marker);
     });
 
     // Cleanup on unmount
     return () => {
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = [];
+      compMarkersRef.current.clear();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -163,17 +272,14 @@ export default function Step6CompSelection() {
     };
   }, [propertyComps, formData, compSelectionState]);
 
-  // Update marker colors when selection state changes
+  // Update marker colors and popups when selection state changes
   useEffect(() => {
     if (!mapRef.current || !propertyComps) return;
 
-    // Remove old markers (except first one which is subject property)
-    markersRef.current.slice(1).forEach((marker) => marker.remove());
-    markersRef.current = markersRef.current.slice(0, 1);
-
-    // Re-add comp markers with updated colors and popups
+    // Update existing markers instead of recreating them
     propertyComps.compsUsed.forEach((comp, idx) => {
-      if (!comp.latitude || !comp.longitude) return;
+      const marker = compMarkersRef.current.get(idx);
+      if (!marker || !comp.latitude || !comp.longitude) return;
 
       const state = compSelectionState.find((s) => s.compIndex === idx);
       const color = state?.removed
@@ -186,9 +292,23 @@ export default function Step6CompSelection() {
       const isRemoved = state?.removed || false;
       const isNormal = !isEmphasized && !isRemoved;
 
+      // Update marker color by replacing the marker element
+      const element = marker.getElement();
+      const svg = element.querySelector('svg');
+      if (svg) {
+        const path = svg.querySelector('path');
+        if (path) {
+          path.setAttribute('fill', color);
+        }
+      }
+
+      // Generate link: use listing URL if available, otherwise search Google
+      const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
+
+      // Update popup HTML with new state
       const popupHTML = `
         <div style="padding: 12px; min-width: 220px;">
-          <a href="${comp.listingUrl || '#'}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #2563eb; text-decoration: underline;">${comp.address}</a>
+          <a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #2563eb; text-decoration: underline;">${escapeHtml(comp.address)}</a>
           <p style="font-size: 12px; margin-bottom: 4px; color: #374151;">$${comp.price.toLocaleString()} • $${formatPricePerSqft(comp.price, comp.sqft)}/sqft</p>
           <p style="font-size: 12px; margin-bottom: 12px; color: #6b7280;">${comp.bedrooms} bed • ${comp.bathrooms} bath • ${comp.sqft.toLocaleString()} sqft</p>
           <div class="flex gap-1">
@@ -214,14 +334,11 @@ export default function Step6CompSelection() {
         </div>
       `;
 
-      const marker = new mapboxgl.Marker({ color })
-        .setLngLat([comp.longitude, comp.latitude])
-        .setPopup(new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(popupHTML))
-        .addTo(mapRef.current);
-
-      marker.getElement().style.cursor = 'pointer';
-
-      markersRef.current.push(marker);
+      // Update the popup content
+      const popup = marker.getPopup();
+      if (popup) {
+        popup.setHTML(popupHTML);
+      }
     });
   }, [compSelectionState, propertyComps]);
 
@@ -461,6 +578,9 @@ function CompCard({ comp, index, state, onUpdate, disableRemove }: CompCardProps
   const isRemoved = state?.removed || false;
   const isNormal = !isEmphasized && !isRemoved;
 
+  // Generate link: use listing URL if available, otherwise search Google
+  const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
+
   return (
     <div
       className={`rounded-sm border-l-4 p-4 transition-all ${
@@ -476,7 +596,7 @@ function CompCard({ comp, index, state, onUpdate, disableRemove }: CompCardProps
         <div className="flex-1">
           <h4 className="font-semibold mb-2">
             <a
-              href={comp.listingUrl || '#'}
+              href={linkUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-dark dark:text-white hover:text-primary dark:hover:text-primary hover:underline"

@@ -190,13 +190,72 @@ See `.env.example` for full list. Critical for development:
 - `src/app/api/underwrite/fetch-comps/route.ts` - New endpoint
 - `src/app/api/underwrite/verify-code/route.ts` - New endpoint
 
-## Production Deployment Notes
+## Production Deployment
 
-When deploying to production:
-1. Run migrations BEFORE deploying new code
-2. Set all required environment variables in Fly.io secrets
-3. Monitor first few submissions for errors
-4. Check Mapbox usage/quotas if using Step 6
+**IMPORTANT:** Always use the deployment script for production deploys. Migrations are NOT run automatically on deploy due to Fly.io volume mount limitations with `release_command`.
+
+### The Deployment Script (Recommended Method)
+
+Use the deployment script at [scripts/deploy.sh](scripts/deploy.sh) for all production deployments:
+
+```bash
+./scripts/deploy.sh
+```
+
+**What this script does:**
+1. Runs `fly deploy` to deploy your code changes
+2. Prompts you to run database migrations (via SSH on the production machine)
+3. Prompts you to restart the app (recommended after migrations)
+4. Provides a monitoring link to track the deployment
+
+**First-time setup:**
+```bash
+# Make the script executable (if not already)
+chmod +x scripts/deploy.sh
+
+# Ensure it's in version control
+git add scripts/deploy.sh
+```
+
+**When to skip migrations:**
+If you're deploying code changes without any database schema changes, you can answer 'n' when prompted for migrations.
+
+### Manual Deployment (Not Recommended)
+
+Only use this if the deployment script is unavailable:
+
+1. **Deploy the code:**
+   ```bash
+   fly deploy
+   ```
+
+2. **Run migrations manually:**
+   ```bash
+   fly ssh console -a glass-loans-brochure-modified-misty-thunder-1484
+   npx tsx scripts/migrate.ts
+   exit
+   ```
+
+3. **Restart the app:**
+   ```bash
+   fly apps restart glass-loans-brochure-modified-misty-thunder-1484
+   ```
+
+### Why Manual Migrations Are Required
+
+The `release_command` in fly.toml runs on a temporary machine without access to the persistent volume at `/data/`. This causes:
+- Database file not found (creates new empty database)
+- Migrations timeout
+- Production data not accessible
+
+Therefore, migrations must be run via SSH on the actual app machine that has the volume mounted. The deployment script handles this automatically.
+
+### Post-Deployment Checklist
+
+After deploying:
+- Monitor first few submissions for errors
+- Check logs: `fly logs -a glass-loans-brochure-modified-misty-thunder-1484`
+- Verify Mapbox usage/quotas if changes affect Step 6
 
 ## Database Backup
 

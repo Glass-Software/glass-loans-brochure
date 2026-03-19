@@ -4,6 +4,24 @@ interface GaryOpinionProps {
   opinion: string;
 }
 
+// Helper function to render text with inline markdown
+function renderMarkdown(text: string) {
+  // Convert markdown to HTML
+  let html = text
+    // Bold: **text** or __text__
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    // Italic: *text* or _text_ (but not inside words)
+    .replace(/(?<!\w)\*(.+?)\*(?!\w)/g, '<em>$1</em>')
+    .replace(/(?<!\w)_(.+?)_(?!\w)/g, '<em>$1</em>')
+    // Code: `text`
+    .replace(/`(.+?)`/g, '<code class="rounded bg-gray-100 px-1 py-0.5 text-sm dark:bg-gray-800">$1</code>')
+    // Line breaks
+    .replace(/\n/g, '<br />');
+
+  return html;
+}
+
 export default function GaryOpinion({ opinion }: GaryOpinionProps) {
   return (
     <div className="rounded-sm bg-white p-8 shadow-three dark:bg-gray-dark">
@@ -56,9 +74,10 @@ export default function GaryOpinion({ opinion }: GaryOpinionProps) {
                     {headerText}
                   </h2>
                   {content && (
-                    <p className="mb-4 text-base leading-relaxed text-dark dark:text-white">
-                      {content}
-                    </p>
+                    <div
+                      className="mb-4 text-base leading-relaxed text-dark dark:text-white"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+                    />
                   )}
                 </div>
               );
@@ -66,12 +85,11 @@ export default function GaryOpinion({ opinion }: GaryOpinionProps) {
 
             // Regular paragraph (no header)
             return (
-              <p
+              <div
                 key={index}
                 className="mb-4 text-base leading-relaxed text-dark dark:text-white last:mb-0"
-              >
-                {trimmed}
-              </p>
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(trimmed) }}
+              />
             );
           });
         })()}
