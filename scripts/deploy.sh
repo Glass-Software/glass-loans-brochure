@@ -12,8 +12,7 @@ echo ""
 # Step 1: Deploy
 echo "📦 Deploying to Fly.io..."
 # Pass Mapbox API key as build arg (not committed to repo for security)
-# --build-cache enables Docker layer caching for faster builds
-fly deploy --build-cache --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA"
+fly deploy --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA"
 
 echo ""
 echo "✅ Deployment complete!"

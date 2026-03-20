@@ -3,7 +3,6 @@ import { normalizeEmail } from "@/lib/email/normalization";
 import {
   incrementUsageCount,
   createSubmission,
-  checkRateLimit,
   generateReportId,
 } from "@/lib/db/queries";
 import { validateCompleteForm } from "@/lib/underwriting/validation";
@@ -287,31 +286,19 @@ export async function POST(request: Request) {
         }
 
 
-        // Step 4: Get client IP for rate limiting
+        // Step 4: Get client IP (for logging only, rate limiting disabled)
         const forwarded = request.headers.get("x-forwarded-for");
         const ip = forwarded ? forwarded.split(",")[0] : "unknown";
 
-        // Step 5: Check rate limit (10 requests per hour per IP) (15-20%)
-        sendProgress(controller, 1, "Checking rate limits...", 15);
+        // Rate limiting DISABLED - causes database locking issues on Fly.io
+        // const rateLimit = await checkRateLimit(ip, "/api/underwrite/submit", 10, 60);
+        // if (!rateLimit.allowed) {
+        //   sendError(controller, "Rate limit exceeded. Please try again later.", "RATE_LIMIT");
+        //   controller.close();
+        //   return;
+        // }
 
-        const rateLimit = await checkRateLimit(
-          ip,
-          "/api/underwrite/submit",
-          10,
-          60,
-        );
-
-        if (!rateLimit.allowed) {
-          sendError(
-            controller,
-            "Rate limit exceeded. Please try again later.",
-            "RATE_LIMIT",
-          );
-          controller.close();
-          return;
-        }
-
-        // Step 6: Get verified user (20-25%)
+        // Step 5: Get verified user (20-25%)
         sendProgress(controller, 1, "Verifying user...", 20);
 
         const normalizedEmail = normalizeEmail(email);

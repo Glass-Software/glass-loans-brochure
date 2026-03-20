@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeEmail } from "@/lib/email/normalization";
-import { verifyUserCode, checkRateLimit } from "@/lib/db/queries";
+import { verifyUserCode } from "@/lib/db/queries";
 import { verifyRecaptchaToken } from "@/lib/recaptcha/verify";
 
 /**
@@ -59,21 +59,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limiting per IP (fallback protection - 10 attempts per hour)
-    const forwarded = request.headers.get("x-forwarded-for");
-    const ip = forwarded ? forwarded.split(",")[0] : "unknown";
-
-    const rateLimit = checkRateLimit(ip, "/api/underwrite/verify-code", 10, 60);
-
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too many verification attempts. Please try again later.",
-        },
-        { status: 429 }
-      );
-    }
+    // Rate limiting DISABLED - causes database locking issues on Fly.io
+    // const forwarded = request.headers.get("x-forwarded-for");
+    // const ip = forwarded ? forwarded.split(",")[0] : "unknown";
+    // const rateLimit = checkRateLimit(ip, "/api/underwrite/verify-code", 10, 60);
+    // if (!rateLimit.allowed) {
+    //   return NextResponse.json({ success: false, error: "Too many verification attempts. Please try again later." }, { status: 429 });
+    // }
 
     // Normalize email and verify code
     const normalizedEmail = normalizeEmail(email);

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UnderwritingFormData } from "@/types/underwriting";
 import { getPropertyEstimates } from "@/lib/comps/provider";
 import { normalizeEmail } from "@/lib/email/normalization";
-import { findVerifiedUserByEmail, checkRateLimit } from "@/lib/db/queries";
+import { findVerifiedUserByEmail } from "@/lib/db/queries";
 
 // Configure route timeout - 60 seconds max
 export const maxDuration = 60;
@@ -46,18 +46,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limiting (5 requests per hour per IP)
-    const forwarded = request.headers.get("x-forwarded-for");
-    const ip = forwarded ? forwarded.split(",")[0] : "unknown";
-
-    const rateLimit = checkRateLimit(ip, "/api/underwrite/fetch-comps", 5, 60);
-
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { success: false, error: "Too many requests. Please try again later." },
-        { status: 429 }
-      );
-    }
+    // Rate limiting DISABLED - causes database locking issues on Fly.io
+    // const forwarded = request.headers.get("x-forwarded-for");
+    // const ip = forwarded ? forwarded.split(",")[0] : "unknown";
+    // const rateLimit = checkRateLimit(ip, "/api/underwrite/fetch-comps", 5, 60);
+    // if (!rateLimit.allowed) {
+    //   return NextResponse.json({ success: false, error: "Too many requests. Please try again later." }, { status: 429 });
+    // }
 
     // Validate form data
     if (!formData) {

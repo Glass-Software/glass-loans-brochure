@@ -41,8 +41,9 @@ export class OpenRouterClient {
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.OPENROUTER_API_KEY || "";
 
-    if (!this.apiKey) {
-      throw new Error("OpenRouter API key is required");
+    // Don't throw during build time - only validate at runtime
+    if (!this.apiKey && typeof window === 'undefined' && process.env.NODE_ENV !== 'production') {
+      console.warn("OpenRouter API key not found - client will fail at runtime");
     }
   }
 
@@ -52,6 +53,11 @@ export class OpenRouterClient {
   async chatCompletion(
     request: ChatCompletionRequest,
   ): Promise<ChatCompletionResponse> {
+    // Validate API key at runtime
+    if (!this.apiKey) {
+      throw new Error("OpenRouter API key is required");
+    }
+
     // Add 60-second timeout for AI API calls
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);

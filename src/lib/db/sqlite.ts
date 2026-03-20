@@ -128,16 +128,25 @@ export function closeDatabase(): void {
 }
 
 // Graceful shutdown handlers (prevents corruption on server restart)
-if (typeof process !== "undefined") {
+// Only register once to prevent duplicate handlers during build
+let handlersRegistered = false;
+
+if (typeof process !== "undefined" && !handlersRegistered) {
+  handlersRegistered = true;
+
   process.on("SIGINT", () => {
-    console.log("Received SIGINT, closing database...");
-    closeDatabase();
+    if (db) {
+      console.log("Received SIGINT, closing database...");
+      closeDatabase();
+    }
     process.exit(0);
   });
 
   process.on("SIGTERM", () => {
-    console.log("Received SIGTERM, closing database...");
-    closeDatabase();
+    if (db) {
+      console.log("Received SIGTERM, closing database...");
+      closeDatabase();
+    }
     process.exit(0);
   });
 
