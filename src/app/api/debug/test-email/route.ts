@@ -7,12 +7,6 @@ import {
 } from "@/lib/db/queries";
 import sgMail from "@sendgrid/mail";
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY is not set");
-}
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
 /**
  * DEBUG ENDPOINT - Test email sending
  * DELETE THIS IN PRODUCTION after debugging!
@@ -21,6 +15,14 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
  */
 export async function GET(request: Request) {
   try {
+    // Initialize SendGrid at runtime (not build time)
+    if (!process.env.SENDGRID_API_KEY) {
+      return NextResponse.json(
+        { error: "Email service not configured" },
+        { status: 500 }
+      );
+    }
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
     const { searchParams } = new URL(request.url);
     const email = searchParams.get("email");
 

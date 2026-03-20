@@ -2,12 +2,6 @@ import { google } from "googleapis";
 import { NextResponse } from "next/server";
 import sgMail from "@sendgrid/mail";
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY is not set in environment variables");
-}
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
 // Google Sheets configuration
 const auth = new google.auth.GoogleAuth({
   credentials: {
@@ -120,6 +114,15 @@ async function ensureSheetExists() {
 
 export async function POST(request: Request) {
   try {
+    // Initialize SendGrid at runtime (not build time)
+    if (!process.env.SENDGRID_API_KEY) {
+      return NextResponse.json(
+        { error: "Email service not configured" },
+        { status: 500 }
+      );
+    }
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
     const body = await request.json();
     const { name, email, company, message, plan } = body;
     const timestamp = new Date().toISOString();

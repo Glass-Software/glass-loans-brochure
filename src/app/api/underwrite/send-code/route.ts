@@ -10,16 +10,19 @@ import {
 } from "@/lib/db/queries";
 import sgMail from "@sendgrid/mail";
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY is not set");
-}
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
 // Set max duration for Vercel/production deployments
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  // Initialize SendGrid at runtime (not build time)
+  if (!process.env.SENDGRID_API_KEY) {
+    console.error("📧 [send-code] SENDGRID_API_KEY is not set");
+    return NextResponse.json(
+      { error: "Email service not configured" },
+      { status: 500 }
+    );
+  }
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
   console.log("📧 [send-code] POST request received");
 
   try {
