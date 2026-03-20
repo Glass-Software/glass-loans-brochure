@@ -10,8 +10,8 @@ import {
 } from "@/lib/db/queries";
 import sgMail from "@sendgrid/mail";
 
-// Set max duration for Vercel/production deployments
-export const maxDuration = 60;
+// Removed maxDuration export - Vercel-specific, causes issues on Fly.io
+// export const maxDuration = 60;
 
 export async function POST(request: Request) {
   // Initialize SendGrid at runtime (not build time)

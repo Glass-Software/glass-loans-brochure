@@ -4,8 +4,8 @@ import { getPropertyEstimates } from "@/lib/comps/provider";
 import { normalizeEmail } from "@/lib/email/normalization";
 import { findVerifiedUserByEmail } from "@/lib/db/queries";
 
-// Configure route timeout - 60 seconds max
-export const maxDuration = 60;
+// Removed maxDuration - Vercel-specific feature that breaks on Fly.io
+// export const maxDuration = 60;
 
 /**
  * POST /api/underwrite/fetch-comps

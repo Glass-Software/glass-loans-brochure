@@ -48,45 +48,56 @@ export default function Step5EmailVerification() {
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("🔵 [Step5] handleSendCode started");
 
     // Validate email format
     try {
       EmailSchema.parse(email);
+      console.log("🔵 [Step5] Email validation passed:", email);
     } catch {
+      console.log("🔴 [Step5] Email validation failed");
       setEmailError("Please enter a valid email address");
       return;
     }
 
     // Validate marketing consent (REQUIRED)
     if (!marketingConsent) {
+      console.log("🔴 [Step5] Marketing consent not checked");
       setEmailError("You must agree to receive marketing emails to continue");
       return;
     }
 
+    console.log("🔵 [Step5] Starting API request...");
     setEmailError("");
     setSendingCode(true);
 
     try {
+      console.log("🔵 [Step5] Fetching /api/underwrite/send-code...");
       const response = await fetch("/api/underwrite/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, marketingConsent }),
       });
 
+      console.log("🔵 [Step5] Response received:", response.status);
       const data = await response.json();
+      console.log("🔵 [Step5] Response data:", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to send verification code");
       }
 
+      console.log("🔵 [Step5] Code sent successfully");
       setCodeSent(true);
       // Focus first code input
       setTimeout(() => {
         codeInputRefs[0].current?.focus();
       }, 100);
     } catch (error: any) {
+      console.error("🔴 [Step5] Error:", error);
       setEmailError(error.message || "An error occurred");
     } finally {
+      console.log("🔵 [Step5] Finally block - resetting sendingCode");
       setSendingCode(false);
     }
   };

@@ -2,18 +2,26 @@
 
 This document contains important information for Claude (AI assistant) when working on this codebase.
 
+## ⚠️ IMPORTANT: Deployment
+
+**Always use the deployment script for production:**
+```bash
+./scripts/deploy.sh
+```
+
+**DO NOT use `fly deploy` directly** - it will fail or break features without required build arguments. See [Production Deployment](#production-deployment) section below for details.
+
 ## Important: Fly.io App Name
 
 **Production App Name:** `glass-loans-brochure-modified-misty-thunder-1484`
 
-All Fly.io commands must use the `-a` flag with this full app name:
+Fly.io commands must use the `-a` flag with this full app name:
 ```bash
 fly ssh console -a glass-loans-brochure-modified-misty-thunder-1484
 fly logs -a glass-loans-brochure-modified-misty-thunder-1484
-fly deploy
 ```
 
-(Note: `fly deploy` reads the app name from `fly.toml` automatically)
+(Note: For deployment, use `./scripts/deploy.sh` instead of `fly deploy`)
 
 ## Database Migrations
 
@@ -192,21 +200,29 @@ See `.env.example` for full list. Critical for development:
 
 ## Production Deployment
 
-**IMPORTANT:** Always use the deployment script for production deploys. Migrations are NOT run automatically on deploy due to Fly.io volume mount limitations with `release_command`.
+**IMPORTANT:** You MUST use the deployment script for all production deploys. Do NOT use `fly deploy` directly without build arguments.
 
-### The Deployment Script (Recommended Method)
+### The Deployment Script (REQUIRED)
 
-Use the deployment script at [scripts/deploy.sh](scripts/deploy.sh) for all production deployments:
+Use the deployment script at [scripts/deploy.sh](scripts/deploy.sh) for **ALL** production deployments:
 
 ```bash
 ./scripts/deploy.sh
 ```
 
 **What this script does:**
-1. Runs `fly deploy` to deploy your code changes
+1. Runs `fly deploy` with required build arguments (public API keys)
 2. Prompts you to run database migrations (via SSH on the production machine)
 3. Prompts you to restart the app (recommended after migrations)
 4. Provides a monitoring link to track the deployment
+
+**Why you MUST use this script:**
+The script passes required public API keys as build arguments. Without these, the Docker build will fail or features will break:
+- `NEXT_PUBLIC_MAPBOX_API_KEY` - Required for Step 6 comp selection maps
+- `NEXT_PUBLIC_GOOGLE_PLACES_API_KEY` - Required for address autocomplete in Step 1
+- `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` - Required for spam protection
+
+These are **public** keys (safe to embed in client-side code) that are restricted by domain in their dashboards.
 
 **First-time setup:**
 ```bash
@@ -220,14 +236,19 @@ git add scripts/deploy.sh
 **When to skip migrations:**
 If you're deploying code changes without any database schema changes, you can answer 'n' when prompted for migrations.
 
-### Manual Deployment (Not Recommended)
+### Manual Deployment (Only if Script Unavailable)
 
-Only use this if the deployment script is unavailable:
+⚠️ **WARNING:** Only use this if the deployment script is broken or unavailable.
 
-1. **Deploy the code:**
+1. **Deploy the code with ALL build args:**
    ```bash
-   fly deploy --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA"
+   fly deploy \
+     --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA" \
+     --build-arg NEXT_PUBLIC_GOOGLE_PLACES_API_KEY="AIzaSyCzo2p73EbPwY4lTNT9PiF6xU-J4AZX3yQ" \
+     --build-arg NEXT_PUBLIC_RECAPTCHA_SITE_KEY="6Le7v3QsAAAAAP2GYcBPteIjGmNgtNbtGNY6CVR_"
    ```
+
+   **DO NOT** forget any of these build args or features will break!
 
 2. **Run migrations manually:**
    ```bash
@@ -257,23 +278,42 @@ After deploying:
 - Check logs: `fly logs -a glass-loans-brochure-modified-misty-thunder-1484`
 - Verify Mapbox usage/quotas if changes affect Step 6
 
-### Mapbox API Key Configuration
+### Public API Keys Configuration
 
-The Mapbox API key for production is passed as a **build argument** during deployment (not committed to the repository to avoid GitHub secret scanning alerts).
-
-**How it works:**
-1. The `Dockerfile` accepts `NEXT_PUBLIC_MAPBOX_API_KEY` as a build ARG and converts it to ENV
-2. The deployment script (`scripts/deploy.sh`) passes the key via `--build-arg` flag
-3. Next.js embeds the key into the JavaScript bundle during `npm run build`
-
-**Important notes:**
-- The key is a Mapbox **public token** (pk.) which is designed to be client-facing
-- It should be URL-restricted in your Mapbox dashboard to `https://glassloans.io/*`
-- Local development uses the key from `.env.local` (different token restricted to `localhost:3000`)
-- If you need to change the production token, update it in `scripts/deploy.sh`
+**CRITICAL:** All `NEXT_PUBLIC_*` API keys are passed as **build arguments** during deployment (not as Fly secrets).
 
 **Why build-time, not runtime?**
 According to [Next.js documentation](https://nextjs.org/docs/pages/guides/environment-variables), all `NEXT_PUBLIC_` environment variables are "frozen with the value evaluated at build time" and embedded into the client-side bundle. They cannot be changed at runtime.
+
+Fly secrets are only injected at runtime, which is **too late** - the JavaScript bundle is already compiled without them.
+
+**How it works:**
+1. The `Dockerfile` accepts build ARGs and converts them to ENV variables
+2. The deployment script (`scripts/deploy.sh`) passes all keys via `--build-arg` flags
+3. Next.js embeds the keys into the JavaScript bundle during `npm run build`
+4. The `.dockerignore` excludes `.env` files to prevent accidental key leakage
+
+**Public keys currently required:**
+- `NEXT_PUBLIC_MAPBOX_API_KEY` - Mapbox public token (pk.)
+  - Restricted in Mapbox dashboard to `https://glassloans.io/*`
+  - Used for Step 6 comp selection maps
+- `NEXT_PUBLIC_GOOGLE_PLACES_API_KEY` - Google Places API key
+  - Restricted in Google Cloud Console to `https://glassloans.io/*` and Places API only
+  - Used for address autocomplete in Step 1
+- `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` - reCAPTCHA v3 site key
+  - Public by design (paired with server-side secret key)
+  - Used for spam protection
+
+**Security:**
+These keys are **meant** to be public (visible in browser JavaScript). They are secured via:
+- Domain/URL restrictions in their respective dashboards
+- API restrictions (e.g., only allow Places API for Google key)
+- Server-side validation (reCAPTCHA secret key stays server-only)
+
+**Server-only secrets** (OpenRouter, SendGrid, etc.) remain as Fly secrets and are NEVER passed as build args.
+
+**Local development:**
+Uses keys from `.env.local` (different tokens restricted to `localhost:3000`)
 
 ## Database Backup
 
