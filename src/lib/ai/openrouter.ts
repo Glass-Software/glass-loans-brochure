@@ -58,6 +58,9 @@ export class OpenRouterClient {
       throw new Error("OpenRouter API key is required");
     }
 
+    const startTime = Date.now();
+    console.log(`📡 [OpenRouter] Request starting - Model: ${request.model}, Temp: ${request.temperature}, MaxTokens: ${request.max_tokens}`);
+
     // Add 60-second timeout for AI API calls
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -82,12 +85,22 @@ export class OpenRouterClient {
         throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
       }
 
-      return response.json();
+      const result = await response.json();
+      const duration = Date.now() - startTime;
+
+      console.log(`📡 [OpenRouter] Response received - Duration: ${duration}ms (${(duration / 1000).toFixed(2)}s), Tokens: ${result.usage?.total_tokens || 'N/A'} (prompt: ${result.usage?.prompt_tokens || 'N/A'}, completion: ${result.usage?.completion_tokens || 'N/A'})`);
+
+      return result;
     } catch (error: any) {
       clearTimeout(timeoutId);
+      const duration = Date.now() - startTime;
+
       if (error.name === 'AbortError') {
+        console.error(`📡 [OpenRouter] Request TIMED OUT after ${duration}ms - Model: ${request.model}`);
         throw new Error('OpenRouter API request timed out after 60 seconds');
       }
+
+      console.error(`📡 [OpenRouter] Request FAILED after ${duration}ms - Model: ${request.model}, Error: ${error.message}`);
       throw error;
     }
   }
@@ -110,6 +123,8 @@ export class OpenRouterClient {
       maxTokens = 2000,
       systemPrompt,
     } = options;
+
+    console.log(`🎯 [OpenRouter] generateText() called with model: ${model}`);
 
     const messages: ChatMessage[] = [];
 
@@ -141,6 +156,7 @@ export class OpenRouterClient {
       systemPrompt?: string;
     } = {},
   ): Promise<T> {
+    console.log(`🎯 [OpenRouter] generateJSON() called with model: ${options.model || "x-ai/grok-4.1-fast"}`);
     const text = await this.generateText(prompt, options);
 
     // Try to extract JSON from the response

@@ -12,13 +12,10 @@ import {
 } from "@/lib/underwriting/calculations";
 import { openRouterClient } from "@/lib/ai/openrouter";
 import {
-  generatePropertyEstimationPrompt,
   generateGaryValuationPrompt,
   generateGaryOpinionPrompt,
-  PROPERTY_ESTIMATION_SYSTEM_PROMPT,
   GARY_VALUATION_SYSTEM_PROMPT,
   GARY_OPINION_SYSTEM_PROMPT,
-  generateMockGaryOpinion,
 } from "@/lib/ai/prompts";
 import { verifyRecaptchaToken } from "@/lib/recaptcha/verify";
 import type { UnderwritingFormData } from "@/types/underwriting";
@@ -26,17 +23,26 @@ import type { UnderwritingFormData } from "@/types/underwriting";
 /**
  * Validate propertyComps structure to prevent malicious data injection
  */
-function validatePropertyComps(propertyComps: any): { valid: boolean; error?: string } {
+function validatePropertyComps(propertyComps: any): {
+  valid: boolean;
+  error?: string;
+} {
   if (!propertyComps) {
     return { valid: true }; // Optional field
   }
 
   // Validate top-level structure
-  if (typeof propertyComps.estimatedARV !== 'number' || propertyComps.estimatedARV <= 0) {
+  if (
+    typeof propertyComps.estimatedARV !== "number" ||
+    propertyComps.estimatedARV <= 0
+  ) {
     return { valid: false, error: "Invalid ARV value" };
   }
 
-  if (typeof propertyComps.asIsValue !== 'number' || propertyComps.asIsValue <= 0) {
+  if (
+    typeof propertyComps.asIsValue !== "number" ||
+    propertyComps.asIsValue <= 0
+  ) {
     return { valid: false, error: "Invalid as-is value" };
   }
 
@@ -53,21 +59,25 @@ function validatePropertyComps(propertyComps: any): { valid: boolean; error?: st
   // Validate each comp
   for (const comp of propertyComps.compsUsed) {
     // Required fields
-    if (!comp.address || typeof comp.address !== 'string') {
+    if (!comp.address || typeof comp.address !== "string") {
       return { valid: false, error: "Invalid comp address" };
     }
 
-    if (typeof comp.price !== 'number' || comp.price <= 0 || comp.price > 100000000) {
+    if (
+      typeof comp.price !== "number" ||
+      comp.price <= 0 ||
+      comp.price > 100000000
+    ) {
       return { valid: false, error: "Invalid comp price" };
     }
 
-    if (typeof comp.sqft !== 'number' || comp.sqft <= 0 || comp.sqft > 50000) {
+    if (typeof comp.sqft !== "number" || comp.sqft <= 0 || comp.sqft > 50000) {
       return { valid: false, error: "Invalid comp square footage" };
     }
 
     // Sanitize string fields (max length)
     comp.address = comp.address.substring(0, 500);
-    if (comp.listingUrl && typeof comp.listingUrl === 'string') {
+    if (comp.listingUrl && typeof comp.listingUrl === "string") {
       comp.listingUrl = comp.listingUrl.substring(0, 1000);
     }
   }
@@ -78,7 +88,10 @@ function validatePropertyComps(propertyComps: any): { valid: boolean; error?: st
 /**
  * Validate compSelectionState to prevent manipulation
  */
-function validateCompSelectionState(compSelectionState: any, compsCount: number): { valid: boolean; error?: string } {
+function validateCompSelectionState(
+  compSelectionState: any,
+  compsCount: number,
+): { valid: boolean; error?: string } {
   if (!compSelectionState) {
     return { valid: true }; // Optional field
   }
@@ -92,9 +105,11 @@ function validateCompSelectionState(compSelectionState: any, compsCount: number)
 
   for (const state of compSelectionState) {
     // Validate structure
-    if (typeof state.compIndex !== 'number' ||
-        typeof state.emphasized !== 'boolean' ||
-        typeof state.removed !== 'boolean') {
+    if (
+      typeof state.compIndex !== "number" ||
+      typeof state.emphasized !== "boolean" ||
+      typeof state.removed !== "boolean"
+    ) {
       return { valid: false, error: "Invalid selection state structure" };
     }
 
@@ -115,15 +130,6 @@ function validateCompSelectionState(compSelectionState: any, compsCount: number)
 
   return { valid: true };
 }
-
-/** AI property estimation response shape for OpenRouter generateJSON */
-type PropertyEstimationResponse = {
-  estimatedARV: number;
-  asIsValue: number;
-  monthlyRent: number;
-  compsUsed: Array<{ address: string; price: number; sqft: number }>;
-  marketAnalysis: string;
-};
 
 /**
  * Progress event types for streaming
@@ -198,13 +204,8 @@ function sendError(
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const {
-    email,
-    recaptchaToken,
-    formData,
-    propertyComps,
-    compSelectionState,
-  } = body;
+  const { email, recaptchaToken, formData, propertyComps, compSelectionState } =
+    body;
 
   // Create a readable stream for progress updates
   const stream = new ReadableStream({
@@ -238,14 +239,20 @@ export async function POST(request: Request) {
           return;
         }
 
-        if (formData.additionalDetails && formData.additionalDetails.length > 5000) {
+        if (
+          formData.additionalDetails &&
+          formData.additionalDetails.length > 5000
+        ) {
           sendError(controller, "Additional details too long", "INVALID_INPUT");
           controller.close();
           return;
         }
 
         // Additional validation: Numeric ranges
-        if (formData.purchasePrice < 1000 || formData.purchasePrice > 100000000) {
+        if (
+          formData.purchasePrice < 1000 ||
+          formData.purchasePrice > 100000000
+        ) {
           sendError(controller, "Invalid purchase price", "INVALID_INPUT");
           controller.close();
           return;
@@ -264,13 +271,23 @@ export async function POST(request: Request) {
         }
 
         // Step 3: Verify reCAPTCHA token (skip if not provided - for local development)
-        let recaptchaVerification: { success: boolean; score?: number; error?: string } = { success: true, score: 0 };
+        let recaptchaVerification: {
+          success: boolean;
+          score?: number;
+          error?: string;
+        } = { success: true, score: 0 };
         if (recaptchaToken) {
           sendProgress(controller, 1, "Verifying security...", 10);
-          recaptchaVerification = await verifyRecaptchaToken(recaptchaToken, 0.5);
+          recaptchaVerification = await verifyRecaptchaToken(
+            recaptchaToken,
+            0.5,
+          );
 
           if (!recaptchaVerification.success) {
-            console.warn("reCAPTCHA verification failed:", recaptchaVerification.error);
+            console.warn(
+              "reCAPTCHA verification failed:",
+              recaptchaVerification.error,
+            );
             sendError(
               controller,
               "Security verification failed. Please try again.",
@@ -280,7 +297,6 @@ export async function POST(request: Request) {
             return;
           }
         }
-
 
         // Step 4: Get client IP (for logging only, rate limiting disabled)
         const forwarded = request.headers.get("x-forwarded-for");
@@ -334,7 +350,11 @@ export async function POST(request: Request) {
         if (propertyComps) {
           const compsValidation = validatePropertyComps(propertyComps);
           if (!compsValidation.valid) {
-            sendError(controller, compsValidation.error || "Invalid comp data", "INVALID_COMPS");
+            sendError(
+              controller,
+              compsValidation.error || "Invalid comp data",
+              "INVALID_COMPS",
+            );
             controller.close();
             return;
           }
@@ -344,10 +364,14 @@ export async function POST(request: Request) {
         if (compSelectionState && propertyComps) {
           const selectionValidation = validateCompSelectionState(
             compSelectionState,
-            propertyComps.compsUsed.length
+            propertyComps.compsUsed.length,
           );
           if (!selectionValidation.valid) {
-            sendError(controller, selectionValidation.error || "Invalid selection state", "INVALID_SELECTION");
+            sendError(
+              controller,
+              selectionValidation.error || "Invalid selection state",
+              "INVALID_SELECTION",
+            );
             controller.close();
             return;
           }
@@ -470,69 +494,19 @@ export async function POST(request: Request) {
               throw new Error("Primary data source not configured");
             }
           } catch (dataError: any) {
-            // Fallback to AI estimation if Realie.ai failed or unavailable
-            console.warn("[Server] Falling back to AI estimates");
-            sendProgress(
-              controller,
-              2,
-              "Using AI estimation (no market data available)...",
-              30,
-            );
+            // Fallback to simple heuristics if Realie.ai failed or unavailable
+            console.warn("[Server] Falling back to heuristic estimates");
+            sendProgress(controller, 2, "Using estimated values...", 30);
 
-            try {
-              if (process.env.OPENROUTER_API_KEY) {
-                const estimationPrompt = generatePropertyEstimationPrompt(
-                  formData as UnderwritingFormData,
-                );
-
-                const aiResponse =
-                  await openRouterClient.generateJSON<PropertyEstimationResponse>(
-                    estimationPrompt,
-                    {
-                      systemPrompt: PROPERTY_ESTIMATION_SYSTEM_PROMPT,
-                      temperature: 0.3,
-                      maxTokens: 2000,
-                    },
-                  );
-
-                // Add fallback markers
-                aiEstimates = {
-                  ...aiResponse,
-                  batchDataUsed: false,
-                  valuationMethod: "ai_fallback",
-                  compTier: 3, // Mark as lowest confidence
-                };
-              } else {
-                // Ultimate fallback: Simple heuristics
-                console.warn(
-                  "No API keys configured, using heuristic estimates",
-                );
-                aiEstimates = {
-                  estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
-                  asIsValue: formData.purchasePrice * 0.85,
-                  monthlyRent:
-                    Math.round((formData.purchasePrice * 0.01) / 10) * 10,
-                  compsUsed: [],
-                  marketAnalysis:
-                    "No real estate data available - using estimated values based on purchase price and rehab budget.",
-                  batchDataUsed: false,
-                  valuationMethod: "heuristic",
-                };
-              }
-            } catch (aiError: any) {
-              console.error("AI estimation also failed:", aiError);
-
-              // Ultimate fallback
-              aiEstimates = {
-                estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
-                asIsValue: formData.purchasePrice * 0.85,
-                compsUsed: [],
-                marketAnalysis:
-                  "Property estimates temporarily unavailable - using conservative estimates.",
-                batchDataUsed: false,
-                valuationMethod: "heuristic",
-              };
-            }
+            aiEstimates = {
+              estimatedARV: formData.purchasePrice + formData.rehab * 1.5,
+              asIsValue: formData.purchasePrice * 0.85,
+              compsUsed: [],
+              marketAnalysis:
+                "No real estate data available - using estimated values based on purchase price and rehab budget.",
+              batchDataUsed: false,
+              valuationMethod: "heuristic",
+            };
 
             sendProgress(controller, 2, "Fallback estimates complete", 50);
           }
@@ -560,7 +534,7 @@ export async function POST(request: Request) {
         sendProgress(
           controller,
           4,
-          "Gary is analyzing comparable sales...",
+          "Gary is calculating property values...",
           65,
         );
 
@@ -572,6 +546,11 @@ export async function POST(request: Request) {
         try {
           if (process.env.OPENROUTER_API_KEY) {
             // CALL 1: Get valuations from Gary (low temperature for consistency)
+            console.log(
+              "🤖 [OPENROUTER CALL 1 START] Valuation call starting...",
+            );
+            const valuationStartTime = Date.now();
+
             const valuationPrompt = generateGaryValuationPrompt(
               formData as UnderwritingFormData,
               aiEstimates.compsUsed,
@@ -587,21 +566,30 @@ export async function POST(request: Request) {
               maxTokens: 500, // Short response, just JSON
             });
 
+            const valuationDuration = Date.now() - valuationStartTime;
+            console.log(
+              `🤖 [OPENROUTER CALL 1 COMPLETE] Valuation call took ${valuationDuration}ms (${(valuationDuration / 1000).toFixed(2)}s)`,
+            );
+
             garyAsIsValue = valuationResponse.asIsValue;
             garyEstimatedARV = valuationResponse.estimatedARV;
 
             // Validate values are reasonable (basic sanity check)
             if (garyAsIsValue <= 0 || garyEstimatedARV <= 0) {
-              throw new Error("Invalid valuations from Gary (values must be positive)");
+              throw new Error(
+                "Invalid valuations from Gary (values must be positive)",
+              );
             }
             if (garyEstimatedARV < garyAsIsValue * 0.8) {
-              console.warn("Warning: Gary's ARV is significantly lower than as-is value");
+              console.warn(
+                "Warning: Gary's ARV is significantly lower than as-is value",
+              );
             }
 
             sendProgress(
               controller,
               4,
-              `Gary calculated ARV: $${(garyEstimatedARV / 1000).toFixed(0)}k`,
+              `Property valuation complete: $${(garyEstimatedARV / 1000).toFixed(0)}k ARV`,
               75,
             );
 
@@ -626,6 +614,11 @@ export async function POST(request: Request) {
               formData as UnderwritingFormData,
             );
 
+            console.log(
+              "🤖 [OPENROUTER CALL 2 START] Opinion call starting...",
+            );
+            const opinionStartTime = Date.now();
+
             const opinionPrompt = generateGaryOpinionPrompt(
               formData as UnderwritingFormData,
               garyCalculationsUpdated,
@@ -644,14 +637,24 @@ export async function POST(request: Request) {
               maxTokens: 1500,
             });
 
+            const opinionDuration = Date.now() - opinionStartTime;
+            console.log(
+              `🤖 [OPENROUTER CALL 2 COMPLETE] Opinion call took ${opinionDuration}ms (${(opinionDuration / 1000).toFixed(2)}s)`,
+            );
+
             // Update garyCalculations for later use
             garyCalculations = garyCalculationsUpdated;
-
           } else {
             // Fallback: Use automated calculation if no API key
-            console.log("No OPENROUTER_API_KEY, using automated calculations...");
+            console.log(
+              "No OPENROUTER_API_KEY, using automated calculations...",
+            );
             const { calculateARV } = await import("@/lib/rentcast/comps");
-            garyEstimatedARV = calculateARV(aiEstimates.compsUsed, formData.rehab, formData.squareFeet);
+            garyEstimatedARV = calculateARV(
+              aiEstimates.compsUsed,
+              formData.rehab,
+              formData.squareFeet,
+            );
             garyAsIsValue = apiAsIsValue; // Use API value as fallback
 
             // Recalculate with automated valuations
@@ -660,21 +663,23 @@ export async function POST(request: Request) {
               garyEstimatedARV,
               garyAsIsValue,
             );
-            finalScore = calculateFinalScore(garyCalculations, formData as UnderwritingFormData);
-
-            garyOpinion = generateMockGaryOpinion(
-              formData as UnderwritingFormData,
+            finalScore = calculateFinalScore(
               garyCalculations,
-              formData.userEstimatedArv,
-              garyEstimatedARV,
+              formData as UnderwritingFormData,
             );
+
+            garyOpinion = "Analysis based on automated calculations using comparable properties. ARV and as-is valuations have been calculated using market data.";
           }
         } catch (garyError: any) {
           console.error("Gary error:", garyError);
           // Fallback to automated calculation
           console.log("Falling back to automated calculation...");
           const { calculateARV } = await import("@/lib/rentcast/comps");
-          garyEstimatedARV = calculateARV(aiEstimates.compsUsed, formData.rehab, formData.squareFeet);
+          garyEstimatedARV = calculateARV(
+            aiEstimates.compsUsed,
+            formData.rehab,
+            formData.squareFeet,
+          );
           garyAsIsValue = apiAsIsValue;
 
           // Recalculate with fallback valuations
@@ -683,14 +688,12 @@ export async function POST(request: Request) {
             garyEstimatedARV,
             garyAsIsValue,
           );
-          finalScore = calculateFinalScore(garyCalculations, formData as UnderwritingFormData);
-
-          garyOpinion = generateMockGaryOpinion(
-            formData as UnderwritingFormData,
+          finalScore = calculateFinalScore(
             garyCalculations,
-            formData.userEstimatedArv,
-            garyEstimatedARV,
+            formData as UnderwritingFormData,
           );
+
+          garyOpinion = "Analysis based on automated calculations using comparable properties. ARV and as-is valuations have been calculated using market data.";
         }
 
         // Update aiEstimates with Gary's valuations
@@ -715,8 +718,14 @@ export async function POST(request: Request) {
           propertyState: formData.propertyState,
           propertyZip: formData.propertyZip,
           propertyCounty: formData.propertyCounty,
-          propertyLatitude: aiEstimates?.subjectLatitude ?? propertyComps?.subjectLatitude ?? formData.propertyLatitude,
-          propertyLongitude: aiEstimates?.subjectLongitude ?? propertyComps?.subjectLongitude ?? formData.propertyLongitude,
+          propertyLatitude:
+            aiEstimates?.subjectLatitude ??
+            propertyComps?.subjectLatitude ??
+            formData.propertyLatitude,
+          propertyLongitude:
+            aiEstimates?.subjectLongitude ??
+            propertyComps?.subjectLongitude ??
+            formData.propertyLongitude,
           purchasePrice: formData.purchasePrice,
           rehab: formData.rehab,
           squareFeet: formData.squareFeet,

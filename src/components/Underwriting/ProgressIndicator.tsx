@@ -14,8 +14,9 @@ export default function ProgressIndicator() {
     { number: 1, label: "Verifying" },
     { number: 2, label: "Researching Comps" },
     { number: 3, label: "Calculating Metrics" },
-    { number: 4, label: "Gary's Opinion" },
-    { number: 5, label: "Finalizing" },
+    { number: 4, label: "Gary's Valuation" },
+    { number: 5, label: "Gary's Opinion" },
+    { number: 6, label: "Finalizing" },
   ];
 
   return (
@@ -131,7 +132,7 @@ export default function ProgressIndicator() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-body-color dark:text-body-color-dark">
-          This usually takes 30-40 seconds. Please don&apos;t close this window.
+          Please give Gary 60-90 seconds to draft your report!
         </p>
       </div>
     </div>
