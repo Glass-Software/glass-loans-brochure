@@ -69,16 +69,24 @@ ${allComps
     const state = compSelectionState?.find((s: any) => s.compIndex === i);
     const marker = state?.removed ? " ❌ REMOVED" : state?.emphasized ? " ⭐ EMPHASIZED" : "";
 
-    let line = `${i + 1}. ${comp.address} - $${comp.price?.toLocaleString() || "N/A"}${marker}`;
-    if (comp.sqft)
-      line += `\n   ${comp.bedrooms || "?"} bed / ${comp.bathrooms || "?"} bath, ${comp.sqft.toLocaleString()} sqft${comp.yearBuilt ? `, built ${comp.yearBuilt}` : ""}`;
-    if (comp.pricePerSqft)
-      line += `\n   $${comp.pricePerSqft.toFixed(2)}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""}`;
-    if (comp.correlation)
-      line += `\n   Similarity score: ${(comp.correlation * 100).toFixed(0)}%`;
-    return line;
+    // Build single-line format with pipe separators
+    const parts = [`${i + 1}. ${comp.address} - $${comp.price?.toLocaleString() || "N/A"}${marker}`];
+
+    if (comp.sqft) {
+      parts.push(`${comp.bedrooms || "?"} bed / ${comp.bathrooms || "?"} bath, ${comp.sqft.toLocaleString()} sqft${comp.yearBuilt ? `, built ${comp.yearBuilt}` : ""}`);
+    }
+
+    if (comp.pricePerSqft) {
+      parts.push(`$${comp.pricePerSqft.toFixed(2)}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""}`);
+    }
+
+    if (comp.correlation) {
+      parts.push(`correlation: ${(comp.correlation * 100).toFixed(0)}%`);
+    }
+
+    return parts.join(" | ");
   })
-  .join("\n\n")}
+  .join("\n")}
 
 **COMP WEIGHTING GUIDELINES:**
 
@@ -297,16 +305,24 @@ ${compsUsed
     const selectionState = compSelectionState?.find((s) => s.compIndex === i);
     const isEmphasized = selectionState?.emphasized;
 
-    let compLine = `${i + 1}. ${comp.address} - $${comp.price?.toLocaleString() || "N/A"}${isEmphasized ? " ⭐ EMPHASIZED BY BORROWER" : ""}`;
-    if (comp.sqft)
-      compLine += `\n   ${comp.bedrooms || "?"} bed / ${comp.bathrooms || "?"} bath, ${comp.sqft.toLocaleString()} sqft${comp.yearBuilt ? `, built ${comp.yearBuilt}` : ""}`;
-    if (comp.pricePerSqft)
-      compLine += `\n   $${comp.pricePerSqft.toFixed(2)}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""}`;
-    if (comp.correlation)
-      compLine += `\n   Similarity score: ${(comp.correlation * 100).toFixed(0)}%`;
-    return compLine;
+    // Build single-line format with pipe separators
+    const parts = [`${i + 1}. ${comp.address} - $${comp.price?.toLocaleString() || "N/A"}${isEmphasized ? " ⭐ EMPHASIZED" : ""}`];
+
+    if (comp.sqft) {
+      parts.push(`${comp.bedrooms || "?"} bed / ${comp.bathrooms || "?"} bath, ${comp.sqft.toLocaleString()} sqft${comp.yearBuilt ? `, built ${comp.yearBuilt}` : ""}`);
+    }
+
+    if (comp.pricePerSqft) {
+      parts.push(`$${comp.pricePerSqft.toFixed(2)}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""}`);
+    }
+
+    if (comp.correlation) {
+      parts.push(`correlation: ${(comp.correlation * 100).toFixed(0)}%`);
+    }
+
+    return parts.join(" | ");
   })
-  .join("\n\n")}`
+  .join("\n")}`
     : `⚠️ Limited comparable sales data available - recommend independent verification.`
 }
 
