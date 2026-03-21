@@ -13,8 +13,9 @@ echo ""
 echo "📦 Deploying to Fly.io..."
 # Pass public API keys as build args (required for client-side bundle)
 # These are public keys restricted by domain in their respective dashboards
+# Using --local-only to build locally (Fly remote builder having issues)
 fly deploy \
-  --legacy-remote-builder \
+  --local-only \
   --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA" \
   --build-arg NEXT_PUBLIC_GOOGLE_PLACES_API_KEY="AIzaSyCzo2p73EbPwY4lTNT9PiF6xU-J4AZX3yQ" \
   --build-arg NEXT_PUBLIC_RECAPTCHA_SITE_KEY="6Le7v3QsAAAAAP2GYcBPteIjGmNgtNbtGNY6CVR_"

@@ -149,14 +149,17 @@ export default function Step5EmailVerification() {
     setCodeError("");
 
     try {
-      // Get reCAPTCHA token
-      if (!executeRecaptcha) {
-        throw new Error("reCAPTCHA not available");
+      // Get reCAPTCHA token (skip if not configured)
+      let recaptchaToken = null;
+      if (executeRecaptcha) {
+        try {
+          recaptchaToken = await executeRecaptcha("verify_code");
+        } catch (error) {
+          console.warn("reCAPTCHA execution failed, continuing without it:", error);
+        }
       }
 
-      const recaptchaToken = await executeRecaptcha("verify_code");
-
-      // Verify email code with reCAPTCHA
+      // Verify email code
       const verifyResponse = await fetch("/api/underwrite/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

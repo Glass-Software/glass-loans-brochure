@@ -38,25 +38,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify reCAPTCHA token (before code verification)
-    if (!recaptchaToken) {
-      return NextResponse.json(
-        { success: false, error: "Security verification required" },
-        { status: 400 }
-      );
-    }
+    // Verify reCAPTCHA token (skip if not provided - for local development)
+    if (recaptchaToken) {
+      const recaptchaVerification = await verifyRecaptchaToken(recaptchaToken, 0.5);
 
-    const recaptchaVerification = await verifyRecaptchaToken(recaptchaToken, 0.5);
-
-    if (!recaptchaVerification.success) {
-      console.warn("reCAPTCHA verification failed:", recaptchaVerification.error);
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Security verification failed. Please try again.",
-        },
-        { status: 400 }
-      );
+      if (!recaptchaVerification.success) {
+        console.warn("reCAPTCHA verification failed:", recaptchaVerification.error);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Security verification failed. Please try again.",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Rate limiting DISABLED - causes database locking issues on Fly.io

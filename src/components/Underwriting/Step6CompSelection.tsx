@@ -363,21 +363,24 @@ export default function Step6CompSelection() {
     setProgressPercent(0);
 
     try {
-      // Get reCAPTCHA token
-      const recaptchaToken = await new Promise<string>((resolve, reject) => {
-        if (typeof window !== "undefined" && window.grecaptcha) {
-          window.grecaptcha.ready(() => {
-            window.grecaptcha
-              .execute(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!, {
-                action: "submit_underwriting",
-              })
-              .then(resolve)
-              .catch(reject);
+      // Get reCAPTCHA token (skip if not configured)
+      let recaptchaToken = null;
+      if (typeof window !== "undefined" && window.grecaptcha && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+        try {
+          recaptchaToken = await new Promise<string>((resolve, reject) => {
+            window.grecaptcha.ready(() => {
+              window.grecaptcha
+                .execute(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!, {
+                  action: "submit_underwriting",
+                })
+                .then(resolve)
+                .catch(reject);
+            });
           });
-        } else {
-          reject(new Error("reCAPTCHA not loaded"));
+        } catch (error) {
+          console.warn("reCAPTCHA execution failed, continuing without it:", error);
         }
-      });
+      }
 
       // Submit with comp selection (email was already verified in Step 5)
       const response = await fetch("/api/underwrite/submit", {

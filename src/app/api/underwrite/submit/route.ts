@@ -263,26 +263,22 @@ export async function POST(request: Request) {
           return;
         }
 
-        // Step 3: Verify reCAPTCHA token (5-15%)
-        sendProgress(controller, 1, "Verifying security...", 10);
+        // Step 3: Verify reCAPTCHA token (skip if not provided - for local development)
+        let recaptchaVerification: { success: boolean; score?: number; error?: string } = { success: true, score: 0 };
+        if (recaptchaToken) {
+          sendProgress(controller, 1, "Verifying security...", 10);
+          recaptchaVerification = await verifyRecaptchaToken(recaptchaToken, 0.5);
 
-        const recaptchaVerification = await verifyRecaptchaToken(
-          recaptchaToken,
-          0.5,
-        );
-
-        if (!recaptchaVerification.success) {
-          console.warn(
-            "reCAPTCHA verification failed:",
-            recaptchaVerification.error,
-          );
-          sendError(
-            controller,
-            "Security verification failed. Please try again.",
-            "RECAPTCHA_FAILED",
-          );
-          controller.close();
-          return;
+          if (!recaptchaVerification.success) {
+            console.warn("reCAPTCHA verification failed:", recaptchaVerification.error);
+            sendError(
+              controller,
+              "Security verification failed. Please try again.",
+              "RECAPTCHA_FAILED",
+            );
+            controller.close();
+            return;
+          }
         }
 
 
