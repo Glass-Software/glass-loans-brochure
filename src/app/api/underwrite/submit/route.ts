@@ -563,7 +563,7 @@ export async function POST(request: Request) {
             }>(valuationPrompt, {
               systemPrompt: GARY_VALUATION_SYSTEM_PROMPT,
               temperature: 0.15, // Low temperature for consistent calculations
-              maxTokens: 500, // Short response, just JSON
+              maxTokens: 2000, // Increased from 500 - was causing 90+ second delays
             });
 
             const valuationDuration = Date.now() - valuationStartTime;
@@ -634,7 +634,7 @@ export async function POST(request: Request) {
             garyOpinion = await openRouterClient.generateText(opinionPrompt, {
               systemPrompt: GARY_OPINION_SYSTEM_PROMPT,
               temperature: 0.7, // Higher temperature for natural, conversational writing
-              maxTokens: 1500,
+              maxTokens: 2000,
             });
 
             const opinionDuration = Date.now() - opinionStartTime;
