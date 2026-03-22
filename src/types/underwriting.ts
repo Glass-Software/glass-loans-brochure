@@ -2,7 +2,7 @@
 // Form Input Types
 // ============================================================================
 
-export type PropertyCondition = "Good" | "Bad" | "Really Bad";
+export type PropertyCondition = "Great (Like New)" | "Good" | "Bad" | "Really Bad";
 export type RenovationLevel =
   | "Light ≤$30/SF"
   | "Medium $31-50/SF"

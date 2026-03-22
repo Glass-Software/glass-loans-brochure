@@ -76,6 +76,7 @@ export default function Step2PropertyCondition() {
               className={selectClass}
             >
               <option value="">Select condition...</option>
+              <option value="Great (Like New)">Great (Like New)</option>
               <option value="Good">Good</option>
               <option value="Bad">Bad</option>
               <option value="Really Bad">Really Bad</option>
@@ -83,6 +84,12 @@ export default function Step2PropertyCondition() {
             {errors.propertyCondition && (
               <p className={errorClass}>{errors.propertyCondition}</p>
             )}
+            <p className="mt-2 text-sm text-body-color dark:text-body-color-dark">
+              <strong>Great (Like New):</strong> Recently renovated/built, no deferred maintenance<br/>
+              <strong>Good:</strong> Functional, minimal work needed<br/>
+              <strong>Bad:</strong> Needs significant updates (flooring, kitchen, bath)<br/>
+              <strong>Really Bad:</strong> Major repairs needed (foundation, HVAC, plumbing, roof)
+            </p>
           </div>
         </div>
 

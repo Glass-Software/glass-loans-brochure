@@ -264,3 +264,153 @@ export function calculateWeightedARVFromComps(
 export function formatPricePerSqft(price: number, sqft: number): string {
   return (price / sqft).toFixed(2);
 }
+
+/**
+ * Calculate as-is value using quartile-based statistical method
+ * Maps property condition to market $/sqft quartile
+ */
+export function calculateAsIsValueFromQuartiles(
+  comps: PropertyComparable[],
+  subjectSqft: number,
+  propertyCondition: string
+): {
+  asIsValue: number;
+  quartileUsed: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  quartileMedian: number;
+  pricePerSqftRange: { min: number; max: number; median: number };
+  compsCount: number;
+  confidence: 'high' | 'medium' | 'low';
+} {
+  // Validation: minimum 4 comps required
+  if (comps.length < 4) {
+    throw new Error(`Insufficient comps. Need 4+, got ${comps.length}`);
+  }
+
+  // Calculate $/sqft for each comp
+  const pricesPerSqft = comps
+    .map(comp => comp.sqft > 0 ? comp.price / comp.sqft : null)
+    .filter((price): price is number => price !== null);
+
+  if (pricesPerSqft.length < 4) {
+    throw new Error(`Insufficient valid comps with sqft. Need 4+, got ${pricesPerSqft.length}`);
+  }
+
+  // Remove outliers using IQR method (1.5x IQR rule)
+  const cleanedPrices = removeOutliers(pricesPerSqft);
+
+  // Use all data if outlier removal leaves too few comps
+  const finalPrices = cleanedPrices.length >= 4 ? cleanedPrices : pricesPerSqft;
+
+  // Sort for quartile calculation
+  const sortedPrices = [...finalPrices].sort((a, b) => a - b);
+
+  // Calculate quartiles using linear interpolation
+  const quartiles = calculateQuartiles(sortedPrices);
+
+  // Map condition to quartile
+  const quartileMapping: Record<string, 'Q1' | 'Q2' | 'Q3' | 'Q4'> = {
+    'Really Bad': 'Q1',
+    'Bad': 'Q2',
+    'Good': 'Q3',
+    'Great (Like New)': 'Q4',
+  };
+
+  const quartileUsed = quartileMapping[propertyCondition];
+  if (!quartileUsed) {
+    throw new Error(`Unknown property condition: ${propertyCondition}`);
+  }
+
+  const quartileMedian = quartiles[quartileUsed];
+
+  // Calculate as-is value
+  const asIsValue = Math.round(quartileMedian * subjectSqft);
+
+  // Determine confidence
+  const confidence = determineConfidence(finalPrices.length, quartiles);
+
+  return {
+    asIsValue,
+    quartileUsed,
+    quartileMedian,
+    pricePerSqftRange: {
+      min: sortedPrices[0],
+      max: sortedPrices[sortedPrices.length - 1],
+      median: quartiles.Q2,
+    },
+    compsCount: finalPrices.length,
+    confidence,
+  };
+}
+
+/**
+ * Calculate quartiles using linear interpolation (Excel QUARTILE.INC method)
+ */
+function calculateQuartiles(sortedPrices: number[]): {
+  Q1: number;
+  Q2: number;
+  Q3: number;
+  Q4: number;
+} {
+  const n = sortedPrices.length;
+
+  const percentile = (p: number): number => {
+    const index = (n - 1) * (p / 100);
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    const weight = index - lower;
+
+    if (lower === upper) return sortedPrices[lower];
+    return sortedPrices[lower] * (1 - weight) + sortedPrices[upper] * weight;
+  };
+
+  return {
+    Q1: percentile(25),   // 25th percentile
+    Q2: percentile(50),   // Median
+    Q3: percentile(75),   // 75th percentile
+    Q4: percentile(87.5), // Midpoint between Q3 and max (avoids outliers)
+  };
+}
+
+/**
+ * Remove outliers using IQR method (1.5x IQR rule)
+ */
+function removeOutliers(prices: number[]): number[] {
+  if (prices.length < 4) return prices;
+
+  const sorted = [...prices].sort((a, b) => a - b);
+  const n = sorted.length;
+
+  const q1Index = Math.floor(n * 0.25);
+  const q3Index = Math.floor(n * 0.75);
+  const Q1 = sorted[q1Index];
+  const Q3 = sorted[q3Index];
+
+  const IQR = Q3 - Q1;
+  const lowerBound = Q1 - 1.5 * IQR;
+  const upperBound = Q3 + 1.5 * IQR;
+
+  const filtered = prices.filter(p => p >= lowerBound && p <= upperBound);
+
+  console.log(`[AsIsCalc] Outlier removal: ${prices.length} → ${filtered.length} comps (bounds: $${lowerBound.toFixed(2)}-$${upperBound.toFixed(2)}/sqft)`);
+
+  return filtered;
+}
+
+/**
+ * Determine confidence based on comp count and variance
+ */
+function determineConfidence(
+  compCount: number,
+  quartiles: { Q1: number; Q2: number; Q3: number; Q4: number }
+): 'high' | 'medium' | 'low' {
+  // Calculate coefficient of variation
+  const mean = (quartiles.Q1 + quartiles.Q2 + quartiles.Q3 + quartiles.Q4) / 4;
+  const variance = ((quartiles.Q1 - mean) ** 2 + (quartiles.Q2 - mean) ** 2 +
+                    (quartiles.Q3 - mean) ** 2 + (quartiles.Q4 - mean) ** 2) / 4;
+  const stdDev = Math.sqrt(variance);
+  const coefficientOfVariation = stdDev / mean;
+
+  if (compCount >= 10 && coefficientOfVariation < 0.15) return 'high';
+  if (compCount < 6 || coefficientOfVariation > 0.25) return 'low';
+  return 'medium';
+}

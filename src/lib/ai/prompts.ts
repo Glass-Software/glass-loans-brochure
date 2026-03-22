@@ -16,6 +16,15 @@ You are evaluating a loan request from a Borrower (property flipper) who wants t
 Return ONLY a JSON object with your calculated values - no additional text or explanation.`;
 
 /**
+ * System prompt for Gary's ARV-only calculation (low temperature)
+ */
+export const GARY_ARV_SYSTEM_PROMPT = `You are Gary, the Senior Loan Underwriter at Glass Loans.
+
+You are calculating ARV (After Repair Value) based on comparable sales. The as-is value has already been calculated using a statistical quartile method.
+
+CRITICAL: Return ONLY a valid JSON object. Do NOT include any explanation, reasoning, analysis, or additional text before or after the JSON. Start your response with { and end with }. No markdown, no code blocks, no commentary.`;
+
+/**
  * Generate prompt for Gary's valuation calculations
  * This is called FIRST with low temperature for consistent numeric results
  */
@@ -136,6 +145,101 @@ Do not include any explanation, markdown, or additional text - just the JSON obj
 }
 
 /**
+ * Generate prompt for Gary's ARV-only calculation
+ * This is called with low temperature for consistent numeric results
+ * As-is value is already calculated deterministically via quartiles
+ */
+export function generateGaryARVPrompt(
+  formData: UnderwritingFormData,
+  allComps: any[],
+  compSelectionState?: CompSelectionState[],
+  calculatedAsIsValue?: number,
+): string {
+  const {
+    propertyAddress,
+    propertyCity,
+    propertyState,
+    purchasePrice,
+    rehab,
+    squareFeet,
+    propertyCondition,
+  } = formData;
+
+  const locationDisplay =
+    propertyCity && propertyState
+      ? `${propertyCity}, ${propertyState}`
+      : propertyState
+        ? propertyState
+        : propertyAddress;
+
+  return `Calculate ARV for this property based on comparable sales.
+
+**PROPERTY DETAILS:**
+- Location: ${locationDisplay}
+${propertyAddress !== locationDisplay ? `- Full Address: ${propertyAddress}` : ""}
+- Purchase Price: $${purchasePrice.toLocaleString()}
+- Rehab Budget: $${rehab.toLocaleString()}
+- Square Feet: ${squareFeet.toLocaleString()}
+- Bedrooms/Bathrooms: ${formData.bedrooms}/${formData.bathrooms}
+- Year Built: ${formData.yearBuilt}
+- Condition: ${propertyCondition}
+- Renovation Level: $${(rehab / squareFeet).toFixed(2)}/SF (${getRenovationLevel(rehab / squareFeet)})
+
+**AS-IS VALUE (Already Calculated):**
+$${calculatedAsIsValue?.toLocaleString()} - calculated using quartile-based statistical method based on ${propertyCondition} condition.
+
+**COMPARABLE SALES (${allComps.length} properties - lender reviewed):**
+${compSelectionState ? `
+The lender marked ${compSelectionState.filter((s) => s.emphasized).length} as "EMPHASIZED" (most similar to post-renovation target), removed ${compSelectionState.filter((s) => s.removed).length} from ARV calculation, and left ${allComps.length - compSelectionState.filter((s) => s.emphasized || s.removed).length} as normal.
+` : ""}
+${allComps
+  .map((comp: any, i: number) => {
+    const state = compSelectionState?.find((s: any) => s.compIndex === i);
+    const marker = state?.removed ? " ❌ REMOVED" : state?.emphasized ? " ⭐ EMPHASIZED" : "";
+
+    const parts = [`${i + 1}. ${comp.address} - $${comp.price?.toLocaleString() || "N/A"}${marker}`];
+
+    if (comp.sqft) {
+      parts.push(`${comp.bedrooms || "?"} bed / ${comp.bathrooms || "?"} bath, ${comp.sqft.toLocaleString()} sqft${comp.yearBuilt ? `, built ${comp.yearBuilt}` : ""}`);
+    }
+
+    if (comp.pricePerSqft) {
+      parts.push(`$${comp.pricePerSqft.toFixed(2)}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""}`);
+    }
+
+    if (comp.correlation) {
+      parts.push(`correlation: ${(comp.correlation * 100).toFixed(0)}%`);
+    }
+
+    return parts.join(" | ");
+  })
+  .join("\n")}
+
+**YOUR TASK:**
+Calculate ARV (After Repair Value) after $${rehab.toLocaleString()} renovation.
+
+- IGNORE ${compSelectionState ? compSelectionState.filter((s) => s.removed).length : 0} ❌ REMOVED comps (not relevant to post-renovation target)
+- STRONGLY WEIGHT ${compSelectionState ? compSelectionState.filter((s) => s.emphasized).length : 0} ⭐ EMPHASIZED comps (lender says these match post-renovation quality)
+- Consider rehab scope: ${getRenovationLevel(rehab / squareFeet)} renovation
+- ${
+    propertyCondition === "Good" && rehab / squareFeet > 50
+      ? `⚠️ CRITICAL: Property already in Good condition but Heavy rehab planned. Assess over-improvement risk - can this market support the target price? Don't exceed what best comps sold for.`
+      : `Heavy rehab can push toward newer/better comps, but can't exceed market ceiling`
+  }
+
+**RETURN FORMAT:**
+CRITICAL: Your response must be ONLY the JSON object below. NO explanation, NO reasoning, NO analysis, NO markdown code blocks.
+
+Start your response with the opening brace { and end with the closing brace }. Nothing else.
+
+{
+  "estimatedARV": <number>
+}
+
+DO NOT write anything before the { or after the }. Just the JSON.`;
+}
+
+/**
  * System prompt for Gary's underwriting opinion
  */
 export const GARY_OPINION_SYSTEM_PROMPT = `You are Gary, the Senior Loan Underwriter at Glass Loans. We write software for hard money lenders.
@@ -172,6 +276,8 @@ You are a conservative lender who understands risk because you've been in the tr
 3. **Skin in the game matters** - 100% Loan-to-Cost loans are bad; the more equity the borrower invests, the better
 
 ## Property Condition Definitions
+
+**Great (Like New)**: The property is in excellent condition - recently renovated or newly built. Everything works perfectly: flooring, foundation, HVAC, plumbing, electrical, appliances all modern and functional. Minimal to no work needed. Appropriate for very Light renovation or cosmetic updates only.
 
 **Good**: The property doesn't need much work. Flooring, foundation, HVAC, and plumbing are in good working condition. Appropriate for Light renovation level.
 
@@ -236,6 +342,18 @@ Final score is 0-100 based on four weighted components. **CRITICAL: Deals scorin
 You are known for being thorough, fair, and specific in your analysis. Provide direct, professional opinions focused on risk assessment and deal quality.`;
 
 /**
+ * Helper function to describe quartile ranges
+ */
+function getQuartileDescription(quartile: 'Q1' | 'Q2' | 'Q3' | 'Q4'): string {
+  return {
+    Q1: '0-25th percentile - lower market range',
+    Q2: '25th-50th percentile - below median',
+    Q3: '50th-75th percentile - above median',
+    Q4: '75th-100th percentile - upper market range',
+  }[quartile];
+}
+
+/**
  * Generate prompt for Gary's opinion
  */
 export function generateGaryOpinionPrompt(
@@ -248,6 +366,7 @@ export function generateGaryOpinionPrompt(
   compsUsed: any[], // NEW: Pass comps for reference
   compSelectionState: CompSelectionState[] | undefined,
   finalScore: number, // NEW: Calculated final score
+  asIsMetadata: any, // NEW: As-is calculation metadata
 ): string {
   const {
     propertyAddress,
@@ -329,14 +448,28 @@ ${compsUsed
 **CALCULATED SCORE: ${finalScore}/100**
 ${finalScore >= 80 ? "🟢 STRONG DEAL - This score indicates approval is warranted" : finalScore >= 70 ? "🟡 ACCEPTABLE DEAL - Standard conditions apply" : finalScore >= 60 ? "🟠 MARGINAL DEAL - Significant conditions required" : "🔴 WEAK DEAL - Consider declining or major restructuring"}
 
-**YOUR VALUATIONS:**
-You calculated the following values (these are YOUR numbers):
-- **Your As-Is Value**: $${garyAsIsValue.toLocaleString()}
-- **Your ARV**: $${garyEstimatedARV.toLocaleString()}
+**AS-IS VALUE CALCULATION (Deterministic):**
+The as-is value of $${garyAsIsValue.toLocaleString()} was calculated using quartile-based statistics:
+- Property Condition: ${formData.propertyCondition}
+- Quartile: ${asIsMetadata.quartileUsed} (${getQuartileDescription(asIsMetadata.quartileUsed)})
+- Market $/sqft: $${asIsMetadata.quartileMedian?.toFixed(2) || 'N/A'}/sqft
+- Calculation: ${formData.squareFeet.toLocaleString()} sqft × $${asIsMetadata.quartileMedian?.toFixed(2) || 'N/A'}/sqft
+- Based on ${asIsMetadata.compsCount || 'N/A'} comps
+- Confidence: ${asIsMetadata.confidence || 'medium'}
 
-**COMPARISON TO BORROWER:**
-- Borrower's As-Is: $${formData.userEstimatedAsIsValue.toLocaleString()} (${garyAsIsValue > formData.userEstimatedAsIsValue ? "you are higher" : "you are lower"} by $${Math.abs(garyAsIsValue - formData.userEstimatedAsIsValue).toLocaleString()})
-- Borrower's ARV: $${userEstimatedArv.toLocaleString()} (${garyEstimatedARV > userEstimatedArv ? "you are higher" : "you are lower"} by $${Math.abs(garyEstimatedARV - userEstimatedArv).toLocaleString()})
+**YOUR ARV CALCULATION:**
+You calculated the ARV at $${garyEstimatedARV.toLocaleString()} based on the comparable sales and renovation scope.
+
+**PURCHASE PRICE ANALYSIS:**
+The borrower is purchasing this property for $${formData.purchasePrice.toLocaleString()}.
+- As-Is Value: $${garyAsIsValue.toLocaleString()}
+- Purchase Price: $${formData.purchasePrice.toLocaleString()}
+- Difference: $${Math.abs(garyAsIsValue - formData.purchasePrice).toLocaleString()} (${garyAsIsValue > formData.purchasePrice ? 'buying below market ✓' : 'paying above market ⚠'})
+- Variance: ${(((formData.purchasePrice - garyAsIsValue) / garyAsIsValue) * 100).toFixed(1)}%
+
+**COMPARISON TO BORROWER'S ESTIMATES:**
+- Borrower's As-Is: $${formData.userEstimatedAsIsValue.toLocaleString()} vs Calculated: $${garyAsIsValue.toLocaleString()} (${garyAsIsValue > formData.userEstimatedAsIsValue ? "calculated higher" : "calculated lower"} by $${Math.abs(garyAsIsValue - formData.userEstimatedAsIsValue).toLocaleString()})
+- Borrower's ARV: $${userEstimatedArv.toLocaleString()} vs Your ARV: $${garyEstimatedARV.toLocaleString()} (${garyEstimatedARV > userEstimatedArv ? "you are higher" : "you are lower"} by $${Math.abs(garyEstimatedARV - userEstimatedArv).toLocaleString()})
 
 **KEY METRICS (Using Your ARV):**
 - Loan to ARV: ${garyCalculated.loanToArv.toFixed(2)}%
@@ -372,9 +505,18 @@ ${compSelectionState && compSelectionState.filter((s) => s.removed).length > 0 ?
 Explain your ARV of $${garyEstimatedARV.toLocaleString()} and reference specific comps that support this value.
 ${garyEstimatedARV !== userEstimatedArv ? `Address why your ARV differs from borrower's $${userEstimatedArv.toLocaleString()}.` : ""}
 
-**Section 4: As-Is Value Assessment**
-Explain your as-is value of $${garyAsIsValue.toLocaleString()} based on condition and comps.
-${Math.abs(garyAsIsValue - formData.userEstimatedAsIsValue) > formData.userEstimatedAsIsValue * 0.1 ? `Address the significant difference from borrower's estimate.` : ""}
+**Section 4: Purchase Price vs. As-Is Value**
+The as-is value ($${garyAsIsValue.toLocaleString()}) was calculated using ${asIsMetadata.quartileUsed} quartile based on ${formData.propertyCondition} condition.
+
+Compare to purchase price ($${formData.purchasePrice.toLocaleString()}):
+${formData.purchasePrice < garyAsIsValue * 0.95
+  ? `✓ Excellent - buying significantly below market. Immediate equity cushion provides downside protection.`
+  : formData.purchasePrice < garyAsIsValue * 1.05
+    ? `Fair - purchase near market value. Profit will come from the renovation, not the acquisition.`
+    : `⚠ CONCERN - paying above calculated market value. Either the ${formData.propertyCondition} condition rating is too pessimistic, the comps don't reflect this property's true value, or the borrower is overpaying. Verify condition rating and comp quality.`
+}
+
+Reference specific comps that support or contradict the as-is calculation.
 
 **Section 5: Property Condition vs Renovation Level**
 Assess if ${propertyCondition} condition matches ${getRenovationLevel(rehab / squareFeet)} renovation level.
