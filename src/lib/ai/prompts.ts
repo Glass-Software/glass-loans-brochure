@@ -57,7 +57,7 @@ export function generateGaryValuationPrompt(
 **PROPERTY DETAILS:**
 - Location: ${locationDisplay}
 ${propertyAddress !== locationDisplay ? `- Full Address: ${propertyAddress}` : ""}
-- Purchase Price: $${purchasePrice.toLocaleString()}
+- **Purchase Price: $${purchasePrice.toLocaleString()}** (IMPORTANT: This is what the borrower is paying - use it as a market signal)
 - Rehab Budget: $${rehab.toLocaleString()}
 - Square Feet: ${squareFeet.toLocaleString()}
 - Bedrooms/Bathrooms: ${formData.bedrooms}/${formData.bathrooms}
@@ -101,8 +101,12 @@ ${allComps
 
 For AS-IS VALUE:
 - Use ALL ${allComps.length} comps (including ❌ REMOVED ones - borrower only removed these from ARV calculation)
-- **Year Built is CRITICAL**: Newer builds act as a CEILING for older properties
-  * Example: If a 2020 build sold for $300k, a similar 1980 build in the same area likely can't exceed this price
+- **Purchase Price ($${purchasePrice.toLocaleString()}) is a STRONG MARKET SIGNAL**:
+  * This is what a real buyer (the borrower) is willing to pay in current condition
+  * It reflects actual market conditions, local knowledge, and negotiation
+  * Weight it alongside comps - don't ignore this important data point
+  * If comps suggest vastly different value, consider: are comps truly comparable? Is there something special about this property?
+- **Year Built is important**: Newer builds act as a CEILING for older properties
   * Properties built closer to subject year (${formData.yearBuilt}) are better comparables
 - Weight by similarity score (correlation) - higher scores = better matches
 - Weight by distance - closer comps are more reliable
@@ -118,10 +122,13 @@ Calculate two values:
 
 1. **As-Is Value**: Current market value in ${propertyCondition} condition
    - USE ALL ${allComps.length} COMPS (including ❌ REMOVED)
-   - CRITICAL: Newer builds (higher yearBuilt) establish price CEILING for older properties
-   - A 2020 build at $300k/sqft means a 1970 build in same area likely maxes out below this
-   - Weight by: Year built proximity to subject (${formData.yearBuilt}), correlation score, distance
-   - Be realistic based on actual sold prices in current condition
+   - **CRITICAL: Purchase price ($${purchasePrice.toLocaleString()}) is a key market signal**
+     * Real buyer paying real money in current market conditions
+     * Weight this heavily alongside comps - it's actual market data, not an estimate
+     * If significantly different from comps, explain why (unique features, motivated seller, etc.)
+   - Year built matters: Newer builds establish price CEILING for older properties
+   - Weight by: Purchase price, year built proximity to subject (${formData.yearBuilt}), correlation score, distance
+   - Be realistic based on actual market transactions
 
 2. **ARV (After Repair Value)**: Value after $${rehab.toLocaleString()} renovation
    - IGNORE ${compSelectionState ? compSelectionState.filter((s) => s.removed).length : 0} ❌ REMOVED comps (not relevant to post-renovation target)
@@ -342,18 +349,6 @@ Final score is 0-100 based on four weighted components. **CRITICAL: Deals scorin
 You are known for being thorough, fair, and specific in your analysis. Provide direct, professional opinions focused on risk assessment and deal quality.`;
 
 /**
- * Helper function to describe quartile ranges
- */
-function getQuartileDescription(quartile: 'Q1' | 'Q2' | 'Q3' | 'Q4'): string {
-  return {
-    Q1: '0-25th percentile - lower market range',
-    Q2: '25th-50th percentile - below median',
-    Q3: '50th-75th percentile - above median',
-    Q4: '75th-100th percentile - upper market range',
-  }[quartile];
-}
-
-/**
  * Generate prompt for Gary's opinion
  */
 export function generateGaryOpinionPrompt(
@@ -366,7 +361,6 @@ export function generateGaryOpinionPrompt(
   compsUsed: any[], // NEW: Pass comps for reference
   compSelectionState: CompSelectionState[] | undefined,
   finalScore: number, // NEW: Calculated final score
-  asIsMetadata: any, // NEW: As-is calculation metadata
 ): string {
   const {
     propertyAddress,
@@ -448,27 +442,20 @@ ${compsUsed
 **CALCULATED SCORE: ${finalScore}/100**
 ${finalScore >= 80 ? "🟢 STRONG DEAL - This score indicates approval is warranted" : finalScore >= 70 ? "🟡 ACCEPTABLE DEAL - Standard conditions apply" : finalScore >= 60 ? "🟠 MARGINAL DEAL - Significant conditions required" : "🔴 WEAK DEAL - Consider declining or major restructuring"}
 
-**AS-IS VALUE CALCULATION (Deterministic):**
-The as-is value of $${garyAsIsValue.toLocaleString()} was calculated using quartile-based statistics:
-- Property Condition: ${formData.propertyCondition}
-- Quartile: ${asIsMetadata.quartileUsed} (${getQuartileDescription(asIsMetadata.quartileUsed)})
-- Market $/sqft: $${asIsMetadata.quartileMedian?.toFixed(2) || 'N/A'}/sqft
-- Calculation: ${formData.squareFeet.toLocaleString()} sqft × $${asIsMetadata.quartileMedian?.toFixed(2) || 'N/A'}/sqft
-- Based on ${asIsMetadata.compsCount || 'N/A'} comps
-- Confidence: ${asIsMetadata.confidence || 'medium'}
+**YOUR VALUATIONS:**
+You calculated the following values (these are YOUR numbers):
+- **Your As-Is Value**: $${garyAsIsValue.toLocaleString()}
+- **Your ARV**: $${garyEstimatedARV.toLocaleString()}
 
-**YOUR ARV CALCULATION:**
-You calculated the ARV at $${garyEstimatedARV.toLocaleString()} based on the comparable sales and renovation scope.
-
-**PURCHASE PRICE ANALYSIS:**
+**PURCHASE PRICE CONTEXT:**
 The borrower is purchasing this property for $${formData.purchasePrice.toLocaleString()}.
-- As-Is Value: $${garyAsIsValue.toLocaleString()}
+- Your As-Is Value: $${garyAsIsValue.toLocaleString()}
 - Purchase Price: $${formData.purchasePrice.toLocaleString()}
-- Difference: $${Math.abs(garyAsIsValue - formData.purchasePrice).toLocaleString()} (${garyAsIsValue > formData.purchasePrice ? 'buying below market ✓' : 'paying above market ⚠'})
+- Difference: $${Math.abs(garyAsIsValue - formData.purchasePrice).toLocaleString()} (${garyAsIsValue > formData.purchasePrice ? 'you valued higher - buyer getting a deal ✓' : 'you valued lower - buyer paying premium ⚠'})
 - Variance: ${(((formData.purchasePrice - garyAsIsValue) / garyAsIsValue) * 100).toFixed(1)}%
 
 **COMPARISON TO BORROWER'S ESTIMATES:**
-- Borrower's As-Is: $${formData.userEstimatedAsIsValue.toLocaleString()} vs Calculated: $${garyAsIsValue.toLocaleString()} (${garyAsIsValue > formData.userEstimatedAsIsValue ? "calculated higher" : "calculated lower"} by $${Math.abs(garyAsIsValue - formData.userEstimatedAsIsValue).toLocaleString()})
+- Borrower's As-Is: $${formData.userEstimatedAsIsValue.toLocaleString()} vs Your As-Is: $${garyAsIsValue.toLocaleString()} (${garyAsIsValue > formData.userEstimatedAsIsValue ? "you are higher" : "you are lower"} by $${Math.abs(garyAsIsValue - formData.userEstimatedAsIsValue).toLocaleString()})
 - Borrower's ARV: $${userEstimatedArv.toLocaleString()} vs Your ARV: $${garyEstimatedARV.toLocaleString()} (${garyEstimatedARV > userEstimatedArv ? "you are higher" : "you are lower"} by $${Math.abs(garyEstimatedARV - userEstimatedArv).toLocaleString()})
 
 **KEY METRICS (Using Your ARV):**
@@ -506,17 +493,15 @@ Explain your ARV of $${garyEstimatedARV.toLocaleString()} and reference specific
 ${garyEstimatedARV !== userEstimatedArv ? `Address why your ARV differs from borrower's $${userEstimatedArv.toLocaleString()}.` : ""}
 
 **Section 4: Purchase Price vs. As-Is Value**
-The as-is value ($${garyAsIsValue.toLocaleString()}) was calculated using ${asIsMetadata.quartileUsed} quartile based on ${formData.propertyCondition} condition.
-
-Compare to purchase price ($${formData.purchasePrice.toLocaleString()}):
+Compare your as-is value ($${garyAsIsValue.toLocaleString()}) to the purchase price ($${formData.purchasePrice.toLocaleString()}):
 ${formData.purchasePrice < garyAsIsValue * 0.95
-  ? `✓ Excellent - buying significantly below market. Immediate equity cushion provides downside protection.`
+  ? `✓ Excellent - borrower is buying significantly below your as-is value. Immediate equity cushion provides downside protection.`
   : formData.purchasePrice < garyAsIsValue * 1.05
-    ? `Fair - purchase near market value. Profit will come from the renovation, not the acquisition.`
-    : `⚠ CONCERN - paying above calculated market value. Either the ${formData.propertyCondition} condition rating is too pessimistic, the comps don't reflect this property's true value, or the borrower is overpaying. Verify condition rating and comp quality.`
+    ? `Fair - purchase price is near your as-is value. This is market rate. Profit will come from the renovation, not the acquisition.`
+    : `⚠ CONCERN - borrower is paying above your calculated as-is value. Explain why: Is the ${formData.propertyCondition} condition rating too pessimistic? Do the comps not reflect this property's true value? Is the borrower overpaying? Or did you factor in the purchase price appropriately as a market signal?`
 }
 
-Reference specific comps that support or contradict the as-is calculation.
+Reference specific comps that support your as-is valuation and explain any variance from the purchase price.
 
 **Section 5: Property Condition vs Renovation Level**
 Assess if ${propertyCondition} condition matches ${getRenovationLevel(rehab / squareFeet)} renovation level.

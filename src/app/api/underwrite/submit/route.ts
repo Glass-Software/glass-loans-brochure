@@ -532,114 +532,54 @@ export async function POST(request: Request) {
           formData as UnderwritingFormData,
         );
 
-        // Step 10.5: Calculate deterministic as-is value (55-60%)
-        sendProgress(controller, 3, "Calculating as-is value from market data...", 55);
-
-        let calculatedAsIsValue: number;
-        let asIsMetadata: any;
-
-        try {
-          const { calculateAsIsValueFromQuartiles } = await import(
-            "@/lib/underwriting/calculations"
-          );
-
-          const asIsResult = calculateAsIsValueFromQuartiles(
-            aiEstimates.compsUsed,
-            formData.squareFeet,
-            formData.propertyCondition
-          );
-
-          calculatedAsIsValue = asIsResult.asIsValue;
-          asIsMetadata = {
-            quartileUsed: asIsResult.quartileUsed,
-            quartileMedian: asIsResult.quartileMedian,
-            pricePerSqftRange: asIsResult.pricePerSqftRange,
-            compsCount: asIsResult.compsCount,
-            confidence: asIsResult.confidence,
-            method: 'quartile-based',
-          };
-
-          console.log(
-            `[AsIsCalc] As-is: $${calculatedAsIsValue.toLocaleString()} using ${asIsResult.quartileUsed} ($/sqft: $${asIsResult.quartileMedian.toFixed(2)})`
-          );
-
-          sendProgress(
-            controller,
-            3,
-            `As-is value: $${(calculatedAsIsValue / 1000).toFixed(0)}k (${asIsResult.quartileUsed})`,
-            60
-          );
-        } catch (asIsError: any) {
-          console.error('[AsIsCalc] Failed:', asIsError.message);
-
-          // Fallback: Use user's estimate (preferred) or purchase price
-          // NOTE: We do NOT use API AVM - it's unreliable
-          if (formData.userEstimatedAsIsValue && formData.userEstimatedAsIsValue > 0) {
-            calculatedAsIsValue = formData.userEstimatedAsIsValue;
-            asIsMetadata = {
-              method: 'user-estimate-fallback',
-              fallbackReason: asIsError.message,
-            };
-          } else {
-            // Last resort: assume purchase price = market value
-            calculatedAsIsValue = formData.purchasePrice;
-            asIsMetadata = {
-              method: 'purchase-price-fallback',
-              fallbackReason: asIsError.message,
-            };
-          }
-
-          sendProgress(controller, 3, 'Using fallback as-is estimate', 60);
-        }
-
-        // Step 11: Generate Gary's ARV (CALL 1 - Low temperature) (65-75%)
+        // Step 11: Generate Gary's valuations (CALL 1 - Low temperature) (65-75%)
         sendProgress(
           controller,
           4,
-          "Gary is calculating ARV...",
+          "Gary is calculating property values...",
           65,
         );
 
-        let garyAsIsValue: number = calculatedAsIsValue; // Use calculated value
+        let garyAsIsValue: number;
         let garyEstimatedARV: number;
         let garyOpinion: string;
         const apiAsIsValue = aiEstimates.asIsValue; // Store API's as-is value separately
 
         try {
           if (process.env.OPENROUTER_API_KEY) {
-            // CALL 1: Get ARV from Gary (low temperature for consistency)
-            // As-is value already calculated via quartile method
+            // CALL 1: Get valuations from Gary (low temperature for consistency)
             console.log(
-              "🤖 [OPENROUTER CALL 1 START] ARV calculation starting...",
+              "🤖 [OPENROUTER CALL 1 START] Valuation call starting...",
             );
-            const arvStartTime = Date.now();
+            const valuationStartTime = Date.now();
 
-            const arvPrompt = generateGaryARVPrompt(
+            const valuationPrompt = generateGaryValuationPrompt(
               formData as UnderwritingFormData,
               aiEstimates.compsUsed,
               compSelectionState,
-              calculatedAsIsValue,
             );
 
-            const arvResponse = await openRouterClient.generateJSON<{
+            const valuationResponse = await openRouterClient.generateJSON<{
+              asIsValue: number;
               estimatedARV: number;
-            }>(arvPrompt, {
-              systemPrompt: GARY_ARV_SYSTEM_PROMPT,
+            }>(valuationPrompt, {
+              systemPrompt: GARY_VALUATION_SYSTEM_PROMPT,
               temperature: 0.15, // Low temperature for consistent calculations
               maxTokens: 2000,
             });
 
-            const arvDuration = Date.now() - arvStartTime;
+            const valuationDuration = Date.now() - valuationStartTime;
             console.log(
-              `🤖 [OPENROUTER CALL 1 COMPLETE] ARV calculation took ${arvDuration}ms (${(arvDuration / 1000).toFixed(2)}s)`,
+              `🤖 [OPENROUTER CALL 1 COMPLETE] Valuation call took ${valuationDuration}ms (${(valuationDuration / 1000).toFixed(2)}s)`,
             );
 
-            garyEstimatedARV = arvResponse.estimatedARV;
+            garyAsIsValue = valuationResponse.asIsValue;
+            garyEstimatedARV = valuationResponse.estimatedARV;
 
-            // Validate ARV is reasonable (basic sanity check)
-            if (garyEstimatedARV <= 0) {
+            // Validate values are reasonable (basic sanity check)
+            if (garyAsIsValue <= 0 || garyEstimatedARV <= 0) {
               throw new Error(
-                "Invalid ARV from Gary (value must be positive)",
+                "Invalid valuations from Gary (values must be positive)",
               );
             }
             if (garyEstimatedARV < garyAsIsValue * 0.8) {
@@ -691,7 +631,6 @@ export async function POST(request: Request) {
               aiEstimates.compsUsed,
               compSelectionState,
               finalScore, // Pass recalculated score based on Gary's valuations
-              asIsMetadata, // Pass as-is calculation metadata
             );
 
             garyOpinion = await openRouterClient.generateText(opinionPrompt, {
