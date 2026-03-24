@@ -5,14 +5,18 @@ import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 
-let db: Database.Database | null = null;
+// Use globalThis to persist singleton across Next.js module reloads
+const globalForDb = globalThis as unknown as {
+  db: Database.Database | undefined
+  checkpointInterval: NodeJS.Timeout | undefined
+}
 
 /**
  * Get or create SQLite database connection
  */
 export function getDatabase(): Database.Database {
-  if (db) {
-    return db;
+  if (globalForDb.db) {
+    return globalForDb.db;
   }
 
   // Determine database path based on environment
@@ -32,36 +36,44 @@ export function getDatabase(): Database.Database {
   console.log(`Connecting to SQLite database at: ${dbPath}`);
 
   // Create database connection
-  db = new Database(dbPath);
+  globalForDb.db = new Database(dbPath);
 
   // Enable foreign keys and WAL mode for better concurrency
-  db.pragma("foreign_keys = ON");
-  db.pragma("journal_mode = WAL");
+  globalForDb.db.pragma("foreign_keys = ON");
+  globalForDb.db.pragma("journal_mode = WAL");
 
   // Set busy timeout to prevent indefinite locking (5 seconds max wait)
   // If another process holds a lock, we'll get an error instead of hanging forever
-  db.pragma("busy_timeout = 5000");
+  globalForDb.db.pragma("busy_timeout = 5000");
 
   // Configure WAL checkpointing to prevent corruption
   // Checkpoint every 1000 pages or 5 minutes
-  db.pragma("wal_autocheckpoint = 1000");
+  globalForDb.db.pragma("wal_autocheckpoint = 1000");
+
+  // Clear old checkpoint interval if exists (prevent leaks on module reload)
+  if (globalForDb.checkpointInterval) {
+    clearInterval(globalForDb.checkpointInterval);
+  }
 
   // Periodically checkpoint WAL to main DB (prevents corruption on crashes)
   if (typeof setInterval !== "undefined") {
-    const checkpointInterval = setInterval(() => {
-      if (db) {
+    globalForDb.checkpointInterval = setInterval(() => {
+      if (globalForDb.db) {
         try {
-          db.pragma("wal_checkpoint(PASSIVE)");
+          globalForDb.db.pragma("wal_checkpoint(PASSIVE)");
         } catch (err) {
           console.error("WAL checkpoint failed:", err);
         }
       } else {
-        clearInterval(checkpointInterval);
+        if (globalForDb.checkpointInterval) {
+          clearInterval(globalForDb.checkpointInterval);
+          globalForDb.checkpointInterval = undefined;
+        }
       }
     }, 5 * 60 * 1000); // Every 5 minutes
   }
 
-  return db;
+  return globalForDb.db;
 }
 
 /**
@@ -121,21 +133,25 @@ export function transaction<T>(
  * Close database connection (for graceful shutdown)
  */
 export function closeDatabase(): void {
-  if (db) {
-    db.close();
-    db = null;
+  if (globalForDb.db) {
+    globalForDb.db.close();
+    globalForDb.db = undefined;
+  }
+  if (globalForDb.checkpointInterval) {
+    clearInterval(globalForDb.checkpointInterval);
+    globalForDb.checkpointInterval = undefined;
   }
 }
 
 // Graceful shutdown handlers (prevents corruption on server restart)
-// Only register once to prevent duplicate handlers during build
-let handlersRegistered = false;
+// Use Symbol.for() to create a process-wide flag that survives module reloads
+const HANDLERS_KEY = Symbol.for('glass-loans.db.handlers') as any;
 
-if (typeof process !== "undefined" && !handlersRegistered) {
-  handlersRegistered = true;
+if (typeof process !== "undefined" && !process[HANDLERS_KEY]) {
+  process[HANDLERS_KEY] = true;
 
   process.on("SIGINT", () => {
-    if (db) {
+    if (globalForDb.db) {
       console.log("Received SIGINT, closing database...");
       closeDatabase();
     }
@@ -143,7 +159,7 @@ if (typeof process !== "undefined" && !handlersRegistered) {
   });
 
   process.on("SIGTERM", () => {
-    if (db) {
+    if (globalForDb.db) {
       console.log("Received SIGTERM, closing database...");
       closeDatabase();
     }
