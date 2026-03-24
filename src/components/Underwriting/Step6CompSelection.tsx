@@ -270,7 +270,7 @@ export default function Step6CompSelection() {
         mapRef.current = null;
       }
     };
-  }, [propertyComps, formData, compSelectionState]);
+  }, [propertyComps, formData]);
 
   // Update marker colors and popups when selection state changes
   useEffect(() => {

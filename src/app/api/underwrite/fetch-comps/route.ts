@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // Verify user is authenticated (email verified in Step 5)
     const normalizedEmail = normalizeEmail(email);
-    const user = findVerifiedUserByEmail(normalizedEmail);
+    const user = await findVerifiedUserByEmail(normalizedEmail);
 
     if (!user) {
       return NextResponse.json(
@@ -90,13 +90,17 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("❌ Fetch comps error:", error);
+    console.error("❌ Error type:", typeof error);
+    console.error("❌ Error constructor:", error?.constructor?.name);
+    console.error("❌ Error stack:", error instanceof Error ? error.stack : "No stack");
+
     return NextResponse.json(
       {
         success: false,
         error:
           error instanceof Error
             ? error.message
-            : "Failed to fetch comps. Please try again.",
+            : String(error) || "Failed to fetch comps. Please try again.",
       },
       { status: 500 }
     );
