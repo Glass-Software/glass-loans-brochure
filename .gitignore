@@ -49,3 +49,5 @@ deploy-secrets.sh
 # Test files
 test-batchdata-client.ts
 test-underwriting-flow.ts
+
+/generated/prisma

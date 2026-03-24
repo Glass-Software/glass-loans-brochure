@@ -1,0 +1,229 @@
+// Glass Loans Underwriting Database Schema
+// Migrated from SQLite to PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Users table for email tracking and usage limits
+model User {
+  id                          Int      @id @default(autoincrement())
+  email                       String   @unique
+  normalizedEmail             String   @unique @map("normalized_email")
+  emailVerified               Boolean  @default(false) @map("email_verified")
+  verificationToken           String?  @map("verification_token")
+  verificationTokenExpires    DateTime? @map("verification_token_expires")
+  verificationCode            String?  @map("verification_code")
+  codeExpiresAt               DateTime? @map("code_expires_at")
+  usageCount                  Int      @default(0) @map("usage_count")
+  usageLimit                  Int      @default(3) @map("usage_limit")
+  reportRetentionDays         Int      @default(14) @map("report_retention_days")
+  marketingConsent            Boolean  @default(false) @map("marketing_consent")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  submissions UnderwritingSubmission[]
+
+  @@index([email])
+  @@index([normalizedEmail])
+  @@index([verificationToken])
+  @@map("users")
+}
+
+// Underwriting submissions table
+model UnderwritingSubmission {
+  id                        Int      @id @default(autoincrement())
+  userId                    Int      @map("user_id")
+
+  // Property details
+  propertyAddress           String   @map("property_address")
+  propertyCity              String?  @map("property_city")
+  propertyState             String?  @map("property_state")
+  propertyZip               String?  @map("property_zip")
+  propertyCounty            String?  @map("property_county")
+  propertyLatitude          Float?   @map("property_latitude")
+  propertyLongitude         Float?   @map("property_longitude")
+  propertyType              String?  @map("property_type")
+  propertyCondition         String   @map("property_condition")
+  squareFeet                Int      @map("square_feet")
+  bedrooms                  Int?
+  bathrooms                 Float?
+  yearBuilt                 Int?     @map("year_built")
+
+  // Financial inputs
+  purchasePrice             Float    @map("purchase_price")
+  rehab                     Float
+  renovationPerSf           String   @map("renovation_per_sf")
+  userEstimatedArv          Float?   @map("user_estimated_arv")
+  userEstimatedAsIsValue    Float?   @map("user_estimated_as_is_value")
+  interestRate              Float    @map("interest_rate")
+  months                    Int
+  loanAtPurchase            Float    @map("loan_at_purchase")
+  renovationFunds           Float    @default(0) @map("renovation_funds")
+  closingCostsPercent       Float    @map("closing_costs_percent")
+  points                    Float
+  marketType                String   @map("market_type")
+  additionalDetails         String?  @map("additional_details")
+  compLinks                 String?  @map("comp_links") // JSON string
+
+  // AI-generated values
+  estimatedArv              Float?   @map("estimated_arv")
+  asIsValue                 Float?   @map("as_is_value")
+  monthlyRent               Float?   @map("monthly_rent")
+  finalScore                Int?     @map("final_score")
+  garyOpinion               String?  @map("gary_opinion") @db.Text
+  aiPropertyComps           String?  @map("ai_property_comps") @db.Text // JSON string
+  compSelectionState        String?  @map("comp_selection_state") @db.Text // JSON string
+
+  // Report management
+  reportId                  String?  @unique @map("report_id")
+  expiresAt                 DateTime? @map("expires_at")
+
+  // Metadata
+  ipAddress                 String?  @map("ip_address")
+  recaptchaScore            Float?   @map("recaptcha_score")
+  createdAt                 DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([propertyState])
+  @@index([reportId])
+  @@index([expiresAt])
+  @@map("underwriting_submissions")
+}
+
+// Rate limiting table
+model RateLimit {
+  id            Int      @id @default(autoincrement())
+  ipAddress     String   @map("ip_address")
+  endpoint      String
+  requestCount  Int      @default(1) @map("request_count")
+  windowStart   DateTime @default(now()) @map("window_start")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([ipAddress, endpoint])
+  @@index([windowStart])
+  @@map("rate_limits")
+}
+
+// BatchData API cache tables (deprecated but keeping for data migration)
+model BatchDataAddressCache {
+  id                    Int      @id @default(autoincrement())
+  originalAddress       String   @map("original_address")
+  normalizedAddress     String   @unique @map("normalized_address")
+  standardizedAddress   String   @map("standardized_address")
+  city                  String?
+  state                 String?
+  zipCode               String?  @map("zip_code")
+  countyFips            String?  @map("county_fips")
+  latitude              Float
+  longitude             Float
+  validated             Boolean
+  rawResponse           String   @map("raw_response") @db.Text
+  createdAt             DateTime @default(now()) @map("created_at")
+  expiresAt             DateTime @map("expires_at")
+
+  @@index([normalizedAddress])
+  @@index([expiresAt])
+  @@map("batchdata_address_cache")
+}
+
+model BatchDataPropertyCache {
+  id                Int      @id @default(autoincrement())
+  address           String   @unique
+  propertyType      String?  @map("property_type")
+  bedrooms          Int?
+  bathrooms         Float?
+  squareFeet        Int?     @map("square_feet")
+  lotSize           Int?     @map("lot_size")
+  yearBuilt         Int?     @map("year_built")
+  lastSaleDate      String?  @map("last_sale_date")
+  lastSalePrice     Float?   @map("last_sale_price")
+  taxAssessedValue  Float?   @map("tax_assessed_value")
+  ownerName         String?  @map("owner_name")
+  ownerType         String?  @map("owner_type")
+  avmValue          Float?   @map("avm_value")
+  avmConfidence     Float?   @map("avm_confidence")
+  avmDate           String?  @map("avm_date")
+  preForeclosure    Boolean? @map("pre_foreclosure")
+  rawResponse       String   @map("raw_response") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at")
+  expiresAt         DateTime @map("expires_at")
+
+  @@index([address])
+  @@index([expiresAt])
+  @@map("batchdata_property_cache")
+}
+
+model BatchDataCompsCache {
+  id                  Int      @id @default(autoincrement())
+  subjectAddress      String   @map("subject_address")
+  searchHash          String   @unique @map("search_hash")
+  compTier            Int      @map("comp_tier")
+  compCount           Int      @map("comp_count")
+  medianPricePerSqft  Float?   @map("median_price_per_sqft")
+  compDerivedValue    Float?   @map("comp_derived_value")
+  rawResponse         String   @map("raw_response") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at")
+  expiresAt           DateTime @map("expires_at")
+
+  @@index([searchHash])
+  @@index([subjectAddress])
+  @@index([expiresAt])
+  @@map("batchdata_comps_cache")
+}
+
+model BatchDataApiUsage {
+  id              Int      @id @default(autoincrement())
+  endpoint        String
+  success         Boolean
+  cached          Boolean
+  responseTimeMs  Int?     @map("response_time_ms")
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("batchdata_api_usage")
+}
+
+// Realie API cache tables (current API)
+model RealieCompsCache {
+  id                  Int      @id @default(autoincrement())
+  searchHash          String   @unique @map("search_hash")
+  latitude            Float
+  longitude           Float
+  radius              Float
+  searchTier          Int      @map("search_tier")
+  compCount           Int      @map("comp_count")
+  medianPricePerSqft  Float?   @map("median_price_per_sqft")
+  estimatedArv        Float?   @map("estimated_arv")
+  rawResponse         String   @map("raw_response") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at")
+  expiresAt           DateTime @map("expires_at")
+
+  @@index([searchHash])
+  @@index([latitude, longitude])
+  @@index([expiresAt])
+  @@map("realie_comps_cache")
+}
+
+model RealieApiUsage {
+  id              Int      @id @default(autoincrement())
+  endpoint        String
+  success         Boolean
+  cached          Boolean
+  responseTimeMs  Int?     @map("response_time_ms")
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("realie_api_usage")
+}

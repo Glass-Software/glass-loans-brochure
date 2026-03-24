@@ -320,7 +320,7 @@ export async function POST(request: Request) {
         // Import findVerifiedUserByEmail (code was already verified in Step 5)
         const { findVerifiedUserByEmail } = await import("@/lib/db/queries");
 
-        const user = findVerifiedUserByEmail(normalizedEmail);
+        const user = await findVerifiedUserByEmail(normalizedEmail);
 
         if (!user) {
           sendError(
@@ -713,7 +713,7 @@ export async function POST(request: Request) {
           Date.now() + retentionDays * 24 * 60 * 60 * 1000,
         ).toISOString();
 
-        const submission = createSubmission({
+        const submission = await createSubmission({
           userId: user.id,
           propertyAddress: formData.propertyAddress,
           propertyCity: formData.propertyCity,
@@ -762,7 +762,7 @@ export async function POST(request: Request) {
         });
 
         // Step 13: Increment usage count
-        incrementUsageCount(user.id);
+        await incrementUsageCount(user.id);
 
         // Step 14: Send email with report link (90-95%)
         sendProgress(controller, 6, "Sending report link to your email...", 95);

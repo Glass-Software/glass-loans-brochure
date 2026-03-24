@@ -13,7 +13,24 @@ if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
+// Timeout utility to prevent indefinite hangs
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${operationName} timed out after ${timeoutMs}ms`)), timeoutMs)
+    ),
+  ]);
+}
+
+// Add runtime config for Next.js to extend timeout
+export const maxDuration = 30; // Max 30 seconds for this route
+export const dynamic = 'force-dynamic'; // Ensure no caching
+
 export async function POST(request: Request) {
+  const startTime = Date.now();
+  console.log("🔵 [send-code] Starting request...");
+
   if (!process.env.SENDGRID_API_KEY) {
     return NextResponse.json(
       { error: "Email service not configured" },
@@ -40,12 +57,38 @@ export async function POST(request: Request) {
 
     // Normalize email
     const normalizedEmail = normalizeEmail(email);
+    console.log(`🔵 [send-code] Processing email: ${email} (normalized: ${normalizedEmail})`);
 
-    // Check if user exists or create new one
-    let user = findUserByNormalizedEmail(normalizedEmail);
+    // Check if user exists or create new one (with timeout protection)
+    let user;
+    try {
+      console.log("🔵 [send-code] Querying database for user...");
+      user = await withTimeout(
+        findUserByNormalizedEmail(normalizedEmail),
+        3000,
+        "Database query (findUser)"
+      );
+      console.log(`🔵 [send-code] User query completed in ${Date.now() - startTime}ms`);
+    } catch (error: any) {
+      console.error("❌ [send-code] Database query timeout:", error.message);
+      return NextResponse.json(
+        { error: "Database timeout. Please try again." },
+        { status: 503 }
+      );
+    }
 
     if (user) {
-      updateMarketingConsent(user.id, marketingConsent);
+      try {
+        console.log("🔵 [send-code] Updating marketing consent...");
+        await withTimeout(
+          updateMarketingConsent(user.id, marketingConsent),
+          2000,
+          "Database update (marketing consent)"
+        );
+      } catch (error: any) {
+        console.error("❌ [send-code] Marketing consent update timeout:", error.message);
+        // Non-critical, continue anyway
+      }
 
       // Check usage limit for verified users
       if (user.email_verified && user.usage_count >= user.usage_limit) {
@@ -58,20 +101,66 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      const { user: newUser } = createUser(email, normalizedEmail, marketingConsent);
-      user = newUser;
+      try {
+        console.log("🔵 [send-code] Creating new user...");
+        const result = await withTimeout(
+          createUser(email, normalizedEmail, marketingConsent),
+          3000,
+          "Database insert (createUser)"
+        );
+        user = result.user;
+        console.log(`🔵 [send-code] User created in ${Date.now() - startTime}ms`);
+      } catch (error: any) {
+        console.error("❌ [send-code] User creation timeout:", error.message);
+        return NextResponse.json(
+          { error: "Database timeout. Please try again." },
+          { status: 503 }
+        );
+      }
     }
 
-    // Generate and send verification code
-    const { code } = generateVerificationCode(user.id);
-    await sendVerificationCodeEmail(email, code);
+    // Generate verification code (with timeout protection)
+    let code: string;
+    try {
+      console.log("🔵 [send-code] Generating verification code...");
+      const result = await withTimeout(
+        generateVerificationCode(user.id),
+        2000,
+        "Database update (generateCode)"
+      );
+      code = result.code;
+      console.log(`🔵 [send-code] Code generated in ${Date.now() - startTime}ms`);
+    } catch (error: any) {
+      console.error("❌ [send-code] Code generation timeout:", error.message);
+      return NextResponse.json(
+        { error: "Database timeout. Please try again." },
+        { status: 503 }
+      );
+    }
+
+    // Send email with timeout protection (SendGrid can hang)
+    try {
+      console.log("🔵 [send-code] Sending email via SendGrid...");
+      await withTimeout(
+        sendVerificationCodeEmail(email, code),
+        15000, // 15 second timeout for SendGrid
+        "SendGrid email send"
+      );
+      console.log(`✅ [send-code] Email sent successfully in ${Date.now() - startTime}ms`);
+    } catch (error: any) {
+      console.error("❌ [send-code] SendGrid timeout or error:", error.message);
+      return NextResponse.json(
+        { error: "Email service timeout. Please try again in a moment." },
+        { status: 503 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
       message: "Verification code sent to your email.",
     });
   } catch (error: any) {
-    console.error("❌ Send code error:", error.message);
+    console.error("❌ [send-code] Unexpected error:", error.message, error.stack);
     return NextResponse.json(
       { error: "Failed to send verification code" },
       { status: 500 }

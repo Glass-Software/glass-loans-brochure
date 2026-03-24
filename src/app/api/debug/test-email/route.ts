@@ -36,14 +36,14 @@ export async function GET(request: Request) {
     const normalizedEmail = normalizeEmail(email);
 
     // Find or create user
-    let user = findUserByNormalizedEmail(normalizedEmail);
+    let user = await findUserByNormalizedEmail(normalizedEmail);
     if (!user) {
-      const { user: newUser } = createUser(email, normalizedEmail, true);
+      const { user: newUser } = await createUser(email, normalizedEmail, true);
       user = newUser;
     }
 
     // Generate code
-    const { code } = generateVerificationCode(user.id);
+    const { code } = await generateVerificationCode(user.id);
 
     // Send email
     const msg = {

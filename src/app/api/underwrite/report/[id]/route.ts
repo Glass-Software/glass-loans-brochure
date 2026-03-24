@@ -26,7 +26,7 @@ export async function GET(
     }
 
     // Fetch the submission
-    const submission = getSubmissionByReportId(reportId);
+    const submission = await getSubmissionByReportId(reportId);
 
     if (!submission) {
       return NextResponse.json(

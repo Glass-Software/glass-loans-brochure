@@ -39,8 +39,8 @@ export default async function ResultsPage({
 
   // Get submission from database
   const submission = isNumeric
-    ? getSubmissionById(parseInt(id, 10))
-    : getSubmissionByReportId(id);
+    ? await getSubmissionById(parseInt(id, 10))
+    : await getSubmissionByReportId(id);
 
   if (!submission) {
     notFound();
