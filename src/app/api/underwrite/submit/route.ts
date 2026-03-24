@@ -736,7 +736,7 @@ export async function POST(request: Request) {
           yearBuilt: formData.yearBuilt,
           propertyType: formData.propertyType,
           propertyCondition: formData.propertyCondition,
-          renovationPerSf: formData.renovationPerSf,
+          renovationPerSf: String(formData.renovationPerSf),
           userEstimatedAsIsValue: formData.userEstimatedAsIsValue,
           userEstimatedArv: formData.userEstimatedArv,
           interestRate: formData.interestRate,

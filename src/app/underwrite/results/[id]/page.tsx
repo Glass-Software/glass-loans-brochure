@@ -63,7 +63,7 @@ export default async function ResultsPage({
     yearBuilt: submission.year_built || 0,
     propertyType: submission.property_type as any,
     propertyCondition: submission.property_condition as any,
-    renovationPerSf: submission.renovation_per_sf as any,
+    renovationPerSf: Number(submission.renovation_per_sf),
     userEstimatedAsIsValue: submission.user_estimated_as_is_value || 0, // Fallback for old submissions
     userEstimatedArv: submission.user_estimated_arv || 0, // Fallback for old submissions
     interestRate: submission.interest_rate,
