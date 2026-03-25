@@ -1,15 +1,16 @@
-import { calculateARV, mapPropertyType, searchComparables } from "./comps";
+import { calculateARV, mapPropertyType, getRadiusForMarketAndTier } from "./comps";
 import { getRentCastClient } from "./client";
 import { RentCastAVMParams, AVMMetadata, NormalizedComparable } from "./types";
 import { UnderwritingFormData, PropertyComps } from "@/types/underwriting";
 import { retryWithBackoff } from "./retry";
 
 /**
- * Get property as-is value from RentCast AVM
+ * Get property as-is value from RentCast AVM with specified radius
  * Falls back to user estimate on error
  */
 async function getAsIsValue(
-  formData: UnderwritingFormData
+  formData: UnderwritingFormData,
+  maxRadius: number
 ): Promise<{
   asIsValue: number;
   avmMetadata: AVMMetadata;
@@ -17,7 +18,7 @@ async function getAsIsValue(
   subjectLatitude?: number;
   subjectLongitude?: number;
 }> {
-  console.log("[RentCast AVM] Fetching as-is value...");
+  console.log(`[RentCast AVM] Fetching as-is value (${maxRadius}mi radius)...`);
 
   const client = getRentCastClient();
 
@@ -29,7 +30,7 @@ async function getAsIsValue(
     squareFootage: formData.squareFeet,
     lookupSubjectAttributes: true, // Use actual property data for best accuracy
     // Comp filtering: tighter radius and more recent listings for better quality
-    maxRadius: 3, // Focus on nearby properties
+    maxRadius, // Use tiered radius based on market type
     daysOld: 365, // Properties sold/listed within last year
     compCount: 25, // RentCast API maximum (documented range: 5-25)
   };
@@ -136,8 +137,9 @@ async function getAsIsValue(
 }
 
 /**
- * Get property estimates using RentCast AVM endpoint + 3-tier comp search
- * Uses AVM for as-is value and 3-tier search for comparable sales
+ * Get property estimates using RentCast AVM endpoint exclusively
+ * Uses AVM for as-is value and comparables (up to 25 high-quality comps)
+ * Implements 3-tier radius escalation based on market type
  * Uses retry logic with email alerts on failure
  */
 export async function getRentCastPropertyEstimates(
@@ -145,56 +147,99 @@ export async function getRentCastPropertyEstimates(
 ): Promise<PropertyComps> {
   console.log("[RentCast] Starting property estimation...");
 
-  // Execute AVM and comp search in parallel with retry logic
-  const [avmResult, compsResult] = await Promise.all([
-    retryWithBackoff(
-      () => getAsIsValue(formData),
+  const marketType = formData.marketType || "Suburban";
+  let tier: 1 | 2 | 3 = 1;
+  let avmResult: Awaited<ReturnType<typeof getAsIsValue>>;
+  let searchRadius = getRadiusForMarketAndTier(marketType, tier);
+
+  // Tier 1: Try with tight radius
+  try {
+    console.log(`[RentCast] Tier 1 AVM search (${searchRadius}mi radius)...`);
+    avmResult = await retryWithBackoff(
+      () => getAsIsValue(formData, searchRadius),
       { maxAttempts: 3, operationName: "RentCast AVM" }
-    ),
-    retryWithBackoff(
-      () => searchComparables(formData, {
-        maxTier: 3, // Use all 3 tiers (will escalate only if needed)
-        marketType: formData.marketType,
-      }),
-      { maxAttempts: 3, operationName: "RentCast Comps Search" }
-    ),
-  ]);
+    );
 
-  const { asIsValue, avmMetadata, subjectLatitude, subjectLongitude } = avmResult;
-  const { comps, tier, searchRadius } = compsResult;
+    console.log(`[RentCast] Tier 1 found ${avmResult.avmComparables.length} comps`);
 
-  if (comps.length === 0) {
+    // Only escalate if we have fewer than 20 comps
+    if (avmResult.avmComparables.length >= 20) {
+      console.log(`[RentCast] Tier 1 sufficient (${avmResult.avmComparables.length} comps), using these results`);
+    } else {
+      console.log(`[RentCast] Tier 1 returned only ${avmResult.avmComparables.length} comps (need 20+), escalating to Tier 2...`);
+      tier = 2;
+      searchRadius = getRadiusForMarketAndTier(marketType, tier);
+
+      console.log(`[RentCast] Tier 2 AVM search (${searchRadius}mi radius)...`);
+      avmResult = await retryWithBackoff(
+        () => getAsIsValue(formData, searchRadius),
+        { maxAttempts: 3, operationName: "RentCast AVM" }
+      );
+
+      console.log(`[RentCast] Tier 2 found ${avmResult.avmComparables.length} comps`);
+
+      if (avmResult.avmComparables.length >= 20) {
+        console.log(`[RentCast] Tier 2 sufficient (${avmResult.avmComparables.length} comps), using these results`);
+      } else {
+        console.log(`[RentCast] Tier 2 returned only ${avmResult.avmComparables.length} comps (need 20+), escalating to Tier 3...`);
+        tier = 3;
+        searchRadius = getRadiusForMarketAndTier(marketType, tier);
+
+        console.log(`[RentCast] Tier 3 AVM search (${searchRadius}mi radius, maximum reach)...`);
+        avmResult = await retryWithBackoff(
+          () => getAsIsValue(formData, searchRadius),
+          { maxAttempts: 3, operationName: "RentCast AVM" }
+        );
+
+        console.log(`[RentCast] Tier 3 found ${avmResult.avmComparables.length} comps (maximum reach)`);
+      }
+    }
+  } catch (error) {
+    console.error(`[RentCast] AVM failed at Tier ${tier}:`, error);
+    throw error;
+  }
+
+  const { asIsValue, avmComparables, avmMetadata, subjectLatitude, subjectLongitude } = avmResult;
+
+  // Use AVM comparables for ARV calculation
+  if (avmComparables.length === 0) {
     const error = new Error("No comparable sales found. Please try a different address.");
     (error as any).code = "NO_COMPS_FOUND";
     throw error;
   }
 
   console.log(
-    `[RentCast] Using ${comps.length} comparables from Tier ${tier} search (${searchRadius}mi radius) for ARV calculation`
+    `[RentCast] Using ${avmComparables.length} comparables from Tier ${tier} AVM search (${searchRadius}mi radius) for ARV calculation`
   );
 
   // Calculate ARV using percentile approach
-  const estimatedARV = calculateARV(comps, formData.rehab, formData.squareFeet);
+  const estimatedARV = calculateARV(avmComparables, formData.rehab, formData.squareFeet);
 
   // Build market analysis summary
   const avgPricePerSqft =
-    comps.reduce((sum, c) => sum + (c.pricePerSqft || 0), 0) / comps.length;
+    avmComparables.reduce((sum, c) => sum + (c.pricePerSqft || 0), 0) / avmComparables.length;
 
   const avmSource = avmMetadata.source === 'rentcast_avm'
     ? 'RentCast AVM'
     : 'user estimate (AVM unavailable)';
 
   const marketAnalysis =
-    `Based on ${comps.length} comparable sales (Tier ${tier} search within ${searchRadius} miles). ` +
+    `Based on ${avmComparables.length} comparable sales from RentCast AVM (Tier ${tier} search within ${searchRadius} miles). ` +
     `Average price per square foot: $${avgPricePerSqft.toFixed(2)}. ` +
-    `Search parameters: ${searchRadius}-mile radius, sold within 365 days. ` +
+    `Comps filtered by RentCast's proprietary algorithm for similarity and recency. ` +
     `As-is value from ${avmSource}.`;
 
-  // Determine confidence based on tier and comp count
+  // Determine confidence based on tier, AVM correlation scores and comp count
   let confidence: "high" | "medium" | "low";
-  if (tier === 1 && comps.length >= 20) {
+  // Calculate average correlation (0-1 scale from AVM)
+  const compsWithCorrelation = avmComparables.filter(c => c.correlation !== undefined);
+  const avgCorrelation = compsWithCorrelation.length > 0
+    ? compsWithCorrelation.reduce((sum, c) => sum + (c.correlation || 0), 0) / compsWithCorrelation.length
+    : 0;
+
+  if (tier === 1 && avmComparables.length >= 20 && avgCorrelation >= 0.85) {
     confidence = "high";
-  } else if (tier === 2 || (tier === 1 && comps.length >= 10)) {
+  } else if ((tier === 2 && avmComparables.length >= 15) || (tier === 1 && avmComparables.length >= 10) || avgCorrelation >= 0.75) {
     confidence = "medium";
   } else {
     confidence = "low";
@@ -203,7 +248,7 @@ export async function getRentCastPropertyEstimates(
   return {
     estimatedARV,
     asIsValue,
-    compsUsed: comps,
+    compsUsed: avmComparables,
     marketAnalysis,
     confidence,
     avmMetadata,

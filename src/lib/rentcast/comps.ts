@@ -8,14 +8,14 @@ import { MarketType, UnderwritingFormData } from "@/types/underwriting";
  * Tier 2: Moderate radius expansion
  * Tier 3: Maximum radius for data-sparse markets
  */
-function getRadiusForMarketAndTier(
+export function getRadiusForMarketAndTier(
   marketType: MarketType,
   tier: 1 | 2 | 3,
 ): number {
   const radii = {
-    Urban: [2, 4, 6], // Dense metro areas
-    Suburban: [3, 6, 9], // Mid-size cities
-    Rural: [6, 11, 16], // Small markets/towns
+    Urban: [1, 2, 3], // Dense metro areas
+    Suburban: [2, 3, 4], // Mid-size cities
+    Rural: [2, 3, 4], // Small markets/towns
   };
   return radii[marketType][tier - 1];
 }

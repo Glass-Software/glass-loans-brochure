@@ -124,6 +124,7 @@ export interface NormalizedComparable {
   listingUrl?: string; // Google search URL for the property
   latitude?: number; // For map display
   longitude?: number; // For map display
+  correlation?: number; // Similarity score (0-1) from AVM
 }
 
 // ============================================================================
