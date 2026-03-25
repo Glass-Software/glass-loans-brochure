@@ -17,7 +17,7 @@ const featuresData: Feature[] = [
       "Comprehensive loan portfolio management, enabling efficient tracking, analysis, and optimization of lending operations.",
   },
   {
-    id: 1,
+    id: 2,
     icon: (
       <svg width="40" height="40" viewBox="0 0 40 40" className="fill-current">
         <path
@@ -32,7 +32,7 @@ const featuresData: Feature[] = [
       "Precise and efficient payoff calculations, providing accurate loan settlement amounts for seamless financial transactions.",
   },
   {
-    id: 1,
+    id: 3,
     icon: (
       <svg width="40" height="40" viewBox="0 0 40 40" className="fill-current">
         <path
@@ -47,7 +47,7 @@ const featuresData: Feature[] = [
       "Streamlines task management, allowing teams to efficiently track, prioritize, and complete tasks with ease and transparency.",
   },
   {
-    id: 1,
+    id: 4,
     icon: (
       <svg width="40" height="42" viewBox="0 0 40 42" className="fill-current">
         <path
@@ -62,7 +62,7 @@ const featuresData: Feature[] = [
       "Secure storage, retrieval, and management of loan-related documents, ensuring compliance and easy access for both borrowers and lenders.",
   },
   {
-    id: 1,
+    id: 5,
     icon: (
       <svg width="40" height="40" viewBox="0 0 40 40" className="fill-current">
         <path
@@ -77,7 +77,7 @@ const featuresData: Feature[] = [
       "Automates and tracks loan payments, including recurring payments, late fees, and disbursements, to ensure timely and accurate transactions.",
   },
   {
-    id: 1,
+    id: 6,
     icon: (
       <svg width="40" height="45" viewBox="0 0 40 45" className="fill-current">
         <path

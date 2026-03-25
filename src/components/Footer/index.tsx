@@ -17,6 +17,7 @@ const Footer = () => {
                     className=" dark:hidden"
                     width={140}
                     height={30}
+                    style={{ height: 'auto' }}
                   />
                   <Image
                     src="/images/logo/glass_logo_2--thicc.svg"
@@ -24,6 +25,7 @@ const Footer = () => {
                     className="hidden dark:block"
                     width={140}
                     height={30}
+                    style={{ height: 'auto' }}
                   />
                 </Link>
                 <p className="mb-9 text-base leading-relaxed text-body-color dark:text-body-color-dark">

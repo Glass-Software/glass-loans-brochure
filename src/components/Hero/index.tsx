@@ -35,6 +35,8 @@ const Hero = () => {
                       src="/images/video/glass_dashboard_thumbnail_1.png"
                       alt="Glass Loans Software Demo"
                       fill
+                      sizes="(max-width: 770px) 100vw, 770px"
+                      priority
                       className="object-cover"
                     />
                     <div className="absolute right-0 top-0 flex h-full w-full items-center justify-center">

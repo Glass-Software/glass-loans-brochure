@@ -12,7 +12,7 @@ const nextConfig = {
         hostname: "localhost",
       },
     ],
-    minimumCacheTTL: 60,
+    // Removed minimumCacheTTL: 60 - using Next.js 16 default of 4 hours (14400 seconds)
     formats: ["image/avif", "image/webp"],
   },
 

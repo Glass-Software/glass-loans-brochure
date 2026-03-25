@@ -94,6 +94,7 @@ const Header = () => {
                   width={140}
                   height={30}
                   className="w-full dark:hidden"
+                  style={{ height: 'auto' }}
                 />
                 <Image
                   src="/images/logo/glass_logo_2--thicc.svg"
@@ -101,6 +102,7 @@ const Header = () => {
                   width={140}
                   height={30}
                   className="hidden w-full dark:block"
+                  style={{ height: 'auto' }}
                 />
               </Link>
             </div>
