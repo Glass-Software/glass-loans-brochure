@@ -480,6 +480,22 @@ export async function POST(request: Request) {
                   );
                   controller.close();
                   return;
+                } else if (providerError.code === "NO_COMPS_FOUND") {
+                  sendError(
+                    controller,
+                    "No comparable sales found. Please try a different address.",
+                    "NO_COMPS_FOUND",
+                  );
+                  controller.close();
+                  return;
+                } else if (providerError.code === "INSUFFICIENT_COMPS") {
+                  sendError(
+                    controller,
+                    "Sorry, we're unable to pull comps for this property. Please try another address with a complete city, state, and ZIP code.",
+                    "INSUFFICIENT_COMPS",
+                  );
+                  controller.close();
+                  return;
                 } else if (providerError.code === "RATE_LIMIT") {
                   console.warn("[Server] Rate limit hit, falling back to AI");
                 } else if (providerError.code === "NOT_FOUND") {

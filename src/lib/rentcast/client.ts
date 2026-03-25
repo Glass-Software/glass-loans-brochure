@@ -175,8 +175,25 @@ export class RentCastClient {
       console.log(`[RentCast AVM] Request completed in ${elapsed}ms`);
 
       if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+
+        // Handle insufficient comparables error
+        if (response.status === 400 && errorData.message?.includes('insufficient comparables')) {
+          throw new RentCastAPIError(
+            'Unable to find sufficient comparable properties for this address. Please try a different property or ensure the address includes city, state, and ZIP code.',
+            response.status,
+            'INSUFFICIENT_COMPS'
+          );
+        }
+
         throw new RentCastAPIError(
-          `RentCast AVM API error: ${response.statusText}`,
+          `RentCast AVM API error: ${errorData.message || response.statusText}`,
           response.status,
           this.getErrorCode(response.status)
         );

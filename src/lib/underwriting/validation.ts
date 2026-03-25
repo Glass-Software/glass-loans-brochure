@@ -29,6 +29,19 @@ export const Step1Schema = z.object({
     .string()
     .min(5, "Property address must be at least 5 characters")
     .max(500, "Property address is too long"),
+  propertyCity: z
+    .string()
+    .min(2, "City is required")
+    .max(100, "City name is too long"),
+  propertyState: z
+    .string()
+    .length(2, "State must be 2 letters (e.g., TX, CA)")
+    .regex(/^[A-Z]{2}$/, "State must be 2 uppercase letters"),
+  propertyZip: z
+    .string()
+    .min(5, "ZIP code must be at least 5 digits")
+    .max(10, "ZIP code is too long")
+    .regex(/^\d{5}(-\d{4})?$/, "ZIP code must be in format 12345 or 12345-6789"),
   purchasePrice: z
     .number()
     .min(1000, "Purchase price must be at least $1,000")

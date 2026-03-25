@@ -88,11 +88,33 @@ export async function POST(request: NextRequest) {
       success: true,
       propertyComps,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ Fetch comps error:", error);
     console.error("❌ Error type:", typeof error);
     console.error("❌ Error constructor:", error?.constructor?.name);
     console.error("❌ Error stack:", error instanceof Error ? error.stack : "No stack");
+
+    // Handle NO_COMPS_FOUND error gracefully with user-friendly message
+    if (error.code === "NO_COMPS_FOUND") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No comparable sales found. Please try a different address.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // Handle INSUFFICIENT_COMPS error from RentCast API
+    if (error.code === "INSUFFICIENT_COMPS") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Sorry, we're unable to pull comps for this property. Please try another address with a complete city, state, and ZIP code.",
+        },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json(
       {

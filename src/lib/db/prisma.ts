@@ -13,9 +13,11 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
+  console.log("🔵 [Prisma] Creating Prisma client...");
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL environment variable is not set");
   }
+  console.log("🔵 [Prisma] DATABASE_URL found, creating Pool...");
 
   // Create PostgreSQL connection pool with serverless-optimized settings
   // References:
@@ -38,11 +40,6 @@ function createPrismaClient(): PrismaClient {
     // Default 10s is too aggressive, 30s recommended for most apps
     // Must be lower than infrastructure timeouts (load balancer, PgBouncer)
 
-    // Query statement timeout (prevents runaway queries)
-    // Note: Set high enough for legitimate long-running queries (OpenRouter can exceed 60s)
-    // This is a safety net, not a performance optimization
-    statement_timeout: 30000, // 30 sec max for any single query
-
     // Keep-alive to detect dead connections early
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
@@ -51,15 +48,21 @@ function createPrismaClient(): PrismaClient {
     maxUses: 7500, // Close connection after 7500 queries
   });
 
+  console.log("🔵 [Prisma] Pool created, creating adapter...");
+
   // Create Prisma adapter for PostgreSQL
   // @ts-ignore - Type mismatch between @types/pg versions (functionally identical)
   const adapter = new PrismaPg(pool);
+  console.log("🔵 [Prisma] Adapter created, creating Prisma Client...");
 
   // Create Prisma Client with adapter and timeout protection
-  return new PrismaClient({
+  const client = new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
+  console.log("✅ [Prisma] Prisma Client created successfully");
+
+  return client;
 }
 
 /**

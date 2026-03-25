@@ -30,6 +30,8 @@ export const dynamic = 'force-dynamic'; // Ensure no caching
 export async function POST(request: Request) {
   const startTime = Date.now();
   console.log("🔵 [send-code] Starting request...");
+  console.log("🔵 [send-code] DATABASE_URL exists:", !!process.env.DATABASE_URL);
+  console.log("🔵 [send-code] DATABASE_URL starts with:", process.env.DATABASE_URL?.substring(0, 20));
 
   if (!process.env.SENDGRID_API_KEY) {
     return NextResponse.json(
@@ -62,15 +64,19 @@ export async function POST(request: Request) {
     // Check if user exists or create new one (with timeout protection)
     let user;
     try {
-      console.log("🔵 [send-code] Querying database for user...");
+      console.log("🔵 [send-code] About to call findUserByNormalizedEmail...");
+      const findUserPromise = findUserByNormalizedEmail(normalizedEmail);
+      console.log("🔵 [send-code] findUserByNormalizedEmail called, waiting for response...");
+
       user = await withTimeout(
-        findUserByNormalizedEmail(normalizedEmail),
+        findUserPromise,
         3000,
         "Database query (findUser)"
       );
       console.log(`🔵 [send-code] User query completed in ${Date.now() - startTime}ms`);
     } catch (error: any) {
-      console.error("❌ [send-code] Database query timeout:", error.message);
+      console.error("❌ [send-code] Database query error:", error.message);
+      console.error("❌ [send-code] Error stack:", error.stack);
       return NextResponse.json(
         { error: "Database timeout. Please try again." },
         { status: 503 }

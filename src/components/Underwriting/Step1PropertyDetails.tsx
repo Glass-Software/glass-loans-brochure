@@ -243,6 +243,9 @@ export default function Step1PropertyDetails() {
 
     const stepData = {
       propertyAddress: formData.propertyAddress || "",
+      propertyCity: formData.propertyCity || "",
+      propertyState: formData.propertyState || "",
+      propertyZip: formData.propertyZip || "",
       purchasePrice: formData.purchasePrice || 0,
       rehab: formData.rehab || 0,
       squareFeet: formData.squareFeet || 0,
@@ -343,40 +346,46 @@ export default function Step1PropertyDetails() {
         <div className="w-full px-4 md:w-1/3">
           <div className="mb-8">
             <label htmlFor="propertyCity" className={labelClass}>
-              City
+              City *
             </label>
             <input
               type="text"
               id="propertyCity"
               value={formData.propertyCity || ""}
               onChange={(e) => updateFormData({ propertyCity: e.target.value })}
-              placeholder="City"
+              placeholder="Nashville"
               className={inputClass}
             />
+            {errors.propertyCity && (
+              <p className={errorClass}>{errors.propertyCity}</p>
+            )}
           </div>
         </div>
 
         <div className="w-full px-4 md:w-1/3">
           <div className="mb-8">
             <label htmlFor="propertyState" className={labelClass}>
-              State
+              State *
             </label>
             <input
               type="text"
               id="propertyState"
               value={formData.propertyState || ""}
               onChange={(e) => updateFormData({ propertyState: e.target.value.toUpperCase().slice(0, 2) })}
-              placeholder="State"
+              placeholder="TX"
               maxLength={2}
               className={inputClass}
             />
+            {errors.propertyState && (
+              <p className={errorClass}>{errors.propertyState}</p>
+            )}
           </div>
         </div>
 
         <div className="w-full px-4 md:w-1/3">
           <div className="mb-8">
             <label htmlFor="propertyZip" className={labelClass}>
-              ZIP Code
+              ZIP Code *
             </label>
             <input
               type="text"
@@ -387,6 +396,9 @@ export default function Step1PropertyDetails() {
               maxLength={10}
               className={inputClass}
             />
+            {errors.propertyZip && (
+              <p className={errorClass}>{errors.propertyZip}</p>
+            )}
           </div>
         </div>
 

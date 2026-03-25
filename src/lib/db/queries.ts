@@ -58,8 +58,19 @@ export async function findUserByEmail(email: string): Promise<User | null> {
  * Find user by normalized email
  */
 export async function findUserByNormalizedEmail(normalizedEmail: string): Promise<User | null> {
-  const user = await prisma.user.findUnique({ where: { normalizedEmail } });
-  return user ? toPrismaUserToLegacy(user) : null;
+  console.log("🔵 [queries] findUserByNormalizedEmail called for:", normalizedEmail);
+  console.log("🔵 [queries] prisma client exists:", !!prisma);
+
+  try {
+    console.log("🔵 [queries] Executing prisma.user.findUnique...");
+    const user = await prisma.user.findUnique({ where: { normalizedEmail } });
+    console.log("🔵 [queries] Query completed, user found:", !!user);
+    return user ? toPrismaUserToLegacy(user) : null;
+  } catch (error: any) {
+    console.error("❌ [queries] Error in findUserByNormalizedEmail:", error.message);
+    console.error("❌ [queries] Error stack:", error.stack);
+    throw error;
+  }
 }
 
 /**

@@ -66,70 +66,26 @@ const providers: Record<CompsProvider, CompsProviderInterface> = {
 };
 
 /**
- * Get the current provider configuration from environment
- */
-function getProviderConfig(): ProviderConfig {
-  // Check environment variable for provider preference
-  const primaryProvider = (process.env.COMPS_PROVIDER || "rentcast") as CompsProvider;
-
-  // Default fallback order: rentcast -> realie
-  const fallback: CompsProvider[] = ["rentcast", "realie"].filter(
-    p => p !== primaryProvider
-  ) as CompsProvider[];
-
-  return {
-    primary: primaryProvider,
-    fallback,
-  };
-}
-
-/**
- * Get property estimates using the configured provider with fallback support
+ * Get property estimates using RentCast (no fallback)
  */
 export async function getPropertyEstimates(
   formData: UnderwritingFormData
 ): Promise<PropertyComps & { providerUsed: string }> {
-  const config = getProviderConfig();
-  const providersToTry = [config.primary, ...(config.fallback || [])];
+  const providerName = (process.env.COMPS_PROVIDER || "rentcast") as CompsProvider;
+  const provider = providers[providerName];
 
-  let lastError: Error | null = null;
-
-  for (const providerName of providersToTry) {
-    const provider = providers[providerName];
-
-    if (!provider.isAvailable()) {
-      console.log(`[Provider] ${provider.getName()} is not available (missing API key)`);
-      continue;
-    }
-
-    try {
-      console.log(`[Provider] Attempting to use ${provider.getName()}...`);
-      const result = await provider.getPropertyEstimates(formData);
-      console.log(`[Provider] ✅ Successfully used ${provider.getName()}`);
-
-      return {
-        ...result,
-        providerUsed: provider.getName(),
-      };
-    } catch (error: any) {
-      console.error(`[Provider] ❌ ${provider.getName()} failed:`, error.message);
-      console.error(`[Provider] Error details:`, error);
-      lastError = error;
-
-      // If it's a critical error (invalid address, etc.), don't try fallback
-      if (error.code === "INVALID_PARAMS" || error.code === "INVALID_ADDRESS") {
-        throw error;
-      }
-
-      // Continue to next provider
-      continue;
-    }
+  if (!provider.isAvailable()) {
+    throw new Error(`${provider.getName()} is not available (missing API key)`);
   }
 
-  // If we get here, all providers failed
-  throw new Error(
-    `All data providers failed. Last error: ${lastError?.message || "Unknown error"}`
-  );
+  console.log(`[Provider] Using ${provider.getName()}...`);
+  const result = await provider.getPropertyEstimates(formData);
+  console.log(`[Provider] ✅ Successfully used ${provider.getName()}`);
+
+  return {
+    ...result,
+    providerUsed: provider.getName(),
+  };
 }
 
 /**
