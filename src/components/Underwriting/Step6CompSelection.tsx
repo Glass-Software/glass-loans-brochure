@@ -4,30 +4,40 @@ import { useEffect, useRef, useState } from "react";
 import { useUnderwriting } from "@/context/UnderwritingContext";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { formatPricePerSqft } from "@/lib/underwriting/calculations";
 import type { PropertyComparable } from "@/types/underwriting";
+import CompCardSquare from "./CompCardSquare";
+import SortDropdown, { SortOption } from "./SortDropdown";
+import ResizablePanel from "./ResizablePanel";
+import { formatPricePerSqft } from "@/lib/underwriting/calculations";
 
-/**
- * Escape HTML special characters to prevent XSS attacks
- */
-function escapeHtml(text: string): string {
-  const map: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
-  };
-  return text.replace(/[&<>"']/g, (m) => map[m] || m);
+interface Step6CompSelectionProps {
+  error?: string;
 }
 
-export default function Step6CompSelection() {
+/**
+ * Step 6: Zillow-style Comparable Properties Selection
+ *
+ * Features:
+ * - Desktop: Large map + resizable drawer with comp cards
+ * - Mobile: Toggle between map and list views
+ * - Sorting: 9 sort options (distance, price, sqft, year, $/sqft)
+ * - Map interaction: Click marker → scroll to comp and highlight
+ *
+ * Demo Mode:
+ * - Add ?demo=true to URL to load test data from "514 Betty Lou Drive"
+ * - Example: http://localhost:3000/underwrite?demo=true
+ * - Navigate to Step 6 to see the Zillow-style UI with real comp data
+ */
+export default function Step6CompSelection({
+  error,
+}: Step6CompSelectionProps = {}) {
   const {
     propertyComps,
     compSelectionState,
     updateCompSelection,
     getActiveCompsCount,
     formData,
+    updateFormData,
     setIsProcessing,
     setProgressStatus,
     setProgressPercent,
@@ -43,19 +53,105 @@ export default function Step6CompSelection() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const compMarkersRef = useRef<Map<number, mapboxgl.Marker>>(new Map());
+  const compCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingComps, setIsLoadingComps] = useState(!propertyComps);
+  const [sortBy, setSortBy] = useState<SortOption>("distance");
+  const [highlightedCompIndex, setHighlightedCompIndex] = useState<
+    number | null
+  >(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [mobileView, setMobileView] = useState<"map" | "list">("map");
+  const [selectedCompForModal, setSelectedCompForModal] = useState<
+    number | null
+  >(null);
+
+  // Check for demo mode on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    setIsDemoMode(urlParams.get("demo") === "true");
+  }, []);
+
+  // Load demo data from existing submission
+  const loadDemoData = async () => {
+    setIsProcessing(true);
+    setProgressStep(1);
+    setProgressStatus("Loading demo data...");
+    setProgressPercent(30);
+
+    try {
+      const response = await fetch("/api/underwrite/demo-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "hervey711@gmail.com",
+          propertyAddress: "514 betty lou",
+          // Optional: add demoKey if needed in production
+          // demoKey: "your-demo-key-here"
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to load demo data");
+      }
+
+      const demoData = await response.json();
+
+      if (!demoData.success) {
+        throw new Error("No demo data received");
+      }
+
+      setProgressStatus("Setting up demo...");
+      setProgressPercent(80);
+
+      // Update context with demo data
+      setPropertyComps(demoData.propertyComps);
+      setCompSelectionState(demoData.compSelectionState);
+
+      // Also update formData if needed
+      Object.entries(demoData.formData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          updateFormData({ [key]: value });
+        }
+      });
+
+      setProgressPercent(100);
+      setProgressStatus("Demo loaded!");
+
+      console.log("✅ Demo mode: Loaded data from 514 Betty Lou Drive");
+    } catch (error: any) {
+      console.error("Demo data error:", error);
+      setError(
+        error.message ||
+          "Failed to load demo data. Please try without demo mode.",
+      );
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => {
+        setProgressStep(0);
+        setProgressStatus("");
+        setProgressPercent(0);
+      }, 1000);
+    }
+  };
 
   // Fetch comps when component mounts (if not already loaded)
   useEffect(() => {
     if (propertyComps) return; // Already loaded
 
+    // If demo mode, load demo data instead
+    if (isDemoMode) {
+      loadDemoData();
+      return;
+    }
+
     const fetchCompsWithRetry = async (attempt = 1, maxAttempts = 3) => {
-      setIsLoadingComps(true);
       setIsProcessing(true);
       setProgressStep(1);
 
-      const attemptText = attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : "";
+      const attemptText =
+        attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : "";
       setProgressStatus(`Fetching comparable properties${attemptText}...`);
       setProgressPercent(30);
 
@@ -91,11 +187,13 @@ export default function Step6CompSelection() {
         setPropertyComps(compsData.propertyComps);
 
         // Initialize selection state (all normal by default)
-        const initialState = compsData.propertyComps.compsUsed.map((_: any, idx: number) => ({
-          compIndex: idx,
-          emphasized: false,
-          removed: false,
-        }));
+        const initialState = compsData.propertyComps.compsUsed.map(
+          (_: any, idx: number) => ({
+            compIndex: idx,
+            emphasized: false,
+            removed: false,
+          }),
+        );
         setCompSelectionState(initialState);
 
         setProgressPercent(100);
@@ -104,21 +202,26 @@ export default function Step6CompSelection() {
         console.error(`Fetch comps error (attempt ${attempt}):`, error);
 
         // Retry logic for timeout/network errors
-        const isRetryable = error.name === "AbortError" || error.message.includes("timeout") || error.message.includes("network");
+        const isRetryable =
+          error.name === "AbortError" ||
+          error.message.includes("timeout") ||
+          error.message.includes("network");
 
         if (isRetryable && attempt < maxAttempts) {
           // Exponential backoff: 2s, 4s
           const delay = Math.pow(2, attempt) * 1000;
           setProgressStatus(`Retrying in ${delay / 1000}s...`);
 
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
           return fetchCompsWithRetry(attempt + 1, maxAttempts);
         }
 
         // Final failure
-        setError(error.message || "Failed to fetch comparable properties. Please try refreshing the page.");
+        setError(
+          error.message ||
+            "Failed to fetch comparable properties. Please try refreshing the page.",
+        );
       } finally {
-        setIsLoadingComps(false);
         setIsProcessing(false);
         // Reset progress
         setTimeout(() => {
@@ -130,36 +233,19 @@ export default function Step6CompSelection() {
     };
 
     fetchCompsWithRetry();
-  }, [propertyComps, formData, setPropertyComps, setCompSelectionState, setIsProcessing, setProgressStep, setProgressStatus, setProgressPercent, setError]);
-
-  // Expose comp update function to window for map marker clicks
-  useEffect(() => {
-    (window as any).updateCompFromMap = (compIndex: number, action: string) => {
-      const activeCount = getActiveCompsCount();
-      const currentState = compSelectionState.find((s) => s.compIndex === compIndex);
-      const isCurrentlyRemoved = currentState?.removed || false;
-
-      // Prevent removing if at minimum (3 comps)
-      if (action === 'remove' && activeCount <= 3 && !isCurrentlyRemoved) {
-        setError("Cannot remove comp - minimum 3 required");
-        setTimeout(() => setError(null), 3000);
-        return;
-      }
-
-      // Update comp selection state
-      if (action === 'emphasize') {
-        updateCompSelection(compIndex, { emphasized: true, removed: false });
-      } else if (action === 'normal') {
-        updateCompSelection(compIndex, { emphasized: false, removed: false });
-      } else if (action === 'remove') {
-        updateCompSelection(compIndex, { emphasized: false, removed: true });
-      }
-    };
-
-    return () => {
-      delete (window as any).updateCompFromMap;
-    };
-  }, [compSelectionState, getActiveCompsCount, updateCompSelection, setError]);
+  }, [
+    propertyComps,
+    formData,
+    email,
+    isDemoMode,
+    setPropertyComps,
+    setCompSelectionState,
+    setIsProcessing,
+    setProgressStep,
+    setProgressStatus,
+    setProgressPercent,
+    setError,
+  ]);
 
   // Initialize Mapbox map
   useEffect(() => {
@@ -172,36 +258,60 @@ export default function Step6CompSelection() {
 
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_API_KEY;
 
+    // Use subject property coordinates from propertyComps (more reliable than formData)
+    const centerLng =
+      propertyComps.subjectLongitude || formData.propertyLongitude || -86.7816;
+    const centerLat =
+      propertyComps.subjectLatitude || formData.propertyLatitude || 36.1627;
+
+    console.log("🗺️ Initializing map at:", { centerLat, centerLng });
+    console.log("🗺️ Map container dimensions:", {
+      width: mapContainer.current.offsetWidth,
+      height: mapContainer.current.offsetHeight,
+    });
+
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [
-        formData.propertyLongitude || -86.7816,
-        formData.propertyLatitude || 36.1627,
-      ],
+      center: [centerLng, centerLat],
       zoom: 12,
+    });
+
+    map.on("load", () => {
+      console.log("🗺️ Map loaded successfully");
+      // Force resize to ensure map fills container properly
+      map.resize();
+    });
+
+    map.on("error", (e) => {
+      console.error("🗺️ Map error:", e);
     });
 
     mapRef.current = map;
 
+    // Force an initial resize after a short delay to ensure container has dimensions
+    setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.resize();
+        console.log("🗺️ Map resized");
+      }
+    }, 100);
+
     // Add subject property marker (red/orange star to stand out)
-    if (formData.propertyLatitude && formData.propertyLongitude) {
+    const subjectLat =
+      propertyComps.subjectLatitude || formData.propertyLatitude;
+    const subjectLng =
+      propertyComps.subjectLongitude || formData.propertyLongitude;
+
+    if (subjectLat && subjectLng) {
       const subjectMarker = new mapboxgl.Marker({ color: "#FF6B35" }) // Bright orange-red
-        .setLngLat([formData.propertyLongitude, formData.propertyLatitude])
-        .setPopup(
-          new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<div class="p-2">
-              <p class="font-semibold text-orange-600">📍 Subject Property</p>
-              <p class="text-sm">${formData.propertyAddress || "Your Property"}</p>
-            </div>`
-          )
-        )
+        .setLngLat([subjectLng, subjectLat])
         .addTo(map);
 
       markersRef.current.push(subjectMarker);
     }
 
-    // Add comp markers with clickable popups
+    // Add comp markers with click handlers (no popups)
     propertyComps.compsUsed.forEach((comp, idx) => {
       if (!comp.latitude || !comp.longitude) return;
 
@@ -212,55 +322,43 @@ export default function Step6CompSelection() {
           ? "#10B981"
           : "#4A6CF7";
 
-      const isEmphasized = state?.emphasized || false;
-      const isRemoved = state?.removed || false;
-      const isNormal = !isEmphasized && !isRemoved;
-
-      // Generate link: use listing URL if available, otherwise search Google
-      const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
-
-      // Create interactive popup with action buttons
-      const popupHTML = `
-        <div style="padding: 12px; min-width: 220px;">
-          <a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #2563eb; text-decoration: underline;">${escapeHtml(comp.address)}</a>
-          <p style="font-size: 12px; margin-bottom: 4px; color: #374151;">$${comp.price.toLocaleString()} • $${formatPricePerSqft(comp.price, comp.sqft)}/sqft</p>
-          <p style="font-size: 12px; margin-bottom: 12px; color: #6b7280;">${comp.bedrooms} bed • ${comp.bathrooms} bath • ${comp.sqft.toLocaleString()} sqft</p>
-          <div class="flex gap-1">
-            <button
-              onclick="window.updateCompFromMap(${idx}, 'emphasize')"
-              class="flex-1 px-2 py-1.5 text-xs rounded font-medium ${isEmphasized ? 'bg-green-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}"
-            >
-              ${isEmphasized ? '✓ ' : ''}Emphasize
-            </button>
-            <button
-              onclick="window.updateCompFromMap(${idx}, 'normal')"
-              class="flex-1 px-2 py-1.5 text-xs rounded font-medium ${isNormal ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}"
-            >
-              ${isNormal ? '✓ ' : ''}Normal
-            </button>
-            <button
-              onclick="window.updateCompFromMap(${idx}, 'remove')"
-              class="flex-1 px-2 py-1.5 text-xs rounded font-medium ${isRemoved ? 'bg-gray-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}"
-            >
-              ${isRemoved ? '✓ ' : ''}Remove
-            </button>
-          </div>
-        </div>
-      `;
-
       const marker = new mapboxgl.Marker({ color })
         .setLngLat([comp.longitude, comp.latitude])
-        .setPopup(new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(popupHTML))
         .addTo(map);
 
-      // Make marker clickable - open popup on click
-      marker.getElement().style.cursor = 'pointer';
+      // Make marker clickable - show modal on mobile, scroll to comp on desktop
+      marker.getElement().style.cursor = "pointer";
+      marker.getElement().addEventListener("click", (e) => {
+        // Prevent event bubbling
+        e.stopPropagation();
+
+        // On mobile, show modal; on desktop, scroll to comp
+        if (window.innerWidth < 1024) {
+          setSelectedCompForModal(idx);
+
+          // Animate the marker
+          const svg = marker.getElement().querySelector("svg");
+          if (svg) {
+            svg.style.transition = "transform 150ms ease-out";
+            svg.style.transform = "scale(1.2) translateY(-10px)";
+            setTimeout(() => {
+              svg.style.transform = "scale(1) translateY(0)";
+            }, 150);
+            setTimeout(() => {
+              svg.style.transition = "";
+              svg.style.transform = "";
+            }, 300);
+          }
+        } else {
+          handleMarkerClick(idx);
+        }
+      });
 
       markersRef.current.push(marker);
       compMarkersRef.current.set(idx, marker);
     });
 
-    // Cleanup on unmount
+    // Cleanup on unmount only
     return () => {
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = [];
@@ -270,9 +368,22 @@ export default function Step6CompSelection() {
         mapRef.current = null;
       }
     };
-  }, [propertyComps, formData]);
+  }, [propertyComps, formData]); // Removed compSelectionState - map should only initialize once
 
-  // Update marker colors and popups when selection state changes
+  // Resize map when switching to map view on mobile
+  useEffect(() => {
+    if (mobileView === "map" && mapRef.current) {
+      // Small delay to ensure the container is visible and has dimensions
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.resize();
+          console.log("🗺️ Map resized after mobile view switch");
+        }
+      }, 100);
+    }
+  }, [mobileView]);
+
+  // Update marker colors when selection state changes
   useEffect(() => {
     if (!mapRef.current || !propertyComps) return;
 
@@ -288,59 +399,97 @@ export default function Step6CompSelection() {
           ? "#10B981"
           : "#4A6CF7";
 
-      const isEmphasized = state?.emphasized || false;
-      const isRemoved = state?.removed || false;
-      const isNormal = !isEmphasized && !isRemoved;
-
       // Update marker color by replacing the marker element
       const element = marker.getElement();
-      const svg = element.querySelector('svg');
+      const svg = element.querySelector("svg");
       if (svg) {
-        const path = svg.querySelector('path');
+        const path = svg.querySelector("path");
         if (path) {
-          path.setAttribute('fill', color);
+          path.setAttribute("fill", color);
         }
-      }
-
-      // Generate link: use listing URL if available, otherwise search Google
-      const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
-
-      // Update popup HTML with new state
-      const popupHTML = `
-        <div style="padding: 12px; min-width: 220px;">
-          <a href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #2563eb; text-decoration: underline;">${escapeHtml(comp.address)}</a>
-          <p style="font-size: 12px; margin-bottom: 4px; color: #374151;">$${comp.price.toLocaleString()} • $${formatPricePerSqft(comp.price, comp.sqft)}/sqft</p>
-          <p style="font-size: 12px; margin-bottom: 12px; color: #6b7280;">${comp.bedrooms} bed • ${comp.bathrooms} bath • ${comp.sqft.toLocaleString()} sqft</p>
-          <div class="flex gap-1">
-            <button
-              onclick="window.updateCompFromMap(${idx}, 'emphasize')"
-              class="flex-1 px-2 py-1.5 text-xs rounded font-medium ${isEmphasized ? 'bg-green-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}"
-            >
-              ${isEmphasized ? '✓ ' : ''}Emphasize
-            </button>
-            <button
-              onclick="window.updateCompFromMap(${idx}, 'normal')"
-              class="flex-1 px-2 py-1.5 text-xs rounded font-medium ${isNormal ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}"
-            >
-              ${isNormal ? '✓ ' : ''}Normal
-            </button>
-            <button
-              onclick="window.updateCompFromMap(${idx}, 'remove')"
-              class="flex-1 px-2 py-1.5 text-xs rounded font-medium ${isRemoved ? 'bg-gray-500 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'}"
-            >
-              ${isRemoved ? '✓ ' : ''}Remove
-            </button>
-          </div>
-        </div>
-      `;
-
-      // Update the popup content
-      const popup = marker.getPopup();
-      if (popup) {
-        popup.setHTML(popupHTML);
       }
     });
   }, [compSelectionState, propertyComps]);
+
+  // Handle marker click - scroll to comp and highlight
+  const handleMarkerClick = (compIndex: number) => {
+    // Scroll to comp card
+    const element = compCardRefs.current.get(compIndex);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      // Highlight temporarily
+      setHighlightedCompIndex(compIndex);
+      setTimeout(() => setHighlightedCompIndex(null), 2000);
+    }
+  };
+
+  // Handle comp card click - animate the marker and show modal on mobile map view
+  const handleCompCardClick = (compIndex: number) => {
+    if (!mapRef.current) return;
+
+    const comp = propertyComps.compsUsed[compIndex];
+    if (comp && comp.latitude && comp.longitude) {
+      // On mobile map view, open modal
+      if (window.innerWidth < 1024 && mobileView === "map") {
+        setSelectedCompForModal(compIndex);
+      }
+
+      // Animate marker on all resolutions
+      const marker = markersRef.current[compIndex + 1]; // +1 because index 0 is subject property
+      if (marker) {
+        const element = marker.getElement();
+        const svg = element.querySelector("svg");
+
+        if (svg) {
+          // Apply snappy scale + bounce animation to SVG only
+          svg.style.transition = "transform 150ms ease-out";
+          svg.style.transform = "scale(1.2) translateY(-10px)";
+
+          // Return to normal
+          setTimeout(() => {
+            svg.style.transform = "scale(1) translateY(0)";
+          }, 150);
+
+          // Clear inline styles after animation completes
+          setTimeout(() => {
+            svg.style.transition = "";
+            svg.style.transform = "";
+          }, 300);
+        }
+      }
+    }
+  };
+
+  // Sort comps based on selected option
+  const sortComps = (
+    comps: PropertyComparable[],
+    sortOption: SortOption,
+  ): PropertyComparable[] => {
+    const sorted = [...comps];
+    switch (sortOption) {
+      case "price-high":
+        return sorted.sort((a, b) => b.price - a.price);
+      case "price-low":
+        return sorted.sort((a, b) => a.price - b.price);
+      case "sqft-high":
+        return sorted.sort((a, b) => b.sqft - a.sqft);
+      case "sqft-low":
+        return sorted.sort((a, b) => a.sqft - b.sqft);
+      case "year-new":
+        return sorted.sort((a, b) => (b.yearBuilt || 0) - (a.yearBuilt || 0));
+      case "year-old":
+        return sorted.sort((a, b) => (a.yearBuilt || 0) - (b.yearBuilt || 0));
+      case "psf-high":
+        return sorted.sort((a, b) => b.price / b.sqft - a.price / a.sqft);
+      case "psf-low":
+        return sorted.sort((a, b) => a.price / a.sqft - b.price / b.sqft);
+      case "distance":
+      default:
+        // Already sorted by distance from API
+        return comps;
+    }
+  };
 
   const handleSubmit = async () => {
     if (!propertyComps || !email) {
@@ -351,7 +500,9 @@ export default function Step6CompSelection() {
     // Validate minimum comps
     const activeCount = getActiveCompsCount();
     if (activeCount < 3) {
-      setError("At least 3 comps must be selected. Please adjust your selections.");
+      setError(
+        "At least 3 comps must be selected. Please adjust your selections.",
+      );
       return;
     }
 
@@ -365,7 +516,11 @@ export default function Step6CompSelection() {
     try {
       // Get reCAPTCHA token (skip if not configured)
       let recaptchaToken = null;
-      if (typeof window !== "undefined" && window.grecaptcha && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+      if (
+        typeof window !== "undefined" &&
+        window.grecaptcha &&
+        process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+      ) {
         try {
           recaptchaToken = await new Promise<string>((resolve, reject) => {
             window.grecaptcha.ready(() => {
@@ -378,7 +533,10 @@ export default function Step6CompSelection() {
             });
           });
         } catch (error) {
-          console.warn("reCAPTCHA execution failed, continuing without it:", error);
+          console.warn(
+            "reCAPTCHA execution failed, continuing without it:",
+            error,
+          );
         }
       }
 
@@ -464,216 +622,348 @@ export default function Step6CompSelection() {
 
   const activeCount = getActiveCompsCount();
 
-  // Sort comps by distance (closest first)
-  const sortedCompsWithIndices = propertyComps.compsUsed
-    .map((comp, originalIndex) => ({ comp, originalIndex }))
-    .sort((a, b) => {
-      // Extract numeric distance value for sorting
-      const distanceA = a.comp.distance ? parseFloat(a.comp.distance) : Infinity;
-      const distanceB = b.comp.distance ? parseFloat(b.comp.distance) : Infinity;
-      return distanceA - distanceB;
-    });
-
-  return (
-    <div>
-      <h3 className="mb-4 text-xl font-semibold text-dark dark:text-white">
-        Review & Select Comparable Properties
-      </h3>
-
-      <div className="mb-6 rounded-sm border-l-4 border-primary bg-blue-50 p-4 dark:bg-blue-900/20">
-        <p className="mb-2 text-sm font-medium text-dark dark:text-white">
-          Think about your property after renovation is complete.
-        </p>
-        <ul className="list-inside list-disc space-y-1 text-sm text-body-color dark:text-body-color-dark">
-          <li>
-            <strong>Emphasize</strong> comps that match your finished property
-          </li>
-          <li>
-            <strong>Remove</strong> comps that aren&apos;t comparable
-          </li>
-          <li>
-            Leave others as <strong>Normal</strong>
-          </li>
-        </ul>
-      </div>
-
-      <p className="mb-6 text-sm text-body-color dark:text-body-color-dark">
-        Review {propertyComps.compsUsed.length} comparable properties found for{" "}
-        {formData.propertyAddress}. At least 3 comps must remain active.
-      </p>
-
-      {/* Comp count indicator */}
-      <div className="mb-6 rounded-sm bg-blue-50 p-4 dark:bg-blue-900/20">
-        <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-          {activeCount} of {propertyComps.compsUsed.length} comps selected
-          {activeCount < 3 && (
-            <span className="ml-2 text-danger">
-              (minimum 3 required)
-            </span>
-          )}
-        </p>
-      </div>
-
-      {/* Map */}
-      <div
-        ref={mapContainer}
-        className="mb-6 h-96 w-full rounded-sm border border-stroke dark:border-stroke-dark"
-      />
-
-      {/* Generate Report Button (under map) */}
-      <div className="mb-6 flex justify-center">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSubmitting || activeCount < 3}
-          className="rounded-sm bg-primary px-8 py-3 text-base font-medium text-white transition duration-300 ease-in-out hover:bg-primary/90 hover:shadow-submit disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isSubmitting ? "Generating Report..." : "Generate Report"}
-        </button>
-      </div>
-
-      {/* Comp Cards - Vertical List (sorted by distance) */}
-      <div className="mb-8 space-y-4">
-        {sortedCompsWithIndices.map(({ comp, originalIndex }) => (
-          <CompCard
-            key={originalIndex}
-            comp={comp}
-            index={originalIndex}
-            state={compSelectionState.find((s) => s.compIndex === originalIndex)}
-            onUpdate={(updates) => updateCompSelection(originalIndex, updates)}
-            disableRemove={activeCount <= 3}
-          />
-        ))}
-      </div>
-
-      {/* Submit Button (bottom) */}
-      <div className="flex justify-between">
-        <button
-          type="button"
-          onClick={() => window.history.back()}
-          className="rounded-sm border border-stroke px-6 py-3 text-base font-medium text-body-color hover:bg-gray-light dark:border-stroke-dark dark:hover:bg-gray-dark"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSubmitting || activeCount < 3}
-          className="rounded-sm bg-primary px-6 py-3 text-base font-medium text-white transition duration-300 ease-in-out hover:bg-primary/90 hover:shadow-submit disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isSubmitting ? "Generating Report..." : "Generate Report"}
-        </button>
-      </div>
-    </div>
+  // Get sorted comps with original indices
+  const sortedCompsWithIndices = sortComps(propertyComps.compsUsed, sortBy).map(
+    (comp) => {
+      const originalIndex = propertyComps.compsUsed.indexOf(comp);
+      return { comp, originalIndex };
+    },
   );
-}
-
-interface CompCardProps {
-  comp: PropertyComparable;
-  index: number;
-  state?: { emphasized: boolean; removed: boolean };
-  onUpdate: (updates: { emphasized?: boolean; removed?: boolean }) => void;
-  disableRemove: boolean;
-}
-
-function CompCard({ comp, index, state, onUpdate, disableRemove }: CompCardProps) {
-  const isEmphasized = state?.emphasized || false;
-  const isRemoved = state?.removed || false;
-  const isNormal = !isEmphasized && !isRemoved;
-
-  // Generate link: use listing URL if available, otherwise search Google
-  const linkUrl = comp.listingUrl || `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`;
 
   return (
-    <div
-      className={`rounded-sm border-l-4 p-4 transition-all ${
-        isRemoved
-          ? "border-gray-300 bg-gray-50 opacity-50 dark:border-gray-600 dark:bg-gray-800"
-          : isEmphasized
-            ? "border-success bg-success-light dark:border-success dark:bg-success/10"
-            : "border-stroke bg-white dark:border-stroke-dark dark:bg-gray-dark"
-      }`}
-    >
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        {/* Comp Details */}
-        <div className="flex-1">
-          <h4 className="font-semibold mb-2">
-            <a
-              href={linkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-dark dark:text-white hover:text-primary dark:hover:text-primary hover:underline"
+    <div className="flex flex-col" style={{ height: "calc(100vh - 72px)" }}>
+      {/* Mobile Toggle - Only visible on mobile */}
+      <div className="flex-shrink-0 border-b border-stroke bg-white dark:border-stroke-dark dark:bg-gray-dark lg:hidden">
+        <div className="flex">
+          <button
+            onClick={() => setMobileView("list")}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              mobileView === "list"
+                ? "border-b-2 border-primary text-primary"
+                : "text-body-color dark:text-body-color-dark"
+            }`}
+          >
+            List ({propertyComps.compsUsed.length})
+          </button>
+          <button
+            onClick={() => setMobileView("map")}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              mobileView === "map"
+                ? "border-b-2 border-primary text-primary"
+                : "text-body-color dark:text-body-color-dark"
+            }`}
+          >
+            Map
+          </button>
+        </div>
+      </div>
+
+      {/* Map + Drawer Layout - Full Height */}
+      <div className="flex flex-1 gap-0 overflow-hidden">
+        {/* Map - Full Width with Overlay Header */}
+        <div
+          className={`relative flex-1 ${
+            mobileView === "list" ? "hidden lg:block" : "block"
+          }`}
+        >
+          {/* Minimal Overlay - Property Address Only */}
+          <div className="absolute left-2 top-2 z-10 rounded-sm bg-white/95 px-2 py-1.5 shadow-md backdrop-blur-sm dark:bg-gray-dark/95 lg:left-4 lg:top-4 lg:px-3 lg:py-2">
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-body-color/60 dark:text-body-color-dark/60 lg:text-[10px]">
+              Subject Property
+            </p>
+            <h3 className="text-xs font-semibold text-dark dark:text-white lg:text-sm">
+              {formData.propertyAddress || "Property Address Not Available"}
+            </h3>
+          </div>
+
+          {/* Map */}
+          <div
+            ref={mapContainer}
+            className="border-stroke h-full w-full rounded-l-sm border dark:border-stroke-dark"
+            style={{ minHeight: "500px" }}
+          />
+        </div>
+
+        {/* Resizable Drawer with Comps */}
+        <div
+          className={`${
+            mobileView === "list" ? "flex" : "hidden"
+          } h-full w-full lg:flex lg:w-auto`}
+        >
+          <ResizablePanel
+            minWidth={600}
+            maxWidth={1200}
+            defaultWidth={800}
+            onResize={() => {
+              // Trigger map resize when drawer width changes
+              if (mapRef.current) {
+                mapRef.current.resize();
+              }
+            }}
+          >
+          <div className="flex h-full flex-col">
+            {/* Conditional Alerts Section - Fixed at Top */}
+            <div className="flex-shrink-0">
+              {/* Error Display */}
+              {error && (
+                <div className="mb-2 rounded-sm bg-red-50 p-2 dark:bg-red-900/20">
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    {error}
+                  </p>
+                </div>
+              )}
+
+              {/* Demo Mode Indicator */}
+              {isDemoMode && (
+                <div className="mb-2 rounded-sm border-l-4 border-warning bg-warning/10 p-2">
+                  <p className="text-xs font-semibold text-warning">
+                    🎨 Demo Mode: Showing data from 514 Betty Lou Drive
+                  </p>
+                </div>
+              )}
+
+              {/* Instructions */}
+              <div className="border-stroke mb-2 rounded-r-sm border border-l-0 bg-gray-light/50 p-2 dark:border-stroke-dark dark:bg-gray-dark/50">
+                <h4 className="mb-1 text-xs font-semibold text-dark dark:text-white">
+                  Review {propertyComps.compsUsed.length} Comparable Properties
+                </h4>
+                <p className="mb-1 text-xs text-body-color dark:text-body-color-dark">
+                  <strong>Emphasize</strong> similar properties •{" "}
+                  <strong>Remove</strong> non-comparable
+                </p>
+              </div>
+
+              {/* Sort Dropdown + Comp Count */}
+              <div className="border-stroke mb-2 rounded-r-sm border border-l-0 bg-white p-2 dark:border-stroke-dark dark:bg-gray-dark">
+                <SortDropdown value={sortBy} onChange={setSortBy} />
+                <p className="mt-1 text-xs font-medium text-primary dark:text-primary">
+                  {activeCount} of {propertyComps.compsUsed.length} selected
+                  {activeCount < 3 && (
+                    <span className="ml-1 text-danger">
+                      (minimum 3 required)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Comp Cards Grid - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="@[500px]:grid-cols-2 @[900px]:grid-cols-3 grid grid-cols-1 gap-3 pb-4 pl-1 pr-2 pt-2">
+                {sortedCompsWithIndices.map(({ comp, originalIndex }) => (
+                  <CompCardSquare
+                    key={originalIndex}
+                    comp={comp}
+                    index={originalIndex}
+                    state={compSelectionState.find(
+                      (s) => s.compIndex === originalIndex,
+                    )}
+                    onUpdate={(updates) =>
+                      updateCompSelection(originalIndex, updates)
+                    }
+                    disableRemove={activeCount <= 3}
+                    isHighlighted={highlightedCompIndex === originalIndex}
+                    compRef={(el) => {
+                      if (el) {
+                        compCardRefs.current.set(originalIndex, el);
+                      }
+                    }}
+                    onCardClick={() => handleCompCardClick(originalIndex)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </ResizablePanel>
+        </div>
+      </div>
+
+      {/* Submit Buttons with Disclaimer - Fixed Footer */}
+      <div className="border-stroke flex-shrink-0 border-t bg-white dark:border-stroke-dark dark:bg-gray-dark">
+        <div className="container max-w-screen-2xl px-4 py-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              className="border-stroke rounded-sm border px-3 py-1.5 text-sm font-medium text-body-color hover:bg-gray-light dark:border-stroke-dark dark:hover:bg-gray-dark"
             >
-              {comp.address}
-            </a>
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-sm text-body-color dark:text-body-color-dark">
-            <div>
-              <span className="font-medium">Price:</span> ${comp.price.toLocaleString()}
+              Back
+            </button>
+
+            {/* Disclaimer - Abbreviated */}
+            <p className="hidden flex-1 px-2 text-center text-[10px] leading-tight text-body-color/80 dark:text-body-color-dark/80 lg:block">
+              Informational only • No liability • Users assume full responsibility
+            </p>
+
+            {/* Mobile info icon with title tooltip */}
+            <div
+              className="flex-1 text-center lg:hidden"
+              title="This AI analysis is for informational purposes only. Glass Loans assumes no liability for lending decisions made based on this tool. Users accept full responsibility for their investment decisions."
+            >
+              <span className="text-[10px] text-body-color/60 dark:text-body-color-dark/60">
+                ⓘ Informational only
+              </span>
             </div>
-            <div>
-              <span className="font-medium">$/sqft:</span> $
-              {formatPricePerSqft(comp.price, comp.sqft)}
-            </div>
-            <div>
-              <span className="font-medium">Size:</span> {comp.sqft.toLocaleString()} sqft
-            </div>
-            <div>
-              <span className="font-medium">Bed/Bath:</span> {comp.bedrooms}/{comp.bathrooms}
-            </div>
-            {comp.distance && (
-              <div>
-                <span className="font-medium">Distance:</span> {comp.distance}
-              </div>
-            )}
-            {comp.soldDate && (
-              <div>
-                <span className="font-medium">Sold:</span> {comp.soldDate}
-              </div>
-            )}
-            {comp.yearBuilt && (
-              <div>
-                <span className="font-medium">Year:</span> {comp.yearBuilt}
-              </div>
-            )}
+
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting || activeCount < 3}
+              className="rounded-sm bg-primary px-3 py-1.5 text-sm font-medium text-white transition duration-300 ease-in-out hover:bg-primary/90 hover:shadow-submit disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSubmitting ? "Generating..." : "Generate Report"}
+            </button>
           </div>
         </div>
-
-        {/* Selection Buttons */}
-        <div className="flex gap-2 sm:flex-shrink-0">
-          <button
-            onClick={() => onUpdate({ emphasized: true, removed: false })}
-            className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-sm transition-colors ${
-              isEmphasized
-                ? "bg-success text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            }`}
-          >
-            {isEmphasized ? "✓ " : ""}Emphasize
-          </button>
-          <button
-            onClick={() => onUpdate({ emphasized: false, removed: false })}
-            className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-sm transition-colors ${
-              isNormal
-                ? "bg-primary text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            }`}
-          >
-            {isNormal ? "✓ " : ""}Normal
-          </button>
-          <button
-            onClick={() => onUpdate({ emphasized: false, removed: true })}
-            disabled={disableRemove && !isRemoved}
-            className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium rounded-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              isRemoved
-                ? "bg-gray-500 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            }`}
-          >
-            {isRemoved ? "✓ " : ""}Remove
-          </button>
-        </div>
       </div>
+
+      {/* Mobile Comp Modal - Shows comp details over map */}
+      {selectedCompForModal !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 lg:hidden"
+          onClick={() => setSelectedCompForModal(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-lg bg-white p-4 shadow-xl dark:bg-gray-dark"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setSelectedCompForModal(null)}
+              className="absolute right-4 top-4 text-2xl text-body-color hover:text-dark dark:text-body-color-dark dark:hover:text-white"
+            >
+              ×
+            </button>
+
+            {/* Comp details */}
+            {(() => {
+              const comp = propertyComps.compsUsed[selectedCompForModal];
+              const state = compSelectionState.find(
+                (s) => s.compIndex === selectedCompForModal,
+              );
+              const isEmphasized = state?.emphasized || false;
+              const isRemoved = state?.removed || false;
+              const isNormal = !isEmphasized && !isRemoved;
+
+              return (
+                <div>
+                  <h4 className="mb-3 pr-8 text-sm font-semibold text-dark dark:text-white">
+                    <a
+                      href={
+                        comp.listingUrl ||
+                        `https://www.google.com/search?q=${encodeURIComponent(comp.address)}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-primary hover:underline"
+                    >
+                      {comp.address}
+                    </a>
+                  </h4>
+
+                  {/* Price */}
+                  <div className="mb-3">
+                    <span className="text-2xl font-bold text-primary">
+                      ${comp.price.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="mb-4 space-y-2 text-sm text-body-color dark:text-body-color-dark">
+                    <div className="flex justify-between">
+                      <span className="font-medium">$/sqft:</span>
+                      <span>
+                        ${formatPricePerSqft(comp.price, comp.sqft)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Size:</span>
+                      <span>{comp.sqft.toLocaleString()} sqft</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Bed/Bath:</span>
+                      <span>
+                        {comp.bedrooms}/{comp.bathrooms}
+                      </span>
+                    </div>
+                    {comp.distance && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">Distance:</span>
+                        <span>{comp.distance}</span>
+                      </div>
+                    )}
+                    {comp.soldDate && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">Sold:</span>
+                        <span>{comp.soldDate}</span>
+                      </div>
+                    )}
+                    {comp.yearBuilt && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">Year:</span>
+                        <span>{comp.yearBuilt}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        updateCompSelection(selectedCompForModal, {
+                          emphasized: true,
+                          removed: false,
+                        });
+                        setSelectedCompForModal(null);
+                      }}
+                      className={`flex-1 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
+                        isEmphasized
+                          ? "bg-success text-white"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      {isEmphasized ? "✓ " : ""}Emphasize
+                    </button>
+                    <button
+                      onClick={() => {
+                        updateCompSelection(selectedCompForModal, {
+                          emphasized: false,
+                          removed: false,
+                        });
+                        setSelectedCompForModal(null);
+                      }}
+                      className={`flex-1 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
+                        isNormal
+                          ? "bg-primary text-white"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      {isNormal ? "✓ " : ""}Normal
+                    </button>
+                    <button
+                      onClick={() => {
+                        updateCompSelection(selectedCompForModal, {
+                          emphasized: false,
+                          removed: true,
+                        });
+                        setSelectedCompForModal(null);
+                      }}
+                      disabled={activeCount <= 3 && !isRemoved}
+                      className={`flex-1 rounded-sm px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isRemoved
+                          ? "bg-gray-500 text-white"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      {isRemoved ? "✓ " : ""}Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

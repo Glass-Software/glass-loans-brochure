@@ -4,11 +4,11 @@ import { getSubmissionById, getSubmissionByReportId } from "@/lib/db/queries";
 import { calculateUnderwriting } from "@/lib/underwriting/calculations";
 import CalculationBreakdown from "@/components/Underwriting/CalculationBreakdown";
 import GaryOpinion from "@/components/Underwriting/GaryOpinion";
+import GaryMetricsSection from "@/components/Underwriting/GaryMetricsSection";
 import ScoreMetricsComparison from "@/components/Underwriting/ScoreMetricsComparison";
 import CompsMapSection from "@/components/Underwriting/CompsMapSection";
 import type {
   UnderwritingFormData,
-  CalculatedResults,
   PropertyComps,
   CompSelectionState,
 } from "@/types/underwriting";
@@ -79,16 +79,16 @@ export default async function ResultsPage({
   // Reconstruct property comps
   let parsedComps: any[] = [];
   try {
-    parsedComps = submission.ai_property_comps
-      ? JSON.parse(submission.ai_property_comps)
+    parsedComps = submission.property_comps
+      ? JSON.parse(submission.property_comps)
       : [];
     // Ensure it's an array
     if (!Array.isArray(parsedComps)) {
-      console.error("ai_property_comps is not an array:", parsedComps);
+      console.error("property_comps is not an array:", parsedComps);
       parsedComps = [];
     }
   } catch (error) {
-    console.error("Failed to parse ai_property_comps:", error);
+    console.error("Failed to parse property_comps:", error);
     parsedComps = [];
   }
 
@@ -122,12 +122,14 @@ export default async function ResultsPage({
     propertyComps.asIsValue
   );
 
-  // Calculate user's metrics (using user's ARV and As-Is estimates)
-  const userCalculations = calculateUnderwriting(
-    formData,
-    formData.userEstimatedArv,
-    formData.userEstimatedAsIsValue
-  );
+  // Calculate user's metrics (using user's ARV and As-Is estimates) - only for legacy reports
+  const userCalculations = formData.userEstimatedArv && formData.userEstimatedAsIsValue
+    ? calculateUnderwriting(
+        formData,
+        formData.userEstimatedArv,
+        formData.userEstimatedAsIsValue
+      )
+    : null;
 
   // Get property coordinates for map
   // Priority: 1) Subject property coords from DB, 2) First comp with valid coords, 3) null (hide map)
@@ -163,15 +165,24 @@ export default async function ResultsPage({
         )}
 
         <div className="mx-auto max-w-5xl">
-          {/* Section 1: Score & Metrics Comparison */}
-          <ScoreMetricsComparison
-            propertyAddress={formData.propertyAddress}
-            score={submission.final_score}
-            userCalculations={userCalculations}
-            garyCalculations={garyCalculations}
-            userAsIsValue={formData.userEstimatedAsIsValue}
-            garyAsIsValue={propertyComps.asIsValue}
-          />
+          {/* Section 1: Metrics - Show comparison for old reports with user estimates, Gary-only for new reports */}
+          {userCalculations && formData.userEstimatedArv && formData.userEstimatedAsIsValue ? (
+            <ScoreMetricsComparison
+              propertyAddress={formData.propertyAddress}
+              score={submission.final_score}
+              userCalculations={userCalculations}
+              garyCalculations={garyCalculations}
+              userAsIsValue={formData.userEstimatedAsIsValue}
+              garyAsIsValue={propertyComps.asIsValue}
+            />
+          ) : (
+            <GaryMetricsSection
+              propertyAddress={formData.propertyAddress}
+              score={submission.final_score}
+              garyCalculations={garyCalculations}
+              garyAsIsValue={propertyComps.asIsValue}
+            />
+          )}
 
           {/* Section 2: Gary's Full Opinion */}
           <div className="mb-8">

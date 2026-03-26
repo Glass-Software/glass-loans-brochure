@@ -1,6 +1,6 @@
 "use client";
 
-import { UnderwritingProvider, useUnderwriting } from "@/context/UnderwritingContext";
+import { useUnderwriting } from "@/context/UnderwritingContext";
 import FormProgress from "./FormProgress";
 import Step1PropertyDetails from "./Step1PropertyDetails";
 import Step2PropertyCondition from "./Step2PropertyCondition";
@@ -41,6 +41,22 @@ function UnderwritingContent() {
     );
   }
 
+  // Step 6 gets special full-width treatment
+  if (currentStep === 6) {
+    return (
+      <>
+        {/* Progress Indicator Modal */}
+        <ProgressIndicator />
+
+        <section className="overflow-hidden">
+          {/* Full-width Map + Drawer - No Container */}
+          <Step6CompSelection error={error} />
+        </section>
+      </>
+    );
+  }
+
+  // All other steps use the standard container
   return (
     <>
       {/* Progress Indicator Modal */}
@@ -84,7 +100,6 @@ function UnderwritingContent() {
                 {currentStep === 3 && <Step3LoanTerms />}
                 {currentStep === 4 && <Step4MarketDetails />}
                 {currentStep === 5 && <Step5EmailVerification />}
-                {currentStep === 6 && <Step6CompSelection />}
               </div>
 
               {/* Disclaimer */}
@@ -103,9 +118,5 @@ function UnderwritingContent() {
 }
 
 export default function Underwriting() {
-  return (
-    <UnderwritingProvider>
-      <UnderwritingContent />
-    </UnderwritingProvider>
-  );
+  return <UnderwritingContent />;
 }

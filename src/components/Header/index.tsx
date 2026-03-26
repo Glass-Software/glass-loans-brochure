@@ -41,6 +41,7 @@ const Header = () => {
   };
 
   const usePathName = usePathname();
+  const isUnderwritePage = usePathName?.startsWith('/underwrite');
 
   // Refs for click outside detection
   const navRef = useRef<HTMLDivElement>(null);
@@ -74,9 +75,11 @@ const Header = () => {
     <>
       <header
         className={`header left-0 top-0 z-40 flex w-full items-center ${
-          sticky
-            ? "fixed z-[9999] bg-white !bg-opacity-80 shadow-sticky backdrop-blur-sm transition dark:bg-gray-dark dark:shadow-sticky-dark"
-            : "absolute bg-transparent"
+          isUnderwritePage
+            ? "relative bg-white dark:bg-gray-dark"
+            : sticky
+              ? "fixed z-[9999] bg-white !bg-opacity-80 shadow-sticky backdrop-blur-sm transition dark:bg-gray-dark dark:shadow-sticky-dark"
+              : "absolute bg-transparent"
         }`}
       >
         <div className="container">
@@ -85,7 +88,7 @@ const Header = () => {
               <Link
                 href="/"
                 className={`header-logo block w-full ${
-                  sticky ? "py-5 lg:py-2" : "py-8"
+                  isUnderwritePage ? "py-2" : sticky ? "py-5 lg:py-2" : "py-8"
                 } `}
               >
                 <Image

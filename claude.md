@@ -388,43 +388,50 @@ chmod +x scripts/deploy.sh
 git add scripts/deploy.sh
 ```
 
-**When to skip migrations:**
-If you're deploying code changes without any database schema changes, you can answer 'n' when prompted for migrations.
+### Automated Database Migrations
+
+**Migrations run automatically** on every deployment via the `release_command` configured in fly.toml:
+
+```toml
+[deploy]
+  release_command = 'npx prisma migrate deploy'
+```
+
+**How it works:**
+1. Fly.io runs the release command on a temporary machine before switching traffic to the new version
+2. The command applies any pending migrations from `prisma/migrations/`
+3. If migrations fail, the deployment is aborted and traffic stays on the old version
+4. If migrations succeed, traffic is switched to the new version
+
+**Why this works with Managed Postgres:**
+- The database is external (Fly.io Managed Postgres), not a local volume
+- The release machine can access the production database via `DATABASE_URL` secret
+- No manual intervention required
+
+**First deployment / Baseline:**
+When deploying to a new environment with an existing database, you must first baseline the migration history:
+
+```bash
+# On production (one-time setup)
+fly ssh console -a glass-loans-brochure-modified-misty-thunder-1484
+npx prisma migrate resolve --applied 0_init
+exit
+```
+
+After baselining, all future deployments will automatically run `npx prisma migrate deploy`.
 
 ### Manual Deployment (Only if Script Unavailable)
 
 ⚠️ **WARNING:** Only use this if the deployment script is broken or unavailable.
 
-1. **Deploy the code with ALL build args:**
-   ```bash
-   fly deploy \
-     --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA" \
-     --build-arg NEXT_PUBLIC_GOOGLE_PLACES_API_KEY="AIzaSyCzo2p73EbPwY4lTNT9PiF6xU-J4AZX3yQ" \
-     --build-arg NEXT_PUBLIC_RECAPTCHA_SITE_KEY="6Le7v3QsAAAAAP2GYcBPteIjGmNgtNbtGNY6CVR_"
-   ```
+```bash
+fly deploy \
+  --build-arg NEXT_PUBLIC_MAPBOX_API_KEY="pk.eyJ1IjoiMHh0eWRvbyIsImEiOiJjbW11cmFxdnAyOHI1MnJwdWh0bzg4MDU4In0.jtitLpJ6BngOUU64Evr5qA" \
+  --build-arg NEXT_PUBLIC_GOOGLE_PLACES_API_KEY="AIzaSyCzo2p73EbPwY4lTNT9PiF6xU-J4AZX3yQ" \
+  --build-arg NEXT_PUBLIC_RECAPTCHA_SITE_KEY="6Le7v3QsAAAAAP2GYcBPteIjGmNgtNbtGNY6CVR_"
+```
 
-   **DO NOT** forget any of these build args or features will break!
-
-2. **Run migrations manually:**
-   ```bash
-   fly ssh console -a glass-loans-brochure-modified-misty-thunder-1484
-   npx tsx scripts/migrate.ts
-   exit
-   ```
-
-3. **Restart the app:**
-   ```bash
-   fly apps restart glass-loans-brochure-modified-misty-thunder-1484
-   ```
-
-### Why Manual Migrations Are Required
-
-The `release_command` in fly.toml runs on a temporary machine without access to the persistent volume at `/data/`. This causes:
-- Database file not found (creates new empty database)
-- Migrations timeout
-- Production data not accessible
-
-Therefore, migrations must be run via SSH on the actual app machine that has the volume mounted. The deployment script handles this automatically.
+**DO NOT** forget any of these build args or features will break! Migrations will run automatically via release_command.
 
 ### Post-Deployment Checklist
 

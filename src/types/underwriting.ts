@@ -31,8 +31,8 @@ export interface UnderwritingFormData {
   // Step 2: Property Condition & ARV
   propertyCondition: PropertyCondition;
   renovationPerSf: number; // Calculated: rehab / squareFeet
-  userEstimatedAsIsValue: number; // User's estimate of current property value
-  userEstimatedArv: number; // User's estimate of After Repair Value
+  userEstimatedAsIsValue?: number; // DEPRECATED: User's estimate of current property value (legacy field for backward compatibility)
+  userEstimatedArv?: number; // DEPRECATED: User's estimate of After Repair Value (legacy field for backward compatibility)
 
   // Step 3: Loan Terms
   interestRate: number; // percentage (e.g., 12 for 12%)

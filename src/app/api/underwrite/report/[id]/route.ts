@@ -64,8 +64,8 @@ export async function GET(
     };
 
     // Reconstruct property comps
-    const propertyComps: PropertyComps = submission.ai_property_comps
-      ? JSON.parse(submission.ai_property_comps)
+    const propertyComps: PropertyComps = submission.property_comps
+      ? JSON.parse(submission.property_comps)
       : {
           estimatedARV: submission.estimated_arv || 0,
           asIsValue: submission.as_is_value || 0,

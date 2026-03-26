@@ -1,8 +1,16 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const Footer = () => {
+  const pathname = usePathname();
+
+  // Hide footer on underwrite pages
+  if (pathname?.startsWith('/underwrite')) {
+    return null;
+  }
+
   return (
     <>
       <footer className="relative bg-white pt-16 dark:bg-gray-dark md:pt-20 lg:pt-24">

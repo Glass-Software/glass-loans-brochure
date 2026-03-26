@@ -77,7 +77,7 @@ model UnderwritingSubmission {
   monthlyRent               Float?   @map("monthly_rent")
   finalScore                Int?     @map("final_score")
   garyOpinion               String?  @map("gary_opinion") @db.Text
-  aiPropertyComps           String?  @map("ai_property_comps") @db.Text // JSON string
+  propertyComps             String?  @map("property_comps") @db.Text // JSON string (from Rentcast/Realie API)
   compSelectionState        String?  @map("comp_selection_state") @db.Text // JSON string
 
   // Report management

@@ -75,23 +75,10 @@ export const Step1Schema = z.object({
 });
 
 // Step 2: Property Condition Schema
-export const Step2Schema = z
-  .object({
-    propertyCondition: PropertyConditionSchema,
-    renovationPerSf: RenovationLevelSchema,
-    userEstimatedAsIsValue: z
-      .number()
-      .min(1000, "As-is value must be at least $1,000")
-      .max(100000000, "As-is value must be less than $100M"),
-    userEstimatedArv: z
-      .number()
-      .min(1000, "ARV must be at least $1,000")
-      .max(100000000, "ARV must be less than $100M"),
-  })
-  .refine((data) => data.userEstimatedAsIsValue <= data.userEstimatedArv, {
-    message: "As-is value cannot exceed ARV (after-repair value)",
-    path: ["userEstimatedAsIsValue"],
-  });
+export const Step2Schema = z.object({
+  propertyCondition: PropertyConditionSchema,
+  renovationPerSf: RenovationLevelSchema,
+});
 
 // Step 3: Loan Terms Schema
 export const Step3Schema = z.object({
@@ -147,11 +134,13 @@ export const UnderwritingFormSchema = z
     userEstimatedAsIsValue: z
       .number()
       .min(1000, "As-is value must be at least $1,000")
-      .max(100000000, "As-is value must be less than $100M"),
+      .max(100000000, "As-is value must be less than $100M")
+      .optional(), // DEPRECATED: legacy field for backward compatibility
     userEstimatedArv: z
       .number()
       .min(1000, "ARV must be at least $1,000")
-      .max(100000000, "ARV must be less than $100M"),
+      .max(100000000, "ARV must be less than $100M")
+      .optional(), // DEPRECATED: legacy field for backward compatibility
     interestRate: z.number().min(0.1, "Interest rate must be at least 0.1%"),
     months: z.number().int().min(1, "Loan term must be at least 1 month"),
     loanAtPurchase: z.number().min(1000, "Loan amount must be at least $1,000"),
@@ -174,11 +163,7 @@ export const UnderwritingFormSchema = z
       message: "Rehab cost seems unusually high compared to purchase price",
       path: ["rehab"],
     },
-  )
-  .refine((data) => data.userEstimatedAsIsValue <= data.userEstimatedArv, {
-    message: "As-is value cannot exceed ARV (after-repair value)",
-    path: ["userEstimatedAsIsValue"],
-  });
+  );
 
 // Email validation schema
 export const EmailSchema = z

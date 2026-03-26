@@ -276,7 +276,7 @@ export interface UnderwritingSubmission {
   monthly_rent: number | null;
   final_score: number | null;
   gary_opinion: string | null;
-  ai_property_comps: string | null;
+  property_comps: string | null;
   comp_selection_state: string | null;
   report_id: string | null;
   expires_at: string | null;
@@ -322,7 +322,7 @@ function toSubmissionLegacy(sub: PrismaSubmission): UnderwritingSubmission {
     monthly_rent: sub.monthlyRent,
     final_score: sub.finalScore,
     gary_opinion: sub.garyOpinion,
-    ai_property_comps: sub.aiPropertyComps,
+    property_comps: sub.propertyComps,
     comp_selection_state: sub.compSelectionState,
     report_id: sub.reportId,
     expires_at: sub.expiresAt?.toISOString() || null,
@@ -350,8 +350,8 @@ export interface CreateSubmissionData {
   propertyType: string;
   propertyCondition: string;
   renovationPerSf: string;
-  userEstimatedAsIsValue: number;
-  userEstimatedArv: number;
+  userEstimatedAsIsValue?: number; // DEPRECATED: Optional for backward compatibility
+  userEstimatedArv?: number; // DEPRECATED: Optional for backward compatibility
   interestRate: number;
   months: number;
   loanAtPurchase: number;
@@ -409,7 +409,7 @@ export async function createSubmission(data: CreateSubmissionData): Promise<Unde
       asIsValue: data.asIsValue,
       finalScore: data.finalScore,
       garyOpinion: data.garyOpinion,
-      aiPropertyComps: data.propertyComps ? JSON.stringify(data.propertyComps) : null,
+      propertyComps: data.propertyComps ? JSON.stringify(data.propertyComps) : null,
       compSelectionState: data.compSelectionState,
       reportId: data.reportId,
       expiresAt: new Date(data.expiresAt),
