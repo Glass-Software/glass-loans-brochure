@@ -206,7 +206,7 @@ function sendError(
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { email, recaptchaToken, formData, propertyComps, compSelectionState } =
+  const { email, recaptchaToken, formData, propertyComps, compSelectionState, isDemoMode } =
     body;
 
   // Create a readable stream for progress updates
@@ -256,6 +256,17 @@ export async function POST(request: Request) {
           formData.purchasePrice > 100000000
         ) {
           sendError(controller, "Invalid purchase price", "INVALID_INPUT");
+          controller.close();
+          return;
+        }
+
+        // Validate that squareFeet and yearBuilt were populated from Rentcast
+        if (!formData.squareFeet || !formData.yearBuilt) {
+          sendError(
+            controller,
+            "Missing required property data. Please return to Step 6 to refresh comparable properties.",
+            "MISSING_PROPERTY_DATA"
+          );
           controller.close();
           return;
         }
@@ -332,8 +343,8 @@ export async function POST(request: Request) {
           return;
         }
 
-        // Step 7: Check usage limit
-        if (user.usage_count >= user.usage_limit) {
+        // Step 7: Check usage limit (skip for demo mode)
+        if (!isDemoMode && user.usage_count >= user.usage_limit) {
           sendError(
             controller,
             `You've reached your limit of ${user.usage_limit} free underwriting ${user.usage_limit === 1 ? "analysis" : "analyses"}.`,
@@ -777,8 +788,10 @@ export async function POST(request: Request) {
           recaptchaScore: recaptchaVerification.score || 0,
         });
 
-        // Step 13: Increment usage count
-        await incrementUsageCount(user.id);
+        // Step 13: Increment usage count (skip for demo mode)
+        if (!isDemoMode) {
+          await incrementUsageCount(user.id);
+        }
 
         // Step 14: Send email with report link (90-95%)
         sendProgress(controller, 6, "Sending report link to your email...", 95);

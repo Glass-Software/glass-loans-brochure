@@ -466,25 +466,6 @@ export default function Step1PropertyDetails() {
 
         <div className="w-full px-4 md:w-1/2">
           <div className="mb-8">
-            <label htmlFor="squareFeet" className={labelClass}>
-              Square Feet *
-            </label>
-            <input
-              type="text"
-              id="squareFeet"
-              value={formatNumber(formData.squareFeet)}
-              onChange={(e) => handleNumberChange("squareFeet", e.target.value)}
-              placeholder="1,150"
-              className={inputClass}
-            />
-            {errors.squareFeet && (
-              <p className={errorClass}>{errors.squareFeet}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="w-full px-4 md:w-1/3">
-          <div className="mb-8">
             <label htmlFor="bedrooms" className={labelClass}>
               Bedrooms *
             </label>
@@ -505,7 +486,7 @@ export default function Step1PropertyDetails() {
           </div>
         </div>
 
-        <div className="w-full px-4 md:w-1/3">
+        <div className="w-full px-4 md:w-1/2">
           <div className="mb-8">
             <label htmlFor="bathrooms" className={labelClass}>
               Bathrooms *
@@ -527,29 +508,7 @@ export default function Step1PropertyDetails() {
           </div>
         </div>
 
-        <div className="w-full px-4 md:w-1/3">
-          <div className="mb-8">
-            <label htmlFor="yearBuilt" className={labelClass}>
-              Year Built *
-            </label>
-            <input
-              type="number"
-              id="yearBuilt"
-              min="1800"
-              max={new Date().getFullYear()}
-              step="1"
-              value={formData.yearBuilt || ""}
-              onChange={(e) => updateFormData({ yearBuilt: parseInt(e.target.value) || 0 })}
-              placeholder="2005"
-              className={inputClass}
-            />
-            {errors.yearBuilt && (
-              <p className={errorClass}>{errors.yearBuilt}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="w-full px-4">
+        <div className="w-full px-4 md:w-1/2">
           <div className="mb-8">
             <label htmlFor="propertyType" className={labelClass}>
               Property Type *
@@ -568,6 +527,47 @@ export default function Step1PropertyDetails() {
             </select>
             {errors.propertyType && (
               <p className={errorClass}>{errors.propertyType}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="w-full px-4 md:w-1/2">
+          <div className="mb-8">
+            <label htmlFor="squareFeet" className={labelClass}>
+              Square Feet *
+            </label>
+            <input
+              type="text"
+              id="squareFeet"
+              value={formatNumber(formData.squareFeet)}
+              onChange={(e) => handleNumberChange("squareFeet", e.target.value)}
+              placeholder="1,500"
+              className={inputClass}
+            />
+            {errors.squareFeet && (
+              <p className={errorClass}>{errors.squareFeet}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="w-full px-4 md:w-1/2">
+          <div className="mb-8">
+            <label htmlFor="yearBuilt" className={labelClass}>
+              Year Built *
+            </label>
+            <input
+              type="number"
+              id="yearBuilt"
+              min="1800"
+              max={new Date().getFullYear()}
+              step="1"
+              value={formData.yearBuilt || ""}
+              onChange={(e) => updateFormData({ yearBuilt: parseInt(e.target.value) || 0 })}
+              placeholder="1995"
+              className={inputClass}
+            />
+            {errors.yearBuilt && (
+              <p className={errorClass}>{errors.yearBuilt}</p>
             )}
           </div>
         </div>

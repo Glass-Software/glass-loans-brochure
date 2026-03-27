@@ -12,6 +12,7 @@ interface CompCardSquareProps {
   isHighlighted?: boolean;
   compRef?: (el: HTMLDivElement | null) => void;
   onCardClick?: () => void;
+  onCategorize?: () => void; // Called when comp is categorized (on desktop only)
 }
 
 export default function CompCardSquare({
@@ -23,6 +24,7 @@ export default function CompCardSquare({
   isHighlighted = false,
   compRef,
   onCardClick,
+  onCategorize,
 }: CompCardSquareProps) {
   const isEmphasized = state?.emphasized || false;
   const isRemoved = state?.removed || false;
@@ -74,9 +76,23 @@ export default function CompCardSquare({
             href={linkUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-dark hover:text-primary hover:underline dark:text-white dark:hover:text-primary"
+            className="inline-flex items-center gap-1 text-dark hover:text-primary hover:underline dark:text-white dark:hover:text-primary"
           >
             {comp.address}
+            <svg
+              className="h-3 w-3 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
           </a>
         </h4>
 
@@ -127,7 +143,13 @@ export default function CompCardSquare({
       {/* Action Buttons - Always visible */}
       <div className="mt-3 flex gap-1">
         <button
-          onClick={() => onUpdate({ emphasized: true, removed: false })}
+          onClick={() => {
+            onUpdate({ emphasized: true, removed: false });
+            // Trigger marker animation on desktop only
+            if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+              onCategorize?.();
+            }
+          }}
           className={`flex-1 rounded-sm px-2 py-1.5 text-xs font-medium transition-colors ${
             isEmphasized
               ? "bg-success text-white"
@@ -138,7 +160,13 @@ export default function CompCardSquare({
           {isEmphasized ? "✓ " : ""}Emphasize
         </button>
         <button
-          onClick={() => onUpdate({ emphasized: false, removed: false })}
+          onClick={() => {
+            onUpdate({ emphasized: false, removed: false });
+            // Trigger marker animation on desktop only
+            if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+              onCategorize?.();
+            }
+          }}
           className={`flex-1 rounded-sm px-2 py-1.5 text-xs font-medium transition-colors ${
             isNormal
               ? "bg-primary text-white"
@@ -149,7 +177,13 @@ export default function CompCardSquare({
           {isNormal ? "✓ " : ""}Normal
         </button>
         <button
-          onClick={() => onUpdate({ emphasized: false, removed: true })}
+          onClick={() => {
+            onUpdate({ emphasized: false, removed: true });
+            // Trigger marker animation on desktop only
+            if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+              onCategorize?.();
+            }
+          }}
           disabled={disableRemove && !isRemoved}
           className={`flex-1 rounded-sm px-2 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
             isRemoved

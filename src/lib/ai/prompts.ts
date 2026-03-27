@@ -41,8 +41,6 @@ export function generateGaryValuationPrompt(
     rehab,
     squareFeet,
     propertyCondition,
-    userEstimatedAsIsValue,
-    userEstimatedArv,
   } = formData;
 
   const locationDisplay =
@@ -64,10 +62,6 @@ ${propertyAddress !== locationDisplay ? `- Full Address: ${propertyAddress}` : "
 - Year Built: ${formData.yearBuilt}
 - Condition: ${propertyCondition}
 - Renovation Level: $${(rehab / squareFeet).toFixed(2)}/SF (${getRenovationLevel(rehab / squareFeet)})
-
-**BORROWER'S ESTIMATES (for reference):**
-- As-Is Value: $${userEstimatedAsIsValue.toLocaleString()}
-- ARV: $${userEstimatedArv.toLocaleString()}
 
 **COMPARABLE SALES (${allComps.length} properties - borrower reviewed):**
 ${compSelectionState ? `
@@ -373,7 +367,6 @@ export function generateGaryOpinionPrompt(
     interestRate,
     months,
     loanAtPurchase,
-    userEstimatedArv,
     marketType,
     additionalDetails,
   } = formData;
@@ -403,9 +396,7 @@ ${propertyAddress !== locationDisplay ? `- Full Address: ${propertyAddress}` : "
 - Loan Amount: $${loanAtPurchase.toLocaleString()} at ${interestRate}% for ${months} months
 - Renovation Funds: $${formData.renovationFunds?.toLocaleString() || "0"}
 
-**BORROWER'S ESTIMATES:**
-- Estimated As-Is Value: $${formData.userEstimatedAsIsValue.toLocaleString()}
-- Estimated ARV: $${userEstimatedArv.toLocaleString()}
+**RENOVATION DETAILS:**
 - Calculated Renovation Budget: $${(rehab / squareFeet).toFixed(2)}/SF (${getRenovationLevel(rehab / squareFeet)})
 
 ${
@@ -454,10 +445,6 @@ The borrower is purchasing this property for $${formData.purchasePrice.toLocaleS
 - Difference: $${Math.abs(garyAsIsValue - formData.purchasePrice).toLocaleString()} (${garyAsIsValue > formData.purchasePrice ? 'you valued higher - buyer getting a deal ✓' : 'you valued lower - buyer paying premium ⚠'})
 - Variance: ${(((formData.purchasePrice - garyAsIsValue) / garyAsIsValue) * 100).toFixed(1)}%
 
-**COMPARISON TO BORROWER'S ESTIMATES:**
-- Borrower's As-Is: $${formData.userEstimatedAsIsValue.toLocaleString()} vs Your As-Is: $${garyAsIsValue.toLocaleString()} (${garyAsIsValue > formData.userEstimatedAsIsValue ? "you are higher" : "you are lower"} by $${Math.abs(garyAsIsValue - formData.userEstimatedAsIsValue).toLocaleString()})
-- Borrower's ARV: $${userEstimatedArv.toLocaleString()} vs Your ARV: $${garyEstimatedARV.toLocaleString()} (${garyEstimatedARV > userEstimatedArv ? "you are higher" : "you are lower"} by $${Math.abs(garyEstimatedARV - userEstimatedArv).toLocaleString()})
-
 **KEY METRICS (Using Your ARV):**
 - Loan to ARV: ${garyCalculated.loanToArv.toFixed(2)}%
 - Loan to As-Is Value: ${garyCalculated.loanToAsIsValue.toFixed(2)}%
@@ -490,7 +477,6 @@ ${compSelectionState && compSelectionState.filter((s) => s.removed).length > 0 ?
 
 **Section 3: ARV Assessment**
 Explain your ARV of $${garyEstimatedARV.toLocaleString()} and reference specific comps that support this value.
-${garyEstimatedARV !== userEstimatedArv ? `Address why your ARV differs from borrower's $${userEstimatedArv.toLocaleString()}.` : ""}
 
 **Section 4: Purchase Price vs. As-Is Value**
 Compare your as-is value ($${garyAsIsValue.toLocaleString()}) to the purchase price ($${formData.purchasePrice.toLocaleString()}):

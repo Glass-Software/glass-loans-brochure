@@ -28,6 +28,11 @@ export function calculateUnderwriting(
     points,
   } = formData;
 
+  // Validate required fields exist
+  if (!squareFeet) {
+    throw new Error("Square footage is required for calculations");
+  }
+
   // Formula 1: Renovation $$/SF = rehab / squareFeet
   const renovationDollarPerSf = rehab / squareFeet;
 
@@ -223,6 +228,10 @@ export function calculateWeightedARVFromComps(
 ): number {
   if (comps.length === 0) {
     throw new Error("At least one comp required for ARV calculation");
+  }
+
+  if (!formData.squareFeet) {
+    throw new Error("Square footage is required for ARV calculation");
   }
 
   // Calculate price per sqft and weight for each comp

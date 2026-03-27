@@ -52,6 +52,7 @@ export const Step1Schema = z.object({
     .max(10000000, "Rehab must be less than $10M"),
   squareFeet: z
     .number()
+    .int("Square feet must be a whole number")
     .min(100, "Square feet must be at least 100")
     .max(50000, "Square feet must be less than 50,000"),
   bedrooms: z
@@ -67,17 +68,14 @@ export const Step1Schema = z.object({
     .number()
     .int("Year built must be a whole number")
     .min(1800, "Year built must be after 1800")
-    .max(
-      new Date().getFullYear(),
-      `Year built cannot be in the future`,
-    ),
+    .max(new Date().getFullYear(), "Year built cannot be in the future"),
   propertyType: PropertyTypeSchema,
 });
 
 // Step 2: Property Condition Schema
 export const Step2Schema = z.object({
   propertyCondition: PropertyConditionSchema,
-  renovationPerSf: RenovationLevelSchema,
+  renovationPerSf: RenovationLevelSchema.optional(), // Calculated from rehab / squareFeet
 });
 
 // Step 3: Loan Terms Schema
@@ -130,7 +128,7 @@ export const UnderwritingFormSchema = z
     yearBuilt: z.number().int().min(1800, "Year built must be after 1800"),
     propertyType: PropertyTypeSchema,
     propertyCondition: PropertyConditionSchema,
-    renovationPerSf: RenovationLevelSchema,
+    renovationPerSf: RenovationLevelSchema.optional(), // Calculated from rehab / squareFeet
     userEstimatedAsIsValue: z
       .number()
       .min(1000, "As-is value must be at least $1,000")

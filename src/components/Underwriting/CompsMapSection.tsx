@@ -86,7 +86,12 @@ export default function CompsMapSection({
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
             `<div style="padding: 8px;">
-              <a href="${linkUrl}" target="_blank" rel="noopener noreferrer" style="display: block; font-weight: 600; margin-bottom: 4px; color: #2563eb; text-decoration: underline;">${comp.address}</a>
+              <a href="${linkUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; margin-bottom: 4px; color: #2563eb; text-decoration: underline;">
+                ${comp.address}
+                <svg style="width: 12px; height: 12px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                </svg>
+              </a>
               <p style="font-size: 14px; color: #374151;">$${comp.price.toLocaleString()}</p>
               <p style="font-size: 14px; color: #374151;">${formatPricePerSqft(comp.price, comp.sqft)}/sqft</p>
               ${state?.emphasized ? '<p style="font-size: 12px; color: #10B981; font-weight: 500; margin-top: 4px;">Emphasized</p>' : ""}

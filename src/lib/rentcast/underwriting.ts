@@ -14,7 +14,7 @@ async function getAsIsValue(
 ): Promise<{
   asIsValue: number;
   avmMetadata: AVMMetadata;
-  avmComparables: NormalizedComparable[]; // NEW: Return AVM comps for ARV calculation
+  avmComparables: NormalizedComparable[];
   subjectLatitude?: number;
   subjectLongitude?: number;
 }> {
@@ -44,15 +44,6 @@ async function getAsIsValue(
     // Calculate confidence metrics
     const range = avmResponse.priceRangeHigh - avmResponse.priceRangeLow;
     const percentRange = (range / avmResponse.price) * 100;
-
-    // Validate against user estimate (log warnings, don't reject)
-    const userEstimate = formData.userEstimatedAsIsValue;
-    const variance = Math.abs((avmResponse.price - userEstimate) / userEstimate) * 100;
-
-    if (variance > 50) {
-      console.warn(`[RentCast AVM] Large variance from user estimate: ${variance.toFixed(1)}%`);
-      console.warn(`[RentCast AVM] AVM: $${avmResponse.price.toLocaleString()}, User: $${userEstimate.toLocaleString()}`);
-    }
 
     // Normalize AVM comparables to NormalizedComparable format
     // Filter out comps with missing essential data
@@ -121,18 +112,9 @@ async function getAsIsValue(
       subjectLongitude: avmResponse.subjectProperty?.longitude,
     };
   } catch (error: any) {
-    console.warn(`[RentCast AVM] Failed: ${error.message}`);
-    console.warn(`[RentCast AVM] Falling back to user estimate: $${formData.userEstimatedAsIsValue.toLocaleString()}`);
-
-    return {
-      asIsValue: formData.userEstimatedAsIsValue,
-      avmComparables: [], // NEW: Empty array when falling back to user estimate
-      avmMetadata: {
-        source: 'user_estimate',
-        timestamp: new Date().toISOString(),
-        fallbackReason: error.code || error.message,
-      },
-    };
+    console.error(`[RentCast AVM] Failed: ${error.message}`);
+    // No fallback - throw error to trigger next provider in chain
+    throw error;
   }
 }
 
@@ -212,7 +194,7 @@ export async function getRentCastPropertyEstimates(
     `[RentCast] Using ${avmComparables.length} comparables from Tier ${tier} AVM search (${searchRadius}mi radius) for ARV calculation`
   );
 
-  // Calculate ARV using percentile approach
+  // Calculate ARV using percentile approach with user-provided square footage
   const estimatedARV = calculateARV(avmComparables, formData.rehab, formData.squareFeet);
 
   // Build market analysis summary
@@ -252,7 +234,7 @@ export async function getRentCastPropertyEstimates(
     marketAnalysis,
     confidence,
     avmMetadata,
-    userEstimatedAsIsValue: formData.userEstimatedAsIsValue, // Preserve for comparison
+    userEstimatedAsIsValue: formData.userEstimatedAsIsValue, // Optional - preserve if provided
     subjectLatitude, // Subject property latitude from AVM
     subjectLongitude, // Subject property longitude from AVM
   };

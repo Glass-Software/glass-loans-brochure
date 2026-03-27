@@ -12,7 +12,6 @@ const stepLabels = [
   "Market Details",
   "Verify Email",
   "Select Comps",
-  "View Report",
 ];
 
 export default function FormProgress({
@@ -24,14 +23,14 @@ export default function FormProgress({
       {/* Progress bar */}
       <div className="mb-4">
         {/* Circles and connecting lines */}
-        <div className="flex items-center">
+        <div className="flex items-center justify-center">
           {[...Array(totalSteps)].map((_, index) => {
             const step = index + 1;
             const isCompleted = step < currentStep;
             const isCurrent = step === currentStep;
 
             return (
-              <div key={step} className="flex flex-1 items-center">
+              <div key={step} className={`flex items-center ${step < totalSteps ? 'flex-1' : ''}`}>
                 {/* Step circle */}
                 <div
                   className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 font-semibold transition-colors ${
@@ -73,14 +72,14 @@ export default function FormProgress({
         </div>
 
         {/* Labels below circles (desktop only) */}
-        <div className="mt-2 hidden sm:flex">
+        <div className="mt-2 hidden sm:flex justify-center">
           {[...Array(totalSteps)].map((_, index) => {
             const step = index + 1;
             const isCompleted = step < currentStep;
             const isCurrent = step === currentStep;
 
             return (
-              <div key={step} className="flex flex-1 items-center">
+              <div key={step} className={`flex items-center ${step < totalSteps ? 'flex-1' : ''}`}>
                 <span
                   className={`flex-shrink-0 text-center text-xs font-medium ${
                     isCompleted || isCurrent

@@ -45,8 +45,11 @@ export default function Step6CompSelection({
     setResults,
     setError,
     email,
+    setEmail,
     setPropertyComps,
     setCompSelectionState,
+    isDemoMode,
+    setIsDemoMode,
   } = useUnderwriting();
 
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -60,17 +63,20 @@ export default function Step6CompSelection({
   const [highlightedCompIndex, setHighlightedCompIndex] = useState<
     number | null
   >(null);
-  const [isDemoMode, setIsDemoMode] = useState(false);
   const [mobileView, setMobileView] = useState<"map" | "list">("map");
   const [selectedCompForModal, setSelectedCompForModal] = useState<
     number | null
   >(null);
 
-  // Check for demo mode on mount
+  // Check for demo mode from URL on mount (if not already set in context)
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    setIsDemoMode(urlParams.get("demo") === "true");
-  }, []);
+    if (!isDemoMode) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("demo") === "true") {
+        setIsDemoMode(true);
+      }
+    }
+  }, [isDemoMode, setIsDemoMode]);
 
   // Load demo data from existing submission
   const loadDemoData = async () => {
@@ -108,6 +114,8 @@ export default function Step6CompSelection({
       // Update context with demo data
       setPropertyComps(demoData.propertyComps);
       setCompSelectionState(demoData.compSelectionState);
+      setEmail("hervey711@gmail.com"); // Set email for submission
+      setIsDemoMode(true); // Enable demo mode to skip usage checks
 
       // Also update formData if needed
       Object.entries(demoData.formData).forEach(([key, value]) => {
@@ -424,6 +432,32 @@ export default function Step6CompSelection({
     }
   };
 
+  // Animate marker for a given comp index
+  const animateMarker = (compIndex: number) => {
+    const marker = markersRef.current[compIndex + 1]; // +1 because index 0 is subject property
+    if (marker) {
+      const element = marker.getElement();
+      const svg = element.querySelector("svg");
+
+      if (svg) {
+        // Apply snappy scale + bounce animation to SVG only
+        svg.style.transition = "transform 150ms ease-out";
+        svg.style.transform = "scale(1.2) translateY(-10px)";
+
+        // Return to normal
+        setTimeout(() => {
+          svg.style.transform = "scale(1) translateY(0)";
+        }, 150);
+
+        // Clear inline styles after animation completes
+        setTimeout(() => {
+          svg.style.transition = "";
+          svg.style.transform = "";
+        }, 300);
+      }
+    }
+  };
+
   // Handle comp card click - animate the marker and show modal on mobile map view
   const handleCompCardClick = (compIndex: number) => {
     if (!mapRef.current) return;
@@ -550,6 +584,7 @@ export default function Step6CompSelection({
           formData,
           propertyComps,
           compSelectionState,
+          isDemoMode, // Pass demo mode flag to skip usage checks
         }),
       });
 
@@ -691,7 +726,7 @@ export default function Step6CompSelection({
           } h-full w-full lg:flex lg:w-auto`}
         >
           <ResizablePanel
-            minWidth={600}
+            minWidth={400}
             maxWidth={1200}
             defaultWidth={800}
             onResize={() => {
@@ -724,10 +759,10 @@ export default function Step6CompSelection({
 
               {/* Instructions */}
               <div className="border-stroke mb-2 rounded-r-sm border border-l-0 bg-gray-light/50 p-2 dark:border-stroke-dark dark:bg-gray-dark/50">
-                <h4 className="mb-1 text-xs font-semibold text-dark dark:text-white">
+                <h4 className="mb-1 text-base font-semibold text-dark dark:text-white lg:text-lg">
                   Review {propertyComps.compsUsed.length} Comparable Properties
                 </h4>
-                <p className="mb-1 text-xs text-body-color dark:text-body-color-dark">
+                <p className="mb-1 text-sm text-body-color dark:text-body-color-dark lg:text-base">
                   <strong>Emphasize</strong> similar properties •{" "}
                   <strong>Remove</strong> non-comparable
                 </p>
@@ -769,6 +804,7 @@ export default function Step6CompSelection({
                       }
                     }}
                     onCardClick={() => handleCompCardClick(originalIndex)}
+                    onCategorize={() => animateMarker(originalIndex)}
                   />
                 ))}
               </div>

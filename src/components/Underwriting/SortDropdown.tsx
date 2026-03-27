@@ -30,25 +30,17 @@ const sortOptions: { value: SortOption; label: string }[] = [
 
 export default function SortDropdown({ value, onChange }: SortDropdownProps) {
   return (
-    <div className="mb-3">
-      <label
-        htmlFor="comp-sort"
-        className="mb-2 block text-xs font-medium text-body-color dark:text-body-color-dark"
-      >
-        Sort by:
-      </label>
-      <select
-        id="comp-sort"
-        value={value}
-        onChange={(e) => onChange(e.target.value as SortOption)}
-        className="w-full rounded-sm border border-stroke bg-white px-3 py-2 text-base text-dark outline-none focus:border-primary dark:border-stroke-dark dark:bg-gray-dark dark:text-white dark:focus:border-primary"
-      >
-        {sortOptions.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
+    <select
+      id="comp-sort"
+      value={value}
+      onChange={(e) => onChange(e.target.value as SortOption)}
+      className="w-full rounded-sm border border-stroke bg-white px-3 py-2 text-sm text-dark outline-none focus:border-primary dark:border-stroke-dark dark:bg-gray-dark dark:text-white dark:focus:border-primary"
+    >
+      {sortOptions.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   );
 }

@@ -22,6 +22,8 @@ export default function DemoPage() {
     setPropertyComps,
     setCompSelectionState,
     setCurrentStep,
+    setEmail,
+    setIsDemoMode,
   } = useUnderwriting();
 
   const [error, setError] = useState<string | null>(null);
@@ -53,14 +55,16 @@ export default function DemoPage() {
         updateFormData(demoData.formData);
         setPropertyComps(demoData.propertyComps);
         setCompSelectionState(demoData.compSelectionState);
+        setEmail("hervey711@gmail.com"); // Set email for Step 5 submission
+        setIsDemoMode(true); // Enable demo mode to skip usage checks
 
-        // Jump to Step 6
+        // Jump to Step 6 (Comp Selection)
         setCurrentStep(6);
 
         console.log("✅ Demo mode: Loaded data from database for 514 Betty Lou Drive");
         console.log(`✅ Loaded ${demoData.propertyComps.compsUsed.length} comps`);
 
-        // Navigate to underwrite page (which will show Step 6)
+        // Navigate to underwrite page (which will show Step 5)
         setTimeout(() => {
           router.push("/underwrite");
         }, 100);

@@ -20,7 +20,7 @@ model User {
   verificationCode            String?  @map("verification_code")
   codeExpiresAt               DateTime? @map("code_expires_at")
   usageCount                  Int      @default(0) @map("usage_count")
-  usageLimit                  Int      @default(3) @map("usage_limit")
+  usageLimit                  Int      @default(5) @map("usage_limit")
   reportRetentionDays         Int      @default(14) @map("report_retention_days")
   marketingConsent            Boolean  @default(false) @map("marketing_consent")
   createdAt                   DateTime @default(now()) @map("created_at")
@@ -53,7 +53,7 @@ model UnderwritingSubmission {
   squareFeet                Int      @map("square_feet")
   bedrooms                  Int?
   bathrooms                 Float?
-  yearBuilt                 Int?     @map("year_built")
+  yearBuilt                 Int      @map("year_built")
 
   // Financial inputs
   purchasePrice             Float    @map("purchase_price")

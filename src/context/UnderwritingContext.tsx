@@ -62,6 +62,10 @@ interface UnderwritingContextType {
   // Errors
   error: string | null;
   setError: (error: string | null) => void;
+
+  // Demo mode
+  isDemoMode: boolean;
+  setIsDemoMode: (isDemoMode: boolean) => void;
 }
 
 const UnderwritingContext = createContext<
@@ -94,7 +98,10 @@ export function UnderwritingProvider({
   const [progressPercent, setProgressPercent] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const usageLimit = 3;
+  // Demo mode
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
+  const usageLimit = 5;
 
   const goToNextStep = () => {
     if (currentStep < 6) {
@@ -156,6 +163,7 @@ export function UnderwritingProvider({
     setError(null);
     setEmailVerified(false);
     setVerificationCodeState(null);
+    setIsDemoMode(false);
   };
 
   const setEmail = (newEmail: string) => {
@@ -205,6 +213,8 @@ export function UnderwritingProvider({
         setIsProcessing,
         error,
         setError,
+        isDemoMode,
+        setIsDemoMode,
       }}
     >
       {children}

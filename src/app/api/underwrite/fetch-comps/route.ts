@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
       "purchasePrice",
       "rehab",
       "squareFeet",
+      "yearBuilt",
     ];
 
     for (const field of requiredFields) {
@@ -111,6 +112,17 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: "Sorry, we're unable to pull comps for this property. Please try another address with a complete city, state, and ZIP code.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Handle MISSING_SQFT error from Rentcast subjectProperty
+    if (error.code === "MISSING_SQFT") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message,
         },
         { status: 400 }
       );

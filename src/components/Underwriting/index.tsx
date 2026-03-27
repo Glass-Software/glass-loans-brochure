@@ -41,7 +41,7 @@ function UnderwritingContent() {
     );
   }
 
-  // Step 6 gets special full-width treatment
+  // Step 6 gets special full-width treatment (Comp Selection)
   if (currentStep === 6) {
     return (
       <>
@@ -84,7 +84,7 @@ function UnderwritingContent() {
 
               {/* Main form container */}
               <div className="rounded-sm bg-white px-8 py-11 shadow-three dark:bg-gray-dark sm:p-[55px] lg:px-8 xl:p-[55px]">
-                <FormProgress currentStep={currentStep} totalSteps={7} />
+                <FormProgress currentStep={currentStep} totalSteps={6} />
 
                 {error && (
                   <div className="mb-8 rounded-sm bg-red-50 p-4 dark:bg-red-900/20">
