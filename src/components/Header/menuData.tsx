@@ -13,6 +13,12 @@ const menuData: Menu[] = [
     path: "/about",
     newTab: false,
   },
+  {
+    id: 3,
+    title: "Underwrite Pro",
+    path: "/underwrite-pro",
+    newTab: false,
+  },
   // {
   //   id: 33,
   //   title: "Blog",
@@ -37,7 +43,7 @@ const menuData: Menu[] = [
   //       newTab: false,
   //     },
   {
-    id: 42,
+    id: 4,
     title: "Contact Page",
     path: "/contact",
     newTab: false,

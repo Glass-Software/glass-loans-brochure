@@ -5,8 +5,9 @@
 Add a subscription system for "Underwrite Pro" with pricing tiers:
 
 - **Monthly**: $129/month (100 analyses/month)
-- **Annual**: $799/year (100 analyses/month, saves $749/year)
-- **Promotional**: $99/month (one-time offer for users hitting free limit)
+- **Annual**: $1199/year (100 analyses/month, saves $349/year)
+- **Promotional Monthly**: $99/month (one-time offer for users hitting free limit)
+- **Promotional Annual**: $799/year (discounted annual for promo users)
 
 Free users get 5 analyses (increased from 3).
 
@@ -105,10 +106,11 @@ ALTER TABLE users ADD COLUMN promo_offer_used INTEGER DEFAULT 0;
 STRIPE_SECRET_KEY=sk_...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID_MONTHLY=price_...           # Regular $129/mo
-STRIPE_PRICE_ID_PROMOTIONAL=price_...       # Promo $99/mo
-STRIPE_PRICE_ID_ANNUAL=price_...            # $799/yr
-JWT_SECRET=...                               # For session tokens
+NEXT_PUBLIC_STRIPE_PRICE_MONTHLY_REGULAR=price_...    # Regular $129/mo
+NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_REGULAR=price_...     # Regular $1199/yr
+NEXT_PUBLIC_STRIPE_PRICE_MONTHLY_PROMO=price_...      # Promo $99/mo
+NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_PROMO=price_...       # Promo $799/yr
+JWT_SECRET=...                                         # For session tokens
 ```
 
 ### Required npm packages
@@ -125,13 +127,19 @@ npm install swr  # For client-side data fetching (dashboard, auth status)
    - $129/month
    - Recurring billing
 
-2. **Underwrite Pro - Monthly (Promotional)**
+2. **Underwrite Pro - Annual (Regular)**
+   - $1199/year
+   - Recurring billing (annual)
+   - Saves $349/year vs monthly
+
+3. **Underwrite Pro - Monthly (Promotional)**
    - $99/month
    - One-time offer for first-time limit-reached users
    - Recurring at $99/month (locked in rate)
 
-3. **Underwrite Pro - Annual**
+4. **Underwrite Pro - Annual (Promotional)**
    - $799/year
+   - Discounted annual for promo-eligible users
    - Recurring billing (annual)
 
 ---
@@ -258,8 +266,8 @@ npm install swr  # For client-side data fetching (dashboard, auth status)
 3. **Pricing Cards**
 
    - Monthly: $129/mo (regular price)
-   - Annual: $799/yr (Save $749/year badge)
-   - Note: First-time users get special $99/mo offer when hitting free limit
+   - Annual: $1199/yr (Save $349/year badge)
+   - Note: First-time users get special $99/mo or $799/yr promo offer when hitting free limit
    - Both CTAs → Stripe Checkout
 
 4. **FAQ**
@@ -557,11 +565,12 @@ export function isPromoEligible(userId: number): boolean;
 1. **Create Stripe Products:**
 
    - Log in to Stripe Dashboard
-   - Create three recurring products with pricing:
+   - Create recurring products with pricing:
      - Monthly Regular: $129/mo
+     - Annual Regular: $1199/yr
      - Monthly Promotional: $99/mo
-     - Annual: $799/yr
-   - Copy all three Price IDs
+     - Annual Promotional: $799/yr
+   - Copy all four Price IDs
 
 2. **Set Environment Variables:**
 
@@ -623,7 +632,7 @@ export function isPromoEligible(userId: number): boolean;
 
 ### Subscription Management
 - [ ] Pro user can access Stripe Customer Portal from `/account`
-- [ ] Annual plan correctly charges $799/year
+- [ ] Annual plan correctly charges $1199/year (regular) or $799/year (promo)
 - [ ] Monthly plan charges $129/month (regular) or $99/month (promo)
 - [ ] Canceled Pro user loses dashboard access
 - [ ] Canceled Pro user reverts to 5 free analyses
@@ -705,9 +714,10 @@ This plan implements a complete subscription and authentication system with:
 
 **Pricing:**
 - Free tier: 5 analyses (lifetime)
-- Pro Monthly: $129/month (100 analyses/month)
-- Pro Promotional: $99/month (one-time offer for first-time limit-reached users)
-- Pro Annual: $799/year (100 analyses/month, saves $749/year)
+- Pro Monthly Regular: $129/month (100 analyses/month)
+- Pro Annual Regular: $1199/year (100 analyses/month, saves $349/year)
+- Pro Monthly Promo: $99/month (one-time offer for first-time limit-reached users)
+- Pro Annual Promo: $799/year (discounted annual for promo-eligible users)
 
 **Key Features:**
 - Authentication system for Pro users (login with email + password)

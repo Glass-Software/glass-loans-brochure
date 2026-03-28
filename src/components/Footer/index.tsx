@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 const Footer = () => {
   const pathname = usePathname();
 
-  // Hide footer on underwrite pages
-  if (pathname?.startsWith('/underwrite')) {
+  // Hide footer on underwrite flow pages (but not on /underwrite-pro landing page)
+  if (pathname?.startsWith('/underwrite') && !pathname?.startsWith('/underwrite-pro')) {
     return null;
   }
 
