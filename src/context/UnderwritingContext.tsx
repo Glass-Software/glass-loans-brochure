@@ -27,6 +27,8 @@ interface UnderwritingContextType {
   setCompSelectionState: (state: CompSelectionState[]) => void;
   updateCompSelection: (compIndex: number, updates: Partial<Omit<CompSelectionState, 'compIndex'>>) => void;
   getActiveCompsCount: () => number;
+  lastFetchedAddress: string | null;
+  setLastFetchedAddress: (address: string | null) => void;
 
   // Email state
   email: string | null;
@@ -98,6 +100,7 @@ export function UnderwritingProvider({
   });
   const [propertyComps, setPropertyComps] = useState<PropertyComps | null>(null);
   const [compSelectionState, setCompSelectionState] = useState<CompSelectionState[]>([]);
+  const [lastFetchedAddress, setLastFetchedAddress] = useState<string | null>(null);
   const [email, setEmailState] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationCode, setVerificationCodeState] = useState<string | null>(null);
@@ -132,8 +135,11 @@ export function UnderwritingProvider({
 
   const goToPreviousStep = () => {
     if (currentStep > 1) {
+      console.log(`📉 goToPreviousStep: ${currentStep} -> ${currentStep - 1}`);
       setCurrentStep(currentStep - 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      console.log(`📉 goToPreviousStep: Already at step 1, cannot go back`);
     }
   };
 
@@ -178,6 +184,7 @@ export function UnderwritingProvider({
     setFormData({ renovationFunds: 0 });
     setPropertyComps(null);
     setCompSelectionState([]);
+    setLastFetchedAddress(null);
     setCurrentStep(1);
     setResults(null);
     setError(null);
@@ -211,6 +218,8 @@ export function UnderwritingProvider({
         setCompSelectionState,
         updateCompSelection,
         getActiveCompsCount,
+        lastFetchedAddress,
+        setLastFetchedAddress,
         email,
         setEmail,
         emailVerified,

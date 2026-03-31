@@ -10,6 +10,9 @@ export const metadata = {
   description: "Manage your underwriting reports and subscription",
 };
 
+// Force dynamic rendering (uses cookies for authentication)
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   // Require authentication
   const user = await getCurrentUser();

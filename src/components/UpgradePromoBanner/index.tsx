@@ -70,6 +70,9 @@ export default function UpgradePromoBanner() {
   // Show banner if we have valid expiry (from cookie or database) and not expired
   const hasActivePromo = expiryTime && !isExpired;
 
+  // Don't show on signup or dashboard pages (user is already upgrading or upgraded)
+  if (pathname === '/signup' || pathname === '/dashboard') return null;
+
   // Don't wait for API loading if we have cookie
   if (loading && !cookieExpiry) return null;
   if (!hasActivePromo) return null;

@@ -11,7 +11,18 @@ import Step6CompSelection from "./Step6CompSelection";
 import ResultsPanel from "./ResultsPanel";
 import ProgressIndicator from "./ProgressIndicator";
 
-function UnderwritingContent() {
+type AuthenticatedUser = {
+  id: number;
+  email: string;
+  tier: string;
+  stripe_customer_id: string | null;
+} | null;
+
+interface UnderwritingContentProps {
+  authenticatedUser: AuthenticatedUser;
+}
+
+function UnderwritingContent({ authenticatedUser }: UnderwritingContentProps) {
   const { currentStep, results, error, usageCount, usageLimit } =
     useUnderwriting();
 
@@ -99,7 +110,7 @@ function UnderwritingContent() {
                 {currentStep === 2 && <Step2PropertyCondition />}
                 {currentStep === 3 && <Step3LoanTerms />}
                 {currentStep === 4 && <Step4MarketDetails />}
-                {currentStep === 5 && <Step5EmailVerification />}
+                {currentStep === 5 && <Step5EmailVerification authenticatedUser={authenticatedUser} />}
               </div>
 
               {/* Disclaimer */}
@@ -117,6 +128,6 @@ function UnderwritingContent() {
   );
 }
 
-export default function Underwriting() {
-  return <UnderwritingContent />;
+export default function Underwriting({ authenticatedUser }: { authenticatedUser: AuthenticatedUser }) {
+  return <UnderwritingContent authenticatedUser={authenticatedUser} />;
 }

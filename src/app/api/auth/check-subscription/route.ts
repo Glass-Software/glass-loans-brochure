@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     }
 
     // Check if user has Pro tier and subscription
-    const hasSubscription = user.tier === "pro" && user.stripeCustomerId;
+    const hasSubscription = user.tier === "pro" && user.stripe_customer_id;
 
     return NextResponse.json({
       exists: true,

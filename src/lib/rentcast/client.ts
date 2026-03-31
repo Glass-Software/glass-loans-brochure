@@ -150,9 +150,6 @@ export class RentCastClient {
 
     const url = `${this.baseUrl}/avm/value?${queryParams}`;
 
-    console.log(`[RentCast AVM] Request URL: ${url}`);
-    console.log(`[RentCast AVM] Request params:`, params);
-
     const startTime = Date.now();
 
     try {

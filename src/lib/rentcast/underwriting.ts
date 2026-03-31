@@ -22,8 +22,16 @@ async function getAsIsValue(
 
   const client = getRentCastClient();
 
+  // Construct full address with city, state, ZIP to prevent Rentcast from geocoding to wrong property
+  const fullAddress = [
+    formData.propertyAddress,
+    formData.propertyCity,
+    formData.propertyState,
+    formData.propertyZip
+  ].filter(Boolean).join(', ');
+
   const avmParams: RentCastAVMParams = {
-    address: formData.propertyAddress,
+    address: fullAddress, // Full address to ensure correct property lookup
     propertyType: mapPropertyType(formData.propertyType),
     bedrooms: formData.bedrooms,
     bathrooms: formData.bathrooms,
@@ -128,6 +136,8 @@ export async function getRentCastPropertyEstimates(
   formData: UnderwritingFormData
 ): Promise<PropertyComps> {
   console.log("[RentCast] Starting property estimation...");
+  console.log(`[RentCast] 🏠 Form Data Address: "${formData.propertyAddress}"`);
+  console.log(`[RentCast] 📍 Coordinates: ${formData.propertyLatitude}, ${formData.propertyLongitude}`);
 
   const marketType = formData.marketType || "Suburban";
   let tier: 1 | 2 | 3 = 1;

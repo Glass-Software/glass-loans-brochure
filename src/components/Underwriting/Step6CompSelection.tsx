@@ -52,6 +52,11 @@ export default function Step6CompSelection({
     isDemoMode,
     setIsDemoMode,
     cachedGaryData,
+    goToPreviousStep,
+    setCurrentStep,
+    emailVerified,
+    lastFetchedAddress,
+    setLastFetchedAddress,
   } = useUnderwriting();
 
   const { openUpgradeModal } = useModal();
@@ -148,9 +153,31 @@ export default function Step6CompSelection({
     }
   };
 
-  // Fetch comps when component mounts (if not already loaded)
+  // Fetch comps when component mounts OR when address changes
+  // (lastFetchedAddress now comes from context to persist across navigation)
   useEffect(() => {
-    if (propertyComps) return; // Already loaded
+    // Build full address key for comparison (same format sent to Rentcast)
+    const currentFullAddress = [
+      formData.propertyAddress,
+      formData.propertyCity,
+      formData.propertyState,
+      formData.propertyZip
+    ].filter(Boolean).join(', ');
+
+    const addressChanged = lastFetchedAddress !== null && lastFetchedAddress !== currentFullAddress;
+
+    // If comps exist and full address hasn't changed, skip refetch
+    if (propertyComps && !addressChanged) {
+      console.log(`✅ Using cached comps for: "${currentFullAddress}"`);
+      return;
+    }
+
+    // If address changed, clear old comps before refetching
+    if (addressChanged) {
+      console.log(`🔄 Address changed from "${lastFetchedAddress}" to "${currentFullAddress}" - refetching comps`);
+      setPropertyComps(null);
+      setCompSelectionState([]);
+    }
 
     // If demo mode, load demo data instead
     if (isDemoMode) {
@@ -208,6 +235,16 @@ export default function Step6CompSelection({
         );
         setCompSelectionState(initialState);
 
+        // Track the FULL address we just fetched for (for cache comparison)
+        const fetchedFullAddress = [
+          formData.propertyAddress,
+          formData.propertyCity,
+          formData.propertyState,
+          formData.propertyZip
+        ].filter(Boolean).join(', ');
+        setLastFetchedAddress(fetchedFullAddress);
+        console.log(`✅ Cached comps for: "${fetchedFullAddress}"`);
+
         setProgressPercent(100);
         setProgressStatus("Complete!");
       } catch (error: any) {
@@ -248,8 +285,10 @@ export default function Step6CompSelection({
   }, [
     propertyComps,
     formData,
+    formData.propertyAddress, // Add explicit dependency on address
     email,
     isDemoMode,
+    lastFetchedAddress,
     setPropertyComps,
     setCompSelectionState,
     setIsProcessing,
@@ -833,7 +872,19 @@ export default function Step6CompSelection({
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
-              onClick={() => window.history.back()}
+              onClick={() => {
+                console.log("🔙 Back button clicked from Step 6");
+                // If email is verified (authenticated user), skip Step 5 and go to Step 4
+                // Otherwise, use normal back navigation
+                if (emailVerified) {
+                  console.log("📧 Email verified - skipping Step 5, going to Step 4");
+                  setCurrentStep(4);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                } else {
+                  console.log("📧 Email not verified - going to Step 5");
+                  goToPreviousStep();
+                }
+              }}
               className="border-stroke rounded-sm border px-3 py-1.5 text-sm font-medium text-body-color hover:bg-gray-light dark:border-stroke-dark dark:hover:bg-gray-dark"
             >
               Back

@@ -328,21 +328,36 @@ export async function POST(request: Request) {
         // Step 5: Get verified user (20-25%)
         sendProgress(controller, 1, "Verifying user...", 20);
 
-        const normalizedEmail = normalizeEmail(email);
+        // Check for authenticated user session first
+        const { getCurrentUser } = await import("@/lib/auth/session");
+        const authenticatedUser = await getCurrentUser();
 
-        // Import findVerifiedUserByEmail (code was already verified in Step 5)
-        const { findVerifiedUserByEmail } = await import("@/lib/db/queries");
+        let user;
 
-        const user = await findVerifiedUserByEmail(normalizedEmail);
+        if (authenticatedUser) {
+          // User is authenticated via session - use their account
+          user = authenticatedUser;
+          console.log(`✅ Using authenticated user: ${user.email} (ID: ${user.id})`);
+        } else {
+          // No session - verify email from form
+          const normalizedEmail = normalizeEmail(email);
 
-        if (!user) {
-          sendError(
-            controller,
-            "User not found or email not verified. Please complete email verification first.",
-            "USER_NOT_VERIFIED",
-          );
-          controller.close();
-          return;
+          // Import findVerifiedUserByEmail (code was already verified in Step 5)
+          const { findVerifiedUserByEmail } = await import("@/lib/db/queries");
+
+          user = await findVerifiedUserByEmail(normalizedEmail);
+
+          if (!user) {
+            sendError(
+              controller,
+              "User not found or email not verified. Please complete email verification first.",
+              "USER_NOT_VERIFIED",
+            );
+            controller.close();
+            return;
+          }
+
+          console.log(`✅ Using verified email user: ${user.email} (ID: ${user.id})`);
         }
 
         // Step 7: Check usage limit (skip for demo mode)

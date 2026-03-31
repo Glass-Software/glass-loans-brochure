@@ -105,6 +105,9 @@ export default function UpgradePromoModal({
                         {secondsRemaining.toString().padStart(2, "0")}
                       </span>
                     </div>
+                    <p className="mt-2 text-sm font-medium text-body-color dark:text-body-color-dark">
+                      You're Out of Reports!
+                    </p>
                   </div>
                 )}
 

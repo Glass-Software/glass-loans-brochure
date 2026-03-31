@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import Underwriting from "@/components/Underwriting";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
   title: "AI Underwriting Tool | Glass Loans",
@@ -14,10 +15,13 @@ export const metadata: Metadata = {
   ],
 };
 
-export default function UnderwritePage() {
+export default async function UnderwritePage() {
+  // Check for authenticated user session
+  const user = await getCurrentUser();
+
   return (
     <>
-      <Underwriting />
+      <Underwriting authenticatedUser={user} />
     </>
   );
 }

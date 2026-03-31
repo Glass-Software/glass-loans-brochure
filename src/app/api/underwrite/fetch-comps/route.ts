@@ -84,6 +84,8 @@ export async function POST(request: NextRequest) {
     // This will try RentCast → Realie → AI → Heuristic fallback
     const propertyComps = await getPropertyEstimates(formData);
 
+    console.log(`[fetch-comps API] ✅ Successfully fetched ${propertyComps.compsUsed.length} comps`);
+
     // Return comps
     return NextResponse.json({
       success: true,

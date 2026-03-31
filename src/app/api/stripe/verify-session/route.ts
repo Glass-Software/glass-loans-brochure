@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe/client";
+import Stripe from "stripe";
 
 export async function GET(request: Request) {
   try {
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
     } else if (session.customer) {
       const customer = await stripe.customers.retrieve(session.customer as string);
       if (!customer.deleted) {
-        email = customer.email;
+        email = (customer as Stripe.Customer).email;
       }
     }
 

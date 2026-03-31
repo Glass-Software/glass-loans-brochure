@@ -109,7 +109,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log(`💳 Subscription: ${subscriptionId}`);
 
   // Get subscription details from Stripe
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const subscriptionResponse = await stripe.subscriptions.retrieve(subscriptionId);
+  const subscription = subscriptionResponse as Stripe.Subscription;
   console.log(`📊 Subscription status: ${subscription.status}`);
 
   // Normalize email to find/create user
@@ -135,16 +136,20 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // Create subscription record
   console.log(`💾 Creating subscription record for user ${user.id}`);
+
+  // Period dates are on the subscription items, not the subscription itself
+  const subscriptionItem = subscription.items.data[0];
+
   await createSubscription({
     userId: user.id,
     stripeCustomerId,
     stripeSubscriptionId: subscriptionId,
-    stripePriceId: subscription.items.data[0].price.id,
+    stripePriceId: subscriptionItem.price.id,
     tier: "pro",
     status: subscription.status,
-    currentPeriodStart: new Date(subscription.current_period_start * 1000),
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    currentPeriodStart: new Date((subscriptionItem as any).current_period_start * 1000),
+    currentPeriodEnd: new Date((subscriptionItem as any).current_period_end * 1000),
+    cancelAtPeriodEnd: (subscription as any).cancel_at_period_end,
   });
 
   // Clear promotional expiry after successful upgrade
@@ -172,12 +177,15 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log(`📝 Updating subscription for user ${dbSubscription.user_id}`);
   console.log(`   Status: ${dbSubscription.status} → ${subscription.status}`);
 
+  // Period dates are on the subscription items, not the subscription itself
+  const subscriptionItem = subscription.items.data[0];
+
   await updateSubscription(dbSubscription.id, {
     status: subscription.status,
-    stripePriceId: subscription.items.data[0].price.id,
-    currentPeriodStart: new Date(subscription.current_period_start * 1000),
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    stripePriceId: subscriptionItem.price.id,
+    currentPeriodStart: new Date((subscriptionItem as any).current_period_start * 1000),
+    currentPeriodEnd: new Date((subscriptionItem as any).current_period_end * 1000),
+    cancelAtPeriodEnd: (subscription as any).cancel_at_period_end,
   });
 
   console.log(`✅ Updated subscription ${subscription.id}`);
@@ -218,7 +226,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
   console.log(`🔵 Processing invoice.payment_failed`);
 
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = (invoice as any).subscription as string;
 
   if (!subscriptionId) {
     console.log("ℹ️  Invoice not associated with subscription, skipping");

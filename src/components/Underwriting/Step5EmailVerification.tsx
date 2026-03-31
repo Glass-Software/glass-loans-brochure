@@ -1,13 +1,24 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUnderwriting } from "@/context/UnderwritingContext";
 import { EmailSchema } from "@/lib/underwriting/validation";
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
 import { useModal } from "@/context/ModalContext";
 
-export default function Step5EmailVerification() {
+type AuthenticatedUser = {
+  id: number;
+  email: string;
+  tier: string;
+  stripe_customer_id: string | null;
+} | null;
+
+interface Step5EmailVerificationProps {
+  authenticatedUser: AuthenticatedUser;
+}
+
+export default function Step5EmailVerification({ authenticatedUser }: Step5EmailVerificationProps) {
   const router = useRouter();
   const { openUpgradeModal } = useModal();
   const {
@@ -37,6 +48,26 @@ export default function Step5EmailVerification() {
   const [codeError, setCodeError] = useState("");
   const [sendingCode, setSendingCode] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
+
+  const isAuthenticated = !!authenticatedUser;
+  const userEmail = authenticatedUser?.email || "";
+
+  // Track if we've already auto-skipped to prevent loops when navigating back
+  const [hasAutoSkipped, setHasAutoSkipped] = useState(false);
+
+  // Auto-skip verification for authenticated users (but only once)
+  useEffect(() => {
+    if (isAuthenticated && userEmail && !hasAutoSkipped) {
+      console.log("📧 [Step5] Auto-skipping for authenticated user:", userEmail);
+      // Set email in context for submit endpoint
+      setContextEmail(userEmail);
+      setEmailVerified(true);
+      setHasAutoSkipped(true);
+
+      // Skip to next step immediately
+      goToNextStep();
+    }
+  }, [isAuthenticated, userEmail, hasAutoSkipped, setContextEmail, setEmailVerified, goToNextStep]);
 
   // Refs for code inputs
   const codeInputRefs = [
@@ -217,54 +248,76 @@ export default function Step5EmailVerification() {
         <div className="mb-8">
           <div className="mb-6 rounded-sm bg-blue-50 p-4 dark:bg-blue-900/20">
             <p className="text-sm text-body-color dark:text-body-color-dark">
-              <strong>Final Step:</strong> Verify your email to receive your AI-powered underwriting analysis from Gary.
+              <strong>Final Step:</strong> {isAuthenticated ? "Verify your identity" : "Verify your email"} to receive your AI-powered underwriting analysis from Gary.
             </p>
-            <p className="mt-2 text-xs text-body-color dark:text-body-color-dark">
-              You get <strong>5 free reports</strong> per verified email address.
-            </p>
+            {!isAuthenticated && (
+              <p className="mt-2 text-xs text-body-color dark:text-body-color-dark">
+                You get <strong>5 free reports</strong> per verified email address.
+              </p>
+            )}
           </div>
 
           {!codeSent ? (
             <form onSubmit={handleSendCode}>
-              <label htmlFor="email" className={labelClass}>
-                Email Address *
-              </label>
-              <div className="mb-4 flex gap-3">
-                <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  disabled={sendingCode}
-                  className={inputClass}
-                />
+              {isAuthenticated ? (
+                <div className="mb-4 rounded-sm border border-green-500/20 bg-green-500/10 p-4">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    ✓ Report will be saved to your Pro account ({userEmail})
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <label htmlFor="email" className={labelClass}>
+                    Email Address *
+                  </label>
+                  <div className="mb-4 flex gap-3">
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      disabled={sendingCode}
+                      className={inputClass}
+                    />
+                    <button
+                      type="submit"
+                      disabled={sendingCode || !marketingConsent}
+                      className="whitespace-nowrap rounded-sm bg-primary px-6 py-3 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      {sendingCode ? "Sending..." : "Send Code"}
+                    </button>
+                  </div>
+                  {emailError && <p className={errorClass}>{emailError}</p>}
+
+                  <div className="mt-4 flex items-start">
+                    <input
+                      type="checkbox"
+                      id="marketingConsent"
+                      checked={marketingConsent}
+                      onChange={(e) => setMarketingConsent(e.target.checked)}
+                      required
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <label
+                      htmlFor="marketingConsent"
+                      className="ml-3 text-sm text-body-color dark:text-body-color-dark"
+                    >
+                      <span className="font-semibold text-dark dark:text-white">*</span> I agree to receive marketing emails from Glass Loans about new products, features, and special offers. You can unsubscribe at any time.
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {isAuthenticated && (
                 <button
                   type="submit"
-                  disabled={sendingCode || !marketingConsent}
-                  className="whitespace-nowrap rounded-sm bg-primary px-6 py-3 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50"
+                  disabled={sendingCode}
+                  className="w-full rounded-sm bg-primary px-6 py-3 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {sendingCode ? "Sending..." : "Send Code"}
+                  {sendingCode ? "Sending..." : "Send Verification Code"}
                 </button>
-              </div>
-              {emailError && <p className={errorClass}>{emailError}</p>}
-
-              <div className="mt-4 flex items-start">
-                <input
-                  type="checkbox"
-                  id="marketingConsent"
-                  checked={marketingConsent}
-                  onChange={(e) => setMarketingConsent(e.target.checked)}
-                  required
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <label
-                  htmlFor="marketingConsent"
-                  className="ml-3 text-sm text-body-color dark:text-body-color-dark"
-                >
-                  <span className="font-semibold text-dark dark:text-white">*</span> I agree to receive marketing emails from Glass Loans about new products, features, and special offers. You can unsubscribe at any time.
-                </label>
-              </div>
+              )}
             </form>
           ) : (
             <div>
