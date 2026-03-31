@@ -24,6 +24,7 @@ export default function DemoPage() {
     setCurrentStep,
     setEmail,
     setIsDemoMode,
+    setCachedGaryData,
   } = useUnderwriting();
 
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,12 @@ export default function DemoPage() {
         setCompSelectionState(demoData.compSelectionState);
         setEmail("hervey711@gmail.com"); // Set email for Step 5 submission
         setIsDemoMode(true); // Enable demo mode to skip usage checks
+
+        // Load cached Gary data to avoid re-calling OpenRouter
+        if (demoData.cachedGaryData) {
+          setCachedGaryData(demoData.cachedGaryData);
+          console.log("✅ Demo mode: Loaded cached Gary data (will skip OpenRouter calls)");
+        }
 
         // Jump to Step 6 (Comp Selection)
         setCurrentStep(6);

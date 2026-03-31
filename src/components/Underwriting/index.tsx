@@ -77,7 +77,7 @@ function UnderwritingContent() {
                 </p>
                 {usageCount > 0 && (
                   <p className="mt-2 text-sm text-body-color dark:text-body-color-dark">
-                    You&apos;ve used {usageCount} of {usageLimit} free analyses
+                    You&apos;ve used {usageCount} of {usageLimit} free reports
                   </p>
                 )}
               </div>

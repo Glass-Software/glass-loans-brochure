@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { useUnderwriting } from "@/context/UnderwritingContext";
 import { EmailSchema } from "@/lib/underwriting/validation";
 import { useGoogleReCaptcha } from "react-google-recaptcha-v3";
+import { useModal } from "@/context/ModalContext";
 
 export default function Step5EmailVerification() {
   const router = useRouter();
+  const { openUpgradeModal } = useModal();
   const {
     formData,
     setIsSubmitting,
@@ -84,6 +86,13 @@ export default function Step5EmailVerification() {
       console.log("🔵 [Step5] Response data:", data);
 
       if (!response.ok) {
+        // Check if user hit usage limit - open upgrade modal instead of showing error
+        if (data.limitReached) {
+          console.log("🔵 [Step5] Usage limit reached - opening upgrade modal");
+          console.log("🔵 [Step5] Promo expires at:", data.promoExpiresAt);
+          openUpgradeModal(data.promoExpiresAt);
+          return;
+        }
         throw new Error(data.error || "Failed to send verification code");
       }
 
@@ -211,7 +220,7 @@ export default function Step5EmailVerification() {
               <strong>Final Step:</strong> Verify your email to receive your AI-powered underwriting analysis from Gary.
             </p>
             <p className="mt-2 text-xs text-body-color dark:text-body-color-dark">
-              You get <strong>3 free analyses</strong> per verified email address.
+              You get <strong>5 free reports</strong> per verified email address.
             </p>
           </div>
 

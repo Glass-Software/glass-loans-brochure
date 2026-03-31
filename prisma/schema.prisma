@@ -23,15 +23,26 @@ model User {
   usageLimit                  Int      @default(5) @map("usage_limit")
   reportRetentionDays         Int      @default(14) @map("report_retention_days")
   marketingConsent            Boolean  @default(false) @map("marketing_consent")
+
+  // Pro tier fields
+  tier                        String   @default("free") // "free" | "pro"
+  usagePeriodStart            DateTime? @map("usage_period_start")
+  stripeCustomerId            String?  @unique @map("stripe_customer_id")
+  promoExpiresAt              DateTime? @map("promo_expires_at") // Promotional offer expiry
+
   createdAt                   DateTime @default(now()) @map("created_at")
   updatedAt                   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  submissions UnderwritingSubmission[]
+  submissions                 UnderwritingSubmission[]
+  subscription                Subscription?
+  sessions                    Session[]
 
   @@index([email])
   @@index([normalizedEmail])
   @@index([verificationToken])
+  @@index([stripeCustomerId])
+  @@index([promoExpiresAt])
   @@map("users")
 }
 
@@ -98,6 +109,50 @@ model UnderwritingSubmission {
   @@index([reportId])
   @@index([expiresAt])
   @@map("underwriting_submissions")
+}
+
+// Subscriptions table for Pro users
+model Subscription {
+  id                    Int      @id @default(autoincrement())
+  userId                Int      @unique @map("user_id")
+  stripeCustomerId      String   @unique @map("stripe_customer_id")
+  stripeSubscriptionId  String   @unique @map("stripe_subscription_id")
+  stripePriceId         String   @map("stripe_price_id")
+  tier                  String   @default("pro")
+  status                String   // "active" | "past_due" | "canceled" | "incomplete" | "trialing"
+  currentPeriodStart    DateTime @map("current_period_start")
+  currentPeriodEnd      DateTime @map("current_period_end")
+  cancelAtPeriodEnd     Boolean  @default(false) @map("cancel_at_period_end")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// Sessions table for authenticated Pro users
+model Session {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  sessionToken String   @unique @map("session_token")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([expiresAt])
+  @@map("sessions")
 }
 
 // Rate limiting table

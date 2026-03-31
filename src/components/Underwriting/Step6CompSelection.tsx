@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useUnderwriting } from "@/context/UnderwritingContext";
+import { useModal } from "@/context/ModalContext";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { PropertyComparable } from "@/types/underwriting";
@@ -50,7 +51,10 @@ export default function Step6CompSelection({
     setCompSelectionState,
     isDemoMode,
     setIsDemoMode,
+    cachedGaryData,
   } = useUnderwriting();
+
+  const { openUpgradeModal } = useModal();
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -585,6 +589,7 @@ export default function Step6CompSelection({
           propertyComps,
           compSelectionState,
           isDemoMode, // Pass demo mode flag to skip usage checks
+          cachedGaryData, // Pass cached Gary data to skip OpenRouter calls in demo mode
         }),
       });
 
@@ -628,6 +633,14 @@ export default function Step6CompSelection({
                 }
                 return;
               } else if (data.type === "error") {
+                // Check if this is a usage limit error
+                if (data.data?.code === "USAGE_LIMIT") {
+                  // Open upgrade modal instead of showing error
+                  openUpgradeModal();
+                  setIsProcessing(false);
+                  setIsSubmitting(false);
+                  return;
+                }
                 throw new Error(data.status);
               }
             } catch (parseError) {

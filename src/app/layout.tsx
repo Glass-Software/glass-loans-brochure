@@ -9,7 +9,9 @@ import "../styles/index.css";
 import { Providers } from "./providers";
 import { ModalProvider } from "@/context/ModalContext";
 import ContactModal from "@/components/ContactModal";
+import UpgradePromoBanner from "@/components/UpgradePromoBanner";
 import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
+import { usePathname } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,6 +21,11 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+
+  // Hide header/footer on dashboard routes
+  const isDashboardRoute = pathname?.startsWith("/dashboard");
+
   return (
     <html suppressHydrationWarning lang="en">
       {/*
@@ -39,9 +46,10 @@ export default function RootLayout({
             }}
           >
             <ModalProvider>
-              <Header />
+              <UpgradePromoBanner />
+              {!isDashboardRoute && <Header />}
               {children}
-              <Footer />
+              {!isDashboardRoute && <Footer />}
               <ScrollToTop />
               <ContactModal />
             </ModalProvider>

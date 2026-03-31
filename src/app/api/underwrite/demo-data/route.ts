@@ -130,11 +130,19 @@ export async function POST(request: Request) {
       }));
     }
 
+    // Return complete submission data (including Gary's opinion and scores)
     return NextResponse.json({
       success: true,
       formData,
       propertyComps,
       compSelectionState,
+      // Cached Gary data to avoid re-calling OpenRouter
+      cachedGaryData: {
+        garyOpinion: submission.garyOpinion,
+        garyEstimatedARV: submission.estimatedArv,
+        garyAsIsValue: submission.asIsValue,
+        finalScore: submission.finalScore,
+      },
       message: `Loaded demo data from submission for ${submission.propertyAddress}`,
     });
   } catch (error) {

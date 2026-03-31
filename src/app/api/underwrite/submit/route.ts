@@ -4,6 +4,7 @@ import {
   incrementUsageCount,
   createSubmission,
   generateReportId,
+  setPromoExpiry,
 } from "@/lib/db/queries";
 import { validateCompleteForm } from "@/lib/underwriting/validation";
 import {
@@ -190,6 +191,7 @@ function sendError(
   controller: ReadableStreamDefaultController,
   error: string,
   code?: string,
+  payload?: any,
 ) {
   const event: ProgressEvent = {
     type: "error",
@@ -197,7 +199,7 @@ function sendError(
     status: error,
     progress: 0,
     timestamp: new Date().toISOString(),
-    data: { code },
+    data: { code, ...payload },
   };
 
   const encoder = new TextEncoder();
@@ -206,7 +208,7 @@ function sendError(
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { email, recaptchaToken, formData, propertyComps, compSelectionState, isDemoMode } =
+  const { email, recaptchaToken, formData, propertyComps, compSelectionState, isDemoMode, cachedGaryData } =
     body;
 
   // Create a readable stream for progress updates
@@ -345,10 +347,16 @@ export async function POST(request: Request) {
 
         // Step 7: Check usage limit (skip for demo mode)
         if (!isDemoMode && user.usage_count >= user.usage_limit) {
+          // Set promo expiry in database (1 hour from now)
+          await setPromoExpiry(user.id);
+
+          const promoExpiresAt = new Date(Date.now() + 3600000);
+
           sendError(
             controller,
-            `You've reached your limit of ${user.usage_limit} free underwriting ${user.usage_limit === 1 ? "analysis" : "analyses"}.`,
+            `You've reached your limit of ${user.usage_limit} free reports. Upgrade to Pro now for a limited-time offer!`,
             "USAGE_LIMIT",
+            { promoExpiresAt: promoExpiresAt.toISOString() }
           );
           controller.close();
           return;
@@ -572,8 +580,50 @@ export async function POST(request: Request) {
         let garyOpinion: string;
         const apiAsIsValue = aiEstimates.asIsValue; // Store API's as-is value separately
 
-        try {
-          if (process.env.OPENROUTER_API_KEY) {
+        // Demo mode: Use cached Gary data to skip OpenRouter calls
+        if (isDemoMode && cachedGaryData?.garyOpinion && cachedGaryData?.garyEstimatedARV && cachedGaryData?.garyAsIsValue) {
+          console.log("🎬 [DEMO MODE] Using cached Gary data - skipping OpenRouter calls");
+          sendProgress(
+            controller,
+            4,
+            "Loading cached analysis...",
+            65,
+          );
+
+          garyAsIsValue = cachedGaryData.garyAsIsValue;
+          garyEstimatedARV = cachedGaryData.garyEstimatedARV;
+          garyOpinion = cachedGaryData.garyOpinion;
+
+          // Always recalculate to update garyCalculations
+          const garyCalculationsUpdated = calculateUnderwriting(
+            formData as UnderwritingFormData,
+            garyEstimatedARV,
+            garyAsIsValue,
+          );
+          garyCalculations = garyCalculationsUpdated;
+
+          // Use cached final score if available, otherwise recalculate
+          if (cachedGaryData.finalScore) {
+            finalScore = cachedGaryData.finalScore;
+          } else {
+            finalScore = calculateFinalScore(
+              garyCalculationsUpdated,
+              formData as UnderwritingFormData,
+            );
+          }
+
+          sendProgress(
+            controller,
+            5,
+            "Cached analysis loaded successfully",
+            80,
+          );
+
+          console.log("🎬 [DEMO MODE] Cached data loaded successfully");
+        } else {
+          // Normal mode: Call OpenRouter
+          try {
+            if (process.env.OPENROUTER_API_KEY) {
             // CALL 1: Get valuations from Gary (low temperature for consistency)
             console.log(
               "🤖 [OPENROUTER CALL 1 START] Valuation call starting...",
@@ -698,31 +748,32 @@ export async function POST(request: Request) {
             );
 
             garyOpinion = "Analysis based on automated calculations using comparable properties. ARV and as-is valuations have been calculated using market data.";
+            }
+          } catch (garyError: any) {
+            console.error("Gary error:", garyError);
+            // Fallback to automated calculation
+            console.log("Falling back to automated calculation...");
+            const { calculateARV } = await import("@/lib/rentcast/comps");
+            garyEstimatedARV = calculateARV(
+              aiEstimates.compsUsed,
+              formData.rehab,
+              formData.squareFeet,
+            );
+            garyAsIsValue = apiAsIsValue;
+
+            // Recalculate with fallback valuations
+            garyCalculations = calculateUnderwriting(
+              formData as UnderwritingFormData,
+              garyEstimatedARV,
+              garyAsIsValue,
+            );
+            finalScore = calculateFinalScore(
+              garyCalculations,
+              formData as UnderwritingFormData,
+            );
+
+            garyOpinion = "Analysis based on automated calculations using comparable properties. ARV and as-is valuations have been calculated using market data.";
           }
-        } catch (garyError: any) {
-          console.error("Gary error:", garyError);
-          // Fallback to automated calculation
-          console.log("Falling back to automated calculation...");
-          const { calculateARV } = await import("@/lib/rentcast/comps");
-          garyEstimatedARV = calculateARV(
-            aiEstimates.compsUsed,
-            formData.rehab,
-            formData.squareFeet,
-          );
-          garyAsIsValue = apiAsIsValue;
-
-          // Recalculate with fallback valuations
-          garyCalculations = calculateUnderwriting(
-            formData as UnderwritingFormData,
-            garyEstimatedARV,
-            garyAsIsValue,
-          );
-          finalScore = calculateFinalScore(
-            garyCalculations,
-            formData as UnderwritingFormData,
-          );
-
-          garyOpinion = "Analysis based on automated calculations using comparable properties. ARV and as-is valuations have been calculated using market data.";
         }
 
         // Update aiEstimates with Gary's valuations

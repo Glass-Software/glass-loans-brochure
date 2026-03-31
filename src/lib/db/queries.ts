@@ -23,6 +23,10 @@ export interface User {
   usage_count: number;
   usage_limit: number;
   report_retention_days: number;
+  tier: string; // "free" | "pro"
+  usage_period_start: string | null;
+  stripe_customer_id: string | null;
+  promo_expires_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +45,10 @@ function toPrismaUserToLegacy(user: PrismaUser): User {
     usage_count: user.usageCount,
     usage_limit: user.usageLimit,
     report_retention_days: user.reportRetentionDays,
+    tier: user.tier,
+    usage_period_start: user.usagePeriodStart?.toISOString() || null,
+    stripe_customer_id: user.stripeCustomerId,
+    promo_expires_at: user.promoExpiresAt?.toISOString() || null,
     created_at: user.createdAt.toISOString(),
     updated_at: user.updatedAt.toISOString(),
   };
@@ -164,13 +172,40 @@ export async function verifyUserEmail(token: string): Promise<User | null> {
 
 /**
  * Increment user usage count
+ * For Pro users: Resets monthly if 30 days have passed since usagePeriodStart
  */
 export async function incrementUsageCount(userId: number): Promise<User> {
-  const user = await prisma.user.update({
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) throw new Error("User not found");
+
+  // For Pro users: check if we need to reset monthly usage
+  if (user.tier === "pro" && user.usagePeriodStart) {
+    const now = new Date();
+    const periodStart = new Date(user.usagePeriodStart);
+
+    // If more than 30 days have passed, reset usage
+    const daysSinceReset = (now.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (daysSinceReset >= 30) {
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          usageCount: 1, // Reset to 1 (this submission)
+          usagePeriodStart: now,
+        },
+      });
+      return toPrismaUserToLegacy(updatedUser);
+    }
+  }
+
+  // Normal increment (for free users or Pro users within their period)
+  const updated = await prisma.user.update({
     where: { id: userId },
     data: { usageCount: { increment: 1 } },
   });
-  return toPrismaUserToLegacy(user);
+
+  return toPrismaUserToLegacy(updated);
 }
 
 /**
@@ -235,6 +270,49 @@ export async function verifyUserCode(code: string, normalizedEmail: string): Pro
 
     return toPrismaUserToLegacy(updated);
   });
+}
+
+// ============================================================================
+// Promo Tracking Queries
+// ============================================================================
+
+/**
+ * Set promotional offer expiry for user (1 hour from now)
+ */
+export async function setPromoExpiry(userId: number): Promise<User> {
+  const promoExpiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { promoExpiresAt },
+  });
+
+  return toPrismaUserToLegacy(updatedUser);
+}
+
+/**
+ * Clear promotional expiry (after user upgrades or timer expires)
+ */
+export async function clearPromoExpiry(userId: number): Promise<User> {
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { promoExpiresAt: null },
+  });
+
+  return toPrismaUserToLegacy(updatedUser);
+}
+
+/**
+ * Check if user has active promo offer
+ */
+export async function hasActivePromo(userId: number): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { promoExpiresAt: true },
+  });
+
+  if (!user?.promoExpiresAt) return false;
+  return user.promoExpiresAt > new Date();
 }
 
 // ============================================================================
@@ -550,4 +628,307 @@ export async function checkRateLimit(
       return { allowed: true, remaining: maxRequests - 1 };
     }
   });
+}
+
+// ============================================================================
+// Subscription Queries
+// ============================================================================
+
+export interface Subscription {
+  id: number;
+  user_id: number;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  stripe_price_id: string;
+  tier: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Create a new subscription
+ */
+export async function createSubscription(data: {
+  userId: number;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  stripePriceId: string;
+  tier: string;
+  status: string;
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+}): Promise<Subscription> {
+  const subscription = await prisma.subscription.create({
+    data: {
+      userId: data.userId,
+      stripeCustomerId: data.stripeCustomerId,
+      stripeSubscriptionId: data.stripeSubscriptionId,
+      stripePriceId: data.stripePriceId,
+      tier: data.tier,
+      status: data.status,
+      currentPeriodStart: data.currentPeriodStart,
+      currentPeriodEnd: data.currentPeriodEnd,
+      cancelAtPeriodEnd: data.cancelAtPeriodEnd,
+    },
+  });
+
+  return {
+    id: subscription.id,
+    user_id: subscription.userId,
+    stripe_customer_id: subscription.stripeCustomerId,
+    stripe_subscription_id: subscription.stripeSubscriptionId,
+    stripe_price_id: subscription.stripePriceId,
+    tier: subscription.tier,
+    status: subscription.status,
+    current_period_start: subscription.currentPeriodStart.toISOString(),
+    current_period_end: subscription.currentPeriodEnd.toISOString(),
+    cancel_at_period_end: subscription.cancelAtPeriodEnd,
+    created_at: subscription.createdAt.toISOString(),
+    updated_at: subscription.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Update a subscription
+ */
+export async function updateSubscription(
+  id: number,
+  data: {
+    status?: string;
+    stripePriceId?: string;
+    currentPeriodStart?: Date;
+    currentPeriodEnd?: Date;
+    cancelAtPeriodEnd?: boolean;
+  }
+): Promise<Subscription> {
+  const subscription = await prisma.subscription.update({
+    where: { id },
+    data: {
+      ...(data.status && { status: data.status }),
+      ...(data.stripePriceId && { stripePriceId: data.stripePriceId }),
+      ...(data.currentPeriodStart && { currentPeriodStart: data.currentPeriodStart }),
+      ...(data.currentPeriodEnd && { currentPeriodEnd: data.currentPeriodEnd }),
+      ...(data.cancelAtPeriodEnd !== undefined && { cancelAtPeriodEnd: data.cancelAtPeriodEnd }),
+    },
+  });
+
+  return {
+    id: subscription.id,
+    user_id: subscription.userId,
+    stripe_customer_id: subscription.stripeCustomerId,
+    stripe_subscription_id: subscription.stripeSubscriptionId,
+    stripe_price_id: subscription.stripePriceId,
+    tier: subscription.tier,
+    status: subscription.status,
+    current_period_start: subscription.currentPeriodStart.toISOString(),
+    current_period_end: subscription.currentPeriodEnd.toISOString(),
+    cancel_at_period_end: subscription.cancelAtPeriodEnd,
+    created_at: subscription.createdAt.toISOString(),
+    updated_at: subscription.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Get subscription by user ID
+ */
+export async function getSubscriptionByUserId(userId: number): Promise<Subscription | null> {
+  const subscription = await prisma.subscription.findUnique({
+    where: { userId },
+  });
+
+  if (!subscription) return null;
+
+  return {
+    id: subscription.id,
+    user_id: subscription.userId,
+    stripe_customer_id: subscription.stripeCustomerId,
+    stripe_subscription_id: subscription.stripeSubscriptionId,
+    stripe_price_id: subscription.stripePriceId,
+    tier: subscription.tier,
+    status: subscription.status,
+    current_period_start: subscription.currentPeriodStart.toISOString(),
+    current_period_end: subscription.currentPeriodEnd.toISOString(),
+    cancel_at_period_end: subscription.cancelAtPeriodEnd,
+    created_at: subscription.createdAt.toISOString(),
+    updated_at: subscription.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Get subscription by Stripe subscription ID
+ */
+export async function getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | null> {
+  const subscription = await prisma.subscription.findUnique({
+    where: { stripeSubscriptionId },
+  });
+
+  if (!subscription) return null;
+
+  return {
+    id: subscription.id,
+    user_id: subscription.userId,
+    stripe_customer_id: subscription.stripeCustomerId,
+    stripe_subscription_id: subscription.stripeSubscriptionId,
+    stripe_price_id: subscription.stripePriceId,
+    tier: subscription.tier,
+    status: subscription.status,
+    current_period_start: subscription.currentPeriodStart.toISOString(),
+    current_period_end: subscription.currentPeriodEnd.toISOString(),
+    cancel_at_period_end: subscription.cancelAtPeriodEnd,
+    created_at: subscription.createdAt.toISOString(),
+    updated_at: subscription.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Upgrade user to Pro tier
+ * CRITICAL: Preserves all existing reports by keeping same user_id
+ */
+export async function upgradeUserToPro(userId: number, stripeCustomerId: string): Promise<User> {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      tier: "pro",
+      usageLimit: 100,
+      reportRetentionDays: 999999, // Effectively unlimited
+      stripeCustomerId,
+      usagePeriodStart: new Date(), // Start tracking monthly period
+    },
+  });
+
+  return toPrismaUserToLegacy(user);
+}
+
+/**
+ * Downgrade user to free tier
+ */
+export async function downgradeUserToFree(userId: number): Promise<User> {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      tier: "free",
+      usageLimit: 5,
+      reportRetentionDays: 14,
+      usagePeriodStart: null,
+    },
+  });
+
+  return toPrismaUserToLegacy(user);
+}
+
+// ============================================================================
+// Session Queries
+// ============================================================================
+
+export interface Session {
+  id: number;
+  user_id: number;
+  session_token: string;
+  expires_at: string;
+  created_at: string;
+  ip_address: string | null;
+  user_agent: string | null;
+}
+
+/**
+ * Create a new session
+ */
+export async function createSession(
+  userId: number,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<{ sessionToken: string; expiresAt: Date }> {
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+  await prisma.session.create({
+    data: {
+      userId,
+      sessionToken,
+      expiresAt,
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+    },
+  });
+
+  return { sessionToken, expiresAt };
+}
+
+/**
+ * Get session by token
+ */
+export async function getSessionByToken(sessionToken: string): Promise<Session | null> {
+  const session = await prisma.session.findUnique({
+    where: { sessionToken },
+  });
+
+  if (!session) return null;
+
+  return {
+    id: session.id,
+    user_id: session.userId,
+    session_token: session.sessionToken,
+    expires_at: session.expiresAt.toISOString(),
+    created_at: session.createdAt.toISOString(),
+    ip_address: session.ipAddress,
+    user_agent: session.userAgent,
+  };
+}
+
+/**
+ * Delete a session (logout)
+ */
+export async function deleteSession(sessionToken: string): Promise<void> {
+  await prisma.session.delete({
+    where: { sessionToken },
+  });
+}
+
+/**
+ * Delete expired sessions
+ */
+export async function deleteExpiredSessions(): Promise<number> {
+  const result = await prisma.session.deleteMany({
+    where: {
+      expiresAt: {
+        lt: new Date(),
+      },
+    },
+  });
+
+  return result.count;
+}
+
+/**
+ * Get user with subscription (for dashboard/session validation)
+ */
+export async function getUserWithSubscription(userId: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      subscription: true,
+    },
+  });
+
+  if (!user) return null;
+
+  return {
+    ...toPrismaUserToLegacy(user),
+    tier: user.tier,
+    usage_period_start: user.usagePeriodStart?.toISOString() || null,
+    stripe_customer_id: user.stripeCustomerId,
+    subscription: user.subscription ? {
+      id: user.subscription.id,
+      stripe_subscription_id: user.subscription.stripeSubscriptionId,
+      status: user.subscription.status,
+      current_period_start: user.subscription.currentPeriodStart.toISOString(),
+      current_period_end: user.subscription.currentPeriodEnd.toISOString(),
+      cancel_at_period_end: user.subscription.cancelAtPeriodEnd,
+    } : null,
+  };
 }

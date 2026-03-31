@@ -66,7 +66,7 @@ export async function POST(request: Request) {
             usageCount: user.usage_count,
             usageLimit: user.usage_limit,
             limitReached: true,
-            message: `You've reached your limit of ${user.usage_limit} free underwriting ${user.usage_limit === 1 ? "analysis" : "analyses"}.`,
+            message: `You've reached your limit of ${user.usage_limit} free reports. Upgrade to Pro for 100 reports per month.`,
           });
         }
 

@@ -85,16 +85,16 @@ export default function ResultsPanel({ results }: ResultsPanelProps) {
       {usageCount >= usageLimit ? (
         <div className="rounded-sm bg-primary/10 p-6 text-center dark:bg-primary/20">
           <h3 className="mb-2 text-lg font-semibold text-dark dark:text-white">
-            Want More Analyses?
+            You&apos;ve Used All 5 Free Reports
           </h3>
           <p className="mb-4 text-body-color dark:text-body-color-dark">
-            You&apos;ve used all 3 free underwriting analyses. Contact us to discuss your lending needs.
+            Upgrade to Pro for 100 reports per month, permanent report storage, PDF exports, and priority support.
           </p>
           <a
-            href="/contact"
+            href="/underwrite-pro"
             className="inline-block rounded-sm bg-primary px-8 py-3 text-base font-medium text-white hover:bg-primary/90"
           >
-            Contact Glass Loans
+            Upgrade to Pro
           </a>
         </div>
       ) : null}

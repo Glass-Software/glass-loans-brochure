@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { normalizeEmail, isValidEmailFormat, isDisposableEmail } from "@/lib/email/normalization";
 import {
   findUserByNormalizedEmail,
   createUser,
   generateVerificationCode,
   updateMarketingConsent,
+  setPromoExpiry,
 } from "@/lib/db/queries";
 import sgMail from "@sendgrid/mail";
 
@@ -96,16 +98,9 @@ export async function POST(request: Request) {
         // Non-critical, continue anyway
       }
 
-      // Check usage limit for verified users
-      if (user.email_verified && user.usage_count >= user.usage_limit) {
-        return NextResponse.json(
-          {
-            error: `You've reached your limit of ${user.usage_limit} free underwriting ${user.usage_limit === 1 ? "analysis" : "analyses"}.`,
-            limitReached: true,
-          },
-          { status: 403 }
-        );
-      }
+      // Note: We don't block sending verification codes based on usage limit
+      // The limit is enforced at report submission time, not email verification
+      // This allows users to verify their email and see the promo banner after verification
     } else {
       try {
         console.log("🔵 [send-code] Creating new user...");
@@ -123,6 +118,48 @@ export async function POST(request: Request) {
           { status: 503 }
         );
       }
+    }
+
+    // Check usage limit for verified users BEFORE proceeding to Step 6
+    // This prevents expensive API calls for users who have hit their limit
+    if (user.email_verified && user.usage_count >= user.usage_limit) {
+      // Only set promo expiry if user doesn't already have one OR if it has expired
+      let promoExpiresAt: Date;
+
+      if (user.promo_expires_at && new Date(user.promo_expires_at) > new Date()) {
+        // User already has an active promo - don't reset the timer
+        promoExpiresAt = new Date(user.promo_expires_at);
+        console.log("🎁 [send-code] User already has active promo, not resetting timer");
+      } else {
+        // Set new promo expiry (1 hour from now)
+        promoExpiresAt = new Date(Date.now() + 3600000);
+        try {
+          await setPromoExpiry(user.id);
+          console.log("🎁 [send-code] New promo expiry set for user", user.id);
+        } catch (error: any) {
+          console.error("❌ [send-code] Failed to set promo expiry:", error);
+        }
+      }
+
+      // Set cookie for client-side banner (persists across page reloads)
+      const cookieStore = await cookies();
+      cookieStore.set("gl_promo_expires", promoExpiresAt.toISOString(), {
+        path: "/",
+        sameSite: "lax",
+        maxAge: 3600, // 1 hour (matches promo duration)
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: false, // Client needs to read this for banner
+      });
+      console.log("🍪 [send-code] Promo cookie set:", promoExpiresAt.toISOString());
+
+      return NextResponse.json(
+        {
+          error: `You've reached your limit of ${user.usage_limit} free reports. Upgrade to Pro for 100 reports per month.`,
+          limitReached: true,
+          promoExpiresAt: promoExpiresAt.toISOString(),
+        },
+        { status: 403 }
+      );
     }
 
     // Generate verification code (with timeout protection)

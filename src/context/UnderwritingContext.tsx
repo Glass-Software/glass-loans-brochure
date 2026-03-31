@@ -66,6 +66,20 @@ interface UnderwritingContextType {
   // Demo mode
   isDemoMode: boolean;
   setIsDemoMode: (isDemoMode: boolean) => void;
+
+  // Cached Gary data (for demo mode)
+  cachedGaryData: {
+    garyOpinion: string | null;
+    garyEstimatedARV: number | null;
+    garyAsIsValue: number | null;
+    finalScore: number | null;
+  } | null;
+  setCachedGaryData: (data: {
+    garyOpinion: string | null;
+    garyEstimatedARV: number | null;
+    garyAsIsValue: number | null;
+    finalScore: number | null;
+  } | null) => void;
 }
 
 const UnderwritingContext = createContext<
@@ -100,6 +114,12 @@ export function UnderwritingProvider({
 
   // Demo mode
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [cachedGaryData, setCachedGaryData] = useState<{
+    garyOpinion: string | null;
+    garyEstimatedARV: number | null;
+    garyAsIsValue: number | null;
+    finalScore: number | null;
+  } | null>(null);
 
   const usageLimit = 5;
 
@@ -164,6 +184,7 @@ export function UnderwritingProvider({
     setEmailVerified(false);
     setVerificationCodeState(null);
     setIsDemoMode(false);
+    setCachedGaryData(null);
   };
 
   const setEmail = (newEmail: string) => {
@@ -215,6 +236,8 @@ export function UnderwritingProvider({
         setError,
         isDemoMode,
         setIsDemoMode,
+        cachedGaryData,
+        setCachedGaryData,
       }}
     >
       {children}

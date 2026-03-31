@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { normalizeEmail } from "@/lib/email/normalization";
 import { verifyUserCode } from "@/lib/db/queries";
 import { verifyRecaptchaToken } from "@/lib/recaptcha/verify";
+import { createSession } from "@/lib/auth/session";
 
 /**
  * POST /api/underwrite/verify-code
@@ -75,6 +77,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Create session for the user (both free and Pro users get sessions now)
+    const forwarded = request.headers.get("x-forwarded-for");
+    const ipAddress = forwarded ? forwarded.split(",")[0] : undefined;
+    const userAgent = request.headers.get("user-agent") || undefined;
+
+    await createSession(user.id, ipAddress, userAgent);
+
+    console.log(`✅ Session created for user ${user.id} (${user.email})`);
+
+    // Clear promo cookie (database is now source of truth)
+    const cookieStore = await cookies();
+    cookieStore.delete("gl_promo_expires");
+    console.log("🍪 [verify-code] Promo cookie cleared (user authenticated)");
 
     // Return success
     return NextResponse.json({

@@ -12,22 +12,14 @@ const UnderwriteProPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleSelectPlan = async (priceId: string, userEmail?: string) => {
+  const handleSelectPlan = async (priceId: string) => {
     try {
       setIsLoading(true);
-
-      const email = userEmail || prompt("Please enter your email address:");
-
-      if (!email) {
-        setIsLoading(false);
-        return;
-      }
 
       const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
           priceId,
         }),
       });
@@ -37,12 +29,11 @@ const UnderwriteProPage = () => {
       if (response.ok && data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || "Failed to create checkout session");
+        console.error("Checkout error:", data.error);
         setIsLoading(false);
       }
     } catch (error) {
       console.error("Error creating checkout session:", error);
-      alert("An error occurred. Please try again.");
       setIsLoading(false);
     }
   };
