@@ -12,6 +12,7 @@ import ContactModal from "@/components/ContactModal";
 import UpgradePromoBanner from "@/components/UpgradePromoBanner";
 import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
 import { usePathname } from "next/navigation";
+import StructuredData from "@/components/StructuredData";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -36,6 +37,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.svg" />
       </head>
       <body className={`bg-[#FCFCFC] dark:bg-black ${inter.className}`}>
+        <StructuredData />
         <Providers>
           <GoogleReCaptchaProvider
             reCaptchaKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
