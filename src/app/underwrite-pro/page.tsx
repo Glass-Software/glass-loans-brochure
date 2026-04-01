@@ -66,25 +66,33 @@ const UnderwriteProPage = () => {
               exports, and priority support.
             </p>
 
-            <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
-              <button
-                onClick={() =>
-                  handleSelectPlan(
-                    isMonthly
-                      ? STRIPE_PRICES.MONTHLY_REGULAR
-                      : STRIPE_PRICES.ANNUAL_REGULAR,
-                  )
-                }
-                disabled={isLoading}
-                className="rounded-sm bg-primary px-8 py-4 text-base font-semibold text-white duration-300 ease-in-out hover:bg-primary/80"
-              >
-                {isLoading ? "Loading..." : "Upgrade Now"}
-              </button>
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
+                <button
+                  onClick={() =>
+                    handleSelectPlan(
+                      isMonthly
+                        ? STRIPE_PRICES.MONTHLY_REGULAR
+                        : STRIPE_PRICES.ANNUAL_REGULAR,
+                    )
+                  }
+                  disabled={isLoading}
+                  className="rounded-sm bg-primary px-8 py-4 text-base font-semibold text-white duration-300 ease-in-out hover:bg-primary/80"
+                >
+                  {isLoading ? "Loading..." : "Upgrade Now"}
+                </button>
+                <Link
+                  href="/underwrite"
+                  className="text-base font-medium text-body-color duration-300 ease-in-out hover:text-primary dark:text-body-color-dark dark:hover:text-primary"
+                >
+                  Try Free Version
+                </Link>
+              </div>
               <Link
-                href="/underwrite"
-                className="text-base font-medium text-body-color duration-300 ease-in-out hover:text-primary dark:text-body-color-dark dark:hover:text-primary"
+                href="/signin"
+                className="text-sm font-medium text-primary duration-300 ease-in-out hover:underline"
               >
-                Try Free Version
+                Already a Subscriber?
               </Link>
             </div>
           </div>

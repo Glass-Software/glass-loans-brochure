@@ -1,125 +1,29 @@
-import { NextRequest, NextResponse } from "next/server";
-import { normalizeEmail } from "@/lib/email/normalization";
-import { verifyUserCode, findUserByNormalizedEmail } from "@/lib/db/queries";
-import { createSession } from "@/lib/auth/session";
-import { addFreeUser } from "@/lib/activecampaign/client";
+#!/usr/bin/env tsx
+/**
+ * Script to send Pro welcome email to a specific user
+ *
+ * Usage:
+ *   npx tsx scripts/send-welcome-email.ts will@urbangatecapital.com
+ *   npx tsx scripts/send-welcome-email.ts email@example.com "John"
+ */
+
 import sgMail from "@sendgrid/mail";
+import { findUserByNormalizedEmail } from "@/lib/db/queries";
+import { normalizeEmail } from "@/lib/email/normalization";
+import * as dotenv from "dotenv";
+import path from "path";
+
+// Load environment variables
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 // Initialize SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+if (!process.env.SENDGRID_API_KEY) {
+  console.error("❌ SENDGRID_API_KEY not found in environment variables");
+  process.exit(1);
 }
 
-/**
- * POST /api/auth/verify-code-pro
- *
- * Verifies the 6-digit verification code for Pro signup and creates a session.
- * Called from the signup page after checkout.
- *
- * Request body:
- * - email: string - User's email address
- * - verificationCode: string - 6-digit code sent to user
- *
- * Response:
- * - success: boolean
- * - redirectTo: string - URL to redirect to (dashboard)
- */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { email, verificationCode } = body;
-
-    // Validate inputs
-    if (!email || typeof email !== "string") {
-      return NextResponse.json(
-        { success: false, error: "Valid email is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!verificationCode || typeof verificationCode !== "string") {
-      return NextResponse.json(
-        { success: false, error: "Verification code is required" },
-        { status: 400 }
-      );
-    }
-
-    // Normalize email and verify code
-    const normalizedEmail = normalizeEmail(email);
-    const user = await verifyUserCode(verificationCode, normalizedEmail);
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid or expired verification code. Please request a new code.",
-        },
-        { status: 400 }
-      );
-    }
-
-    // Get IP address and user agent for session tracking
-    const forwarded = request.headers.get("x-forwarded-for");
-    const ip = forwarded ? forwarded.split(",")[0] : request.headers.get("x-real-ip") || undefined;
-    const userAgent = request.headers.get("user-agent") || undefined;
-
-    // Create session (sets HTTP-only cookie)
-    await createSession(user.id, ip, userAgent);
-
-    console.log(`✅ Pro user ${user.id} logged in successfully`);
-
-    // Add to ActiveCampaign if marketing consent is true
-    // Fetch the latest user data to get updated name and marketing consent
-    const updatedUser = await findUserByNormalizedEmail(normalizedEmail);
-
-    if (updatedUser?.marketingConsent) {
-      try {
-        await addFreeUser(
-          updatedUser.email,
-          updatedUser.usageCount,
-          undefined, // propertyState - not available at signup
-          updatedUser.firstName || undefined,
-          updatedUser.lastName || undefined
-        );
-        console.log(`✅ [verify-code-pro] Added user ${updatedUser.id} to ActiveCampaign`);
-      } catch (acError: any) {
-        // Don't block signup if ActiveCampaign fails
-        console.error(`❌ [verify-code-pro] Failed to add user to ActiveCampaign:`, acError.message);
-      }
-    }
-
-    // Send welcome email to Pro member
-    if (process.env.SENDGRID_API_KEY) {
-      try {
-        await sendProWelcomeEmail(
-          user.email,
-          updatedUser?.firstName || undefined
-        );
-        console.log(`✅ [verify-code-pro] Sent welcome email to ${user.email}`);
-      } catch (emailError: any) {
-        // Don't block signup if email fails
-        console.error(`❌ [verify-code-pro] Failed to send welcome email:`, emailError.message);
-      }
-    }
-
-    // Return success with redirect URL
-    return NextResponse.json({
-      success: true,
-      redirectTo: "/dashboard",
-      user: {
-        id: user.id,
-        email: user.email,
-        tier: user.tier,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Verify code pro error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to verify code. Please try again." },
-      { status: 500 }
-    );
-  }
-}
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 /**
  * Send Pro welcome email via SendGrid
@@ -242,3 +146,54 @@ Glass Loans Team`,
 
   await sgMail.send(msg);
 }
+
+async function main() {
+  const email = process.argv[2];
+  const firstNameOverride = process.argv[3];
+
+  if (!email) {
+    console.error("❌ Usage: npx tsx scripts/send-welcome-email.ts <email> [firstName]");
+    console.error("   Example: npx tsx scripts/send-welcome-email.ts will@urbangatecapital.com");
+    process.exit(1);
+  }
+
+  console.log("\n🚀 Sending Pro welcome email...\n");
+  console.log("Email:", email);
+
+  try {
+    // Look up user in database to get their first name (unless overridden)
+    let firstName = firstNameOverride;
+
+    if (!firstName) {
+      const normalizedEmail = normalizeEmail(email);
+      const user = await findUserByNormalizedEmail(normalizedEmail);
+
+      if (user?.firstName) {
+        firstName = user.firstName;
+        console.log("First Name:", firstName, "(from database)");
+      } else {
+        console.log("First Name: (none - will use generic greeting)");
+      }
+    } else {
+      console.log("First Name:", firstName, "(from command line)");
+    }
+
+    console.log("\n" + "=".repeat(60) + "\n");
+
+    const startTime = Date.now();
+    await sendProWelcomeEmail(email, firstName);
+    const duration = Date.now() - startTime;
+
+    console.log(`✅ Welcome email sent successfully in ${duration}ms`);
+    console.log("\n📧 Check the inbox for:", email);
+    console.log("\n" + "=".repeat(60) + "\n");
+  } catch (error: any) {
+    console.error("\n❌ Failed to send email:", error.message);
+    if (error.response?.body) {
+      console.error("SendGrid error:", error.response.body);
+    }
+    process.exit(1);
+  }
+}
+
+main();
