@@ -16,15 +16,6 @@ You are evaluating a loan request from a Borrower (property flipper) who wants t
 Return ONLY a JSON object with your calculated values - no additional text or explanation.`;
 
 /**
- * System prompt for Gary's ARV-only calculation (low temperature)
- */
-export const GARY_ARV_SYSTEM_PROMPT = `You are Gary, the Senior Loan Underwriter at Glass Loans.
-
-You are calculating ARV (After Repair Value) based on comparable sales. The as-is value has already been calculated using a statistical quartile method.
-
-CRITICAL: Return ONLY a valid JSON object. Do NOT include any explanation, reasoning, analysis, or additional text before or after the JSON. Start your response with { and end with }. No markdown, no code blocks, no commentary.`;
-
-/**
  * Generate prompt for Gary's valuation calculations
  * This is called FIRST with low temperature for consistent numeric results
  */
@@ -143,101 +134,6 @@ Return ONLY a JSON object with these exact fields (no other text):
 }
 
 Do not include any explanation, markdown, or additional text - just the JSON object.`;
-}
-
-/**
- * Generate prompt for Gary's ARV-only calculation
- * This is called with low temperature for consistent numeric results
- * As-is value is already calculated deterministically via quartiles
- */
-export function generateGaryARVPrompt(
-  formData: UnderwritingFormData,
-  allComps: any[],
-  compSelectionState?: CompSelectionState[],
-  calculatedAsIsValue?: number,
-): string {
-  const {
-    propertyAddress,
-    propertyCity,
-    propertyState,
-    purchasePrice,
-    rehab,
-    squareFeet,
-    propertyCondition,
-  } = formData;
-
-  const locationDisplay =
-    propertyCity && propertyState
-      ? `${propertyCity}, ${propertyState}`
-      : propertyState
-        ? propertyState
-        : propertyAddress;
-
-  return `Calculate ARV for this property based on comparable sales.
-
-**PROPERTY DETAILS:**
-- Location: ${locationDisplay}
-${propertyAddress !== locationDisplay ? `- Full Address: ${propertyAddress}` : ""}
-- Purchase Price: $${purchasePrice.toLocaleString()}
-- Rehab Budget: $${rehab.toLocaleString()}
-- Square Feet: ${squareFeet.toLocaleString()}
-- Bedrooms/Bathrooms: ${formData.bedrooms}/${formData.bathrooms}
-- Year Built: ${formData.yearBuilt}
-- Condition: ${propertyCondition}
-- Renovation Level: $${(rehab / squareFeet).toFixed(2)}/SF (${getRenovationLevel(rehab / squareFeet)})
-
-**AS-IS VALUE (Already Calculated):**
-$${calculatedAsIsValue?.toLocaleString()} - calculated using quartile-based statistical method based on ${propertyCondition} condition.
-
-**COMPARABLE SALES (${allComps.length} properties - lender reviewed):**
-${compSelectionState ? `
-The lender marked ${compSelectionState.filter((s) => s.emphasized).length} as "EMPHASIZED" (most similar to post-renovation target), removed ${compSelectionState.filter((s) => s.removed).length} from ARV calculation, and left ${allComps.length - compSelectionState.filter((s) => s.emphasized || s.removed).length} as normal.
-` : ""}
-${allComps
-  .map((comp: any, i: number) => {
-    const state = compSelectionState?.find((s: any) => s.compIndex === i);
-    const marker = state?.removed ? " ❌ REMOVED" : state?.emphasized ? " ⭐ EMPHASIZED" : "";
-
-    const parts = [`${i + 1}. ${comp.address} - $${comp.price?.toLocaleString() || "N/A"}${marker}`];
-
-    if (comp.sqft) {
-      parts.push(`${comp.bedrooms || "?"} bed / ${comp.bathrooms || "?"} bath, ${comp.sqft.toLocaleString()} sqft${comp.yearBuilt ? `, built ${comp.yearBuilt}` : ""}`);
-    }
-
-    if (comp.pricePerSqft) {
-      parts.push(`$${comp.pricePerSqft.toFixed(2)}/sqft${comp.distance ? `, ${comp.distance}` : ""}${comp.soldDate ? `, sold ${comp.soldDate}` : ""}`);
-    }
-
-    if (comp.correlation) {
-      parts.push(`correlation: ${(comp.correlation * 100).toFixed(0)}%`);
-    }
-
-    return parts.join(" | ");
-  })
-  .join("\n")}
-
-**YOUR TASK:**
-Calculate ARV (After Repair Value) after $${rehab.toLocaleString()} renovation.
-
-- IGNORE ${compSelectionState ? compSelectionState.filter((s) => s.removed).length : 0} ❌ REMOVED comps (not relevant to post-renovation target)
-- STRONGLY WEIGHT ${compSelectionState ? compSelectionState.filter((s) => s.emphasized).length : 0} ⭐ EMPHASIZED comps (lender says these match post-renovation quality)
-- Consider rehab scope: ${getRenovationLevel(rehab / squareFeet)} renovation
-- ${
-    propertyCondition === "Good" && rehab / squareFeet > 50
-      ? `⚠️ CRITICAL: Property already in Good condition but Heavy rehab planned. Assess over-improvement risk - can this market support the target price? Don't exceed what best comps sold for.`
-      : `Heavy rehab can push toward newer/better comps, but can't exceed market ceiling`
-  }
-
-**RETURN FORMAT:**
-CRITICAL: Your response must be ONLY the JSON object below. NO explanation, NO reasoning, NO analysis, NO markdown code blocks.
-
-Start your response with the opening brace { and end with the closing brace }. Nothing else.
-
-{
-  "estimatedARV": <number>
-}
-
-DO NOT write anything before the { or after the }. Just the JSON.`;
 }
 
 /**

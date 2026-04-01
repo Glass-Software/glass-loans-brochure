@@ -124,7 +124,7 @@ export function UnderwritingProvider({
     finalScore: number | null;
   } | null>(null);
 
-  const usageLimit = 5;
+  const usageLimit = 3;
 
   const goToNextStep = () => {
     if (currentStep < 6) {

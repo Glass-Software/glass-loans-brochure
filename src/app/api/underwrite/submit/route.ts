@@ -14,10 +14,8 @@ import {
 import { openRouterClient } from "@/lib/ai/openrouter";
 import {
   generateGaryValuationPrompt,
-  generateGaryARVPrompt,
   generateGaryOpinionPrompt,
   GARY_VALUATION_SYSTEM_PROMPT,
-  GARY_ARV_SYSTEM_PROMPT,
   GARY_OPINION_SYSTEM_PROMPT,
 } from "@/lib/ai/prompts";
 import { verifyRecaptchaToken } from "@/lib/recaptcha/verify";
