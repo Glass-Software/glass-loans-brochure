@@ -51,6 +51,15 @@ export default function UpgradePromoBanner() {
     setCookieExpiry(getCookie("gl_promo_expires"));
   }, [pathname]);
 
+  // Clear cookie if API says user is Pro (prevents banner from showing on future page loads)
+  useEffect(() => {
+    if (!loading && promoStatus && !promoStatus.hasPromo && cookieExpiry) {
+      // Delete the cookie
+      document.cookie = "gl_promo_expires=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      setCookieExpiry(null);
+    }
+  }, [loading, promoStatus, cookieExpiry]);
+
   // Memoize the Date object to prevent recreating it on every render
   const expiryTime = useMemo(() => {
     if (cookieExpiry) {
@@ -72,6 +81,9 @@ export default function UpgradePromoBanner() {
 
   // Don't show on signup or dashboard pages (user is already upgrading or upgraded)
   if (pathname === '/signup' || pathname === '/dashboard') return null;
+
+  // Hide banner if API has loaded and user is Pro (hasPromo: false overrides cookie)
+  if (!loading && promoStatus && !promoStatus.hasPromo) return null;
 
   // Don't wait for API loading if we have cookie
   if (loading && !cookieExpiry) return null;

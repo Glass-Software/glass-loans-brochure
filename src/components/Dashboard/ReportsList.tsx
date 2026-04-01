@@ -24,8 +24,43 @@ interface ReportsListProps {
 export default function ReportsList({ reports, userTier }: ReportsListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "score">("date");
+  const [exportingReportId, setExportingReportId] = useState<string | null>(null);
 
   const isPro = userTier === "pro";
+
+  // Handle PDF export
+  async function handleExportPDF(reportId: string) {
+    try {
+      setExportingReportId(reportId);
+
+      const response = await fetch(`/api/underwrite/export-pdf/${reportId}`);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to export PDF");
+      }
+
+      // Create blob from response
+      const blob = await response.blob();
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `GlassLoans_Report_${reportId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      alert(error instanceof Error ? error.message : "Failed to export PDF");
+    } finally {
+      setExportingReportId(null);
+    }
+  }
 
   // Filter and sort reports
   const filteredAndSortedReports = useMemo(() => {
@@ -256,12 +291,61 @@ export default function ReportsList({ reports, userTier }: ReportsListProps) {
                       {new Date(report.createdAt).toLocaleDateString()}
                     </span>
                     {reportUrl && !expired && (
-                      <Link
-                        href={reportUrl}
-                        className="shadow-submit dark:shadow-submit-dark rounded-md bg-primary px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-primary/90"
-                      >
-                        View Report
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        {/* Export PDF Button (Pro only) */}
+                        {isPro && (
+                          <button
+                            onClick={() => handleExportPDF(report.reportId!)}
+                            disabled={exportingReportId === report.reportId}
+                            className="shadow-submit dark:shadow-submit-dark rounded-md border border-stroke bg-white px-2 py-1 text-body-color transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 dark:border-stroke-dark dark:bg-gray-dark dark:text-body-color-dark dark:hover:border-primary dark:hover:text-primary"
+                            title="Export as PDF"
+                          >
+                            {exportingReportId === report.reportId ? (
+                              <svg
+                                className="h-5 w-5 animate-spin"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                />
+                              </svg>
+                            ) : (
+                              <svg
+                                className="h-5 w-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+
+                        {/* View Report Button */}
+                        <Link
+                          href={reportUrl}
+                          className="shadow-submit dark:shadow-submit-dark rounded-md bg-primary px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-primary/90"
+                        >
+                          View Report
+                        </Link>
+                      </div>
                     )}
                   </div>
                 </div>

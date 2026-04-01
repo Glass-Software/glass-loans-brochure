@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ThemeToggler from "@/components/Header/ThemeToggler";
 
 interface User {
   id: number;
@@ -63,6 +64,7 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
           >
             {isLoggingOut ? "Logging out..." : "Logout"}
           </button>
+          <ThemeToggler />
         </nav>
       </div>
     </header>

@@ -12,6 +12,7 @@
     "@headlessui/react": "^2.2.0",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
+    "@react-pdf/renderer": "^4.3.2",
     "@sendgrid/mail": "^8.1.4",
     "@tailwindcss/container-queries": "^0.1.1",
     "@types/bcrypt": "^6.0.0",

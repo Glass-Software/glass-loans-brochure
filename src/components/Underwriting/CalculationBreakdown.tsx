@@ -138,7 +138,7 @@ export default function CalculationBreakdown({
           <Section title="Borrower Profit Calculation">
             <div className="space-y-3">
               {/* Revenue */}
-              <div className="rounded bg-green-50 p-3 dark:bg-green-900/20">
+              <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
                 <div className="text-sm font-medium text-dark dark:text-white">
                   Revenue
                 </div>
@@ -153,7 +153,7 @@ export default function CalculationBreakdown({
               </div>
 
               {/* Costs Breakdown */}
-              <div className="rounded bg-red-50 p-3 dark:bg-red-900/20">
+              <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
                 <div className="text-sm font-medium text-dark dark:text-white">
                   Costs
                 </div>
@@ -204,7 +204,7 @@ export default function CalculationBreakdown({
               </div>
 
               {/* Profit Formula */}
-              <div className="rounded bg-blue-50 p-3 dark:bg-blue-900/20">
+              <div className="rounded bg-gray-50 p-3 dark:bg-gray-800">
                 <div className="text-center text-sm text-gray-700 dark:text-gray-300">
                   Borrower Profit = Revenue - Costs
                 </div>
@@ -218,7 +218,7 @@ export default function CalculationBreakdown({
               </div>
 
               {/* Stress Tested */}
-              <div className="border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-900/20 mt-3 rounded border p-3">
+              <div className="mt-3 rounded border border-gray-300 bg-white p-3 dark:border-gray-600 dark:bg-gray-dark">
                 <div className="flex justify-between">
                   <span className="text-sm font-medium text-dark dark:text-white">
                     Stress Tested Profit (5% ARV drop)
