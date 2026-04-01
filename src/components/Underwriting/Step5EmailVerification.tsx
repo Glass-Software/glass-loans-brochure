@@ -50,15 +50,16 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
   const [marketingConsent, setMarketingConsent] = useState(false);
 
   const isAuthenticated = !!authenticatedUser;
+  const isProUser = authenticatedUser?.tier === 'pro';
   const userEmail = authenticatedUser?.email || "";
 
   // Track if we've already auto-skipped to prevent loops when navigating back
   const [hasAutoSkipped, setHasAutoSkipped] = useState(false);
 
-  // Auto-skip verification for authenticated users (but only once)
+  // Auto-skip verification for Pro users ONLY (but only once)
   useEffect(() => {
-    if (isAuthenticated && userEmail && !hasAutoSkipped) {
-      console.log("📧 [Step5] Auto-skipping for authenticated user:", userEmail);
+    if (isProUser && userEmail && !hasAutoSkipped) {
+      console.log("📧 [Step5] Auto-skipping for Pro user:", userEmail);
 
       // Check usage limit before auto-skipping (prevents expensive API calls in Step 6)
       const checkUsageLimitAndSkip = async () => {
@@ -92,7 +93,7 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
 
       checkUsageLimitAndSkip();
     }
-  }, [isAuthenticated, userEmail, hasAutoSkipped, setContextEmail, setEmailVerified, goToNextStep, openUpgradeModal]);
+  }, [isProUser, userEmail, hasAutoSkipped, setContextEmail, setEmailVerified, goToNextStep, openUpgradeModal]);
 
   // Refs for code inputs
   const codeInputRefs = [
