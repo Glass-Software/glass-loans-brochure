@@ -146,6 +146,65 @@ const UnderwriteProPage = () => {
         </div>
       </section>
 
+      {/* Product Screenshots Section */}
+      <section className="relative py-16 md:py-20 lg:py-28">
+        <div className="container">
+          <SectionTitle
+            title="See It In Action"
+            paragraph="Powerful tools designed to streamline your underwriting workflow."
+            center
+          />
+
+          <div className="space-y-16">
+            {/* Comparable Sales Map Screenshot */}
+            <div className="wow fadeInUp" data-wow-delay=".15s">
+              <div className="overflow-hidden rounded-lg border border-stroke bg-white shadow-testimonial dark:border-strokedark dark:bg-gray-dark">
+                <div className="w-full">
+                  <img
+                    src="/images/underwrite-pro/interactive-comperable-sales-tool.png"
+                    alt="Interactive comparable sales map"
+                    className="w-full h-auto"
+                  />
+                </div>
+                <div className="p-8">
+                  <h3 className="mb-3 text-xl font-bold text-black dark:text-white sm:text-2xl">
+                    Interactive Comparable Sales Map
+                  </h3>
+                  <p className="text-base leading-relaxed text-body-color dark:text-body-color-dark">
+                    Sort through similar properties with ease. View detailed
+                    listings on the fly with our interactive map tool that helps
+                    you analyze comps and make informed decisions faster.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Dashboard Screenshot */}
+            <div className="wow fadeInUp" data-wow-delay=".2s">
+              <div className="overflow-hidden rounded-lg border border-stroke bg-white shadow-testimonial dark:border-strokedark dark:bg-gray-dark">
+                <div className="w-full">
+                  <img
+                    src="/images/underwrite-pro/pro-dashboard.png"
+                    alt="Pro dashboard with saved reports"
+                    className="w-full h-auto"
+                  />
+                </div>
+                <div className="p-8">
+                  <h3 className="mb-3 text-xl font-bold text-black dark:text-white sm:text-2xl">
+                    Centralized Dashboard
+                  </h3>
+                  <p className="text-base leading-relaxed text-body-color dark:text-body-color-dark">
+                    All your underwriting reports saved in one place. Access your
+                    complete report history, filter by property, and never lose
+                    track of your analysis.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pro Features Section */}
       <section className="relative py-16 md:py-20 lg:py-28">
         <div className="container">
