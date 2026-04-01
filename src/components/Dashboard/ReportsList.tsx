@@ -25,6 +25,10 @@ export default function ReportsList({ reports, userTier }: ReportsListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"date" | "score">("date");
   const [exportingReportId, setExportingReportId] = useState<string | null>(null);
+  const [deletingReportId, setDeletingReportId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [localReports, setLocalReports] = useState(reports);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isPro = userTier === "pro";
 
@@ -32,6 +36,7 @@ export default function ReportsList({ reports, userTier }: ReportsListProps) {
   async function handleExportPDF(reportId: string) {
     try {
       setExportingReportId(reportId);
+      setErrorMessage(null);
 
       const response = await fetch(`/api/underwrite/export-pdf/${reportId}`);
 
@@ -56,20 +61,59 @@ export default function ReportsList({ reports, userTier }: ReportsListProps) {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error exporting PDF:", error);
-      alert(error instanceof Error ? error.message : "Failed to export PDF");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to export PDF");
     } finally {
       setExportingReportId(null);
     }
   }
 
+  // Show delete confirmation
+  function showDeleteConfirmation(reportId: number) {
+    setConfirmDeleteId(reportId);
+    setErrorMessage(null);
+  }
+
+  // Cancel delete
+  function cancelDelete() {
+    setConfirmDeleteId(null);
+  }
+
+  // Confirm and execute delete
+  async function confirmDelete() {
+    if (!confirmDeleteId) return;
+
+    try {
+      setDeletingReportId(confirmDeleteId);
+      setErrorMessage(null);
+
+      const response = await fetch(`/api/underwrite/report/${confirmDeleteId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete report");
+      }
+
+      // Remove from local state
+      setLocalReports((prev) => prev.filter((r) => r.id !== confirmDeleteId));
+      setConfirmDeleteId(null);
+    } catch (error) {
+      console.error("Error deleting report:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Failed to delete report");
+    } finally {
+      setDeletingReportId(null);
+    }
+  }
+
   // Filter and sort reports
   const filteredAndSortedReports = useMemo(() => {
-    let filtered = reports;
+    let filtered = localReports;
 
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = reports.filter(
+      filtered = localReports.filter(
         (report) =>
           report.propertyAddress.toLowerCase().includes(query) ||
           report.propertyCity?.toLowerCase().includes(query) ||
@@ -90,7 +134,7 @@ export default function ReportsList({ reports, userTier }: ReportsListProps) {
     });
 
     return sorted;
-  }, [reports, searchQuery, sortBy]);
+  }, [localReports, searchQuery, sortBy]);
 
   // Check if report is expired
   function isExpired(report: Report): boolean {
@@ -111,12 +155,60 @@ export default function ReportsList({ reports, userTier }: ReportsListProps) {
 
   return (
     <div className="shadow-three rounded-lg border border-stroke bg-white p-6 dark:border-white/10 dark:bg-black/40">
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-sm text-red-800 dark:text-red-300">{errorMessage}</p>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="ml-auto text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg border border-stroke bg-white p-6 shadow-lg dark:border-white/10 dark:bg-black">
+            <h3 className="text-lg font-semibold text-black dark:text-white">Delete Report</h3>
+            <p className="mt-2 text-sm text-body-color dark:text-body-color-dark">
+              Are you sure you want to delete this report? This action cannot be undone.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={cancelDelete}
+                disabled={deletingReportId === confirmDeleteId}
+                className="flex-1 rounded-md border border-stroke bg-white px-4 py-2 text-sm font-medium text-body-color transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-gray-dark dark:text-white dark:hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deletingReportId === confirmDeleteId}
+                className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deletingReportId === confirmDeleteId ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-black dark:text-white">
           Your Reports
         </h2>
         <p className="mt-1 text-sm text-body-color dark:text-body-color-dark">
-          {reports.length} {reports.length === 1 ? "report" : "reports"} total
+          {localReports.length} {localReports.length === 1 ? "report" : "reports"} total
         </p>
       </div>
 
@@ -292,6 +384,50 @@ export default function ReportsList({ reports, userTier }: ReportsListProps) {
                     </span>
                     {reportUrl && !expired && (
                       <div className="flex items-center gap-2">
+                        {/* Delete Button */}
+                        <button
+                          onClick={() => showDeleteConfirmation(report.id)}
+                          disabled={deletingReportId === report.id}
+                          className="rounded-md border border-red-200 bg-white px-2 py-1 text-red-600 transition-colors hover:border-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-gray-dark dark:text-red-400 dark:hover:border-red-700 dark:hover:bg-red-950/30"
+                          title="Delete report"
+                        >
+                          {deletingReportId === report.id ? (
+                            <svg
+                              className="h-5 w-5 animate-spin"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                          ) : (
+                            <svg
+                              className="h-5 w-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          )}
+                        </button>
+
                         {/* Export PDF Button (Pro only) */}
                         {isPro && (
                           <button

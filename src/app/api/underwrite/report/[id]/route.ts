@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSubmissionByReportId } from "@/lib/db/queries";
+import { getCurrentUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/db/prisma";
 import {
   UnderwritingResults,
   UnderwritingFormData,
@@ -102,6 +104,73 @@ export async function GET(
     console.error("[Server] Error fetching report:", error);
     return NextResponse.json(
       { error: "Failed to fetch report" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/underwrite/report/[id]
+ * Delete an underwriting report (authenticated users only)
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Require authentication
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized - Please sign in" },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+
+    // Parse ID as number (submission ID, not reportId)
+    const submissionId = parseInt(id, 10);
+
+    if (isNaN(submissionId)) {
+      return NextResponse.json(
+        { error: "Invalid report ID" },
+        { status: 400 }
+      );
+    }
+
+    // Fetch the submission to verify ownership
+    const submission = await prisma.underwritingSubmission.findUnique({
+      where: { id: submissionId },
+      select: { id: true, userId: true },
+    });
+
+    if (!submission) {
+      return NextResponse.json(
+        { error: "Report not found" },
+        { status: 404 }
+      );
+    }
+
+    // Verify user owns this report
+    if (submission.userId !== user.id) {
+      return NextResponse.json(
+        { error: "Forbidden - You don't own this report" },
+        { status: 403 }
+      );
+    }
+
+    // Delete the report
+    await prisma.underwritingSubmission.delete({
+      where: { id: submissionId },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("[Server] Error deleting report:", error);
+    return NextResponse.json(
+      { error: "Failed to delete report" },
       { status: 500 }
     );
   }
