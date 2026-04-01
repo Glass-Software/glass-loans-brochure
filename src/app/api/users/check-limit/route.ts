@@ -25,13 +25,13 @@ export async function GET() {
 
     // Check if user has exceeded their usage limit
     // Note: This applies to both free and Pro users (Pro users have higher limits)
-    if (user.usage_count >= user.usage_limit) {
+    if (user.usageCount >= user.usageLimit) {
       // Set promo expiry (1 hour from now) if not already set
       let promoExpiresAt: Date;
 
-      if (user.promo_expires_at && new Date(user.promo_expires_at) > new Date()) {
+      if (user.promoExpiresAt && new Date(user.promoExpiresAt) > new Date()) {
         // User already has an active promo
-        promoExpiresAt = new Date(user.promo_expires_at);
+        promoExpiresAt = new Date(user.promoExpiresAt);
       } else {
         // Set new promo expiry
         promoExpiresAt = new Date(Date.now() + 3600000);
@@ -40,8 +40,8 @@ export async function GET() {
 
       return NextResponse.json({
         limitReached: true,
-        usageCount: user.usage_count,
-        usageLimit: user.usage_limit,
+        usageCount: user.usageCount,
+        usageLimit: user.usageLimit,
         promoExpiresAt: promoExpiresAt.toISOString(),
       });
     }
@@ -49,8 +49,8 @@ export async function GET() {
     // User is within their limit
     return NextResponse.json({
       limitReached: false,
-      usageCount: user.usage_count,
-      usageLimit: user.usage_limit,
+      usageCount: user.usageCount,
+      usageLimit: user.usageLimit,
     });
   } catch (error: any) {
     console.error("❌ [check-limit] Error:", error);

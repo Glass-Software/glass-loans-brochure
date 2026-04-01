@@ -14,43 +14,43 @@ import type { User as PrismaUser, UnderwritingSubmission as PrismaSubmission } f
 export interface User {
   id: number;
   email: string;
-  normalized_email: string;
-  email_verified: number; // Keep as number for backward compatibility
-  verification_token: string | null;
-  verification_token_expires: string | null;
-  verification_code: string | null;
-  code_expires_at: string | null;
-  usage_count: number;
-  usage_limit: number;
-  report_retention_days: number;
+  normalizedEmail: string;
+  emailVerified: boolean;
+  verificationToken: string | null;
+  verificationTokenExpires: string | null;
+  verificationCode: string | null;
+  codeExpiresAt: string | null;
+  usageCount: number;
+  usageLimit: number;
+  reportRetentionDays: number;
   tier: string; // "free" | "pro"
-  usage_period_start: string | null;
-  stripe_customer_id: string | null;
-  promo_expires_at: string | null;
-  created_at: string;
-  updated_at: string;
+  usagePeriodStart: string | null;
+  stripeCustomerId: string | null;
+  promoExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// Convert Prisma User to legacy format
+// Convert Prisma User to consistent camelCase format
 function toPrismaUserToLegacy(user: PrismaUser): User {
   return {
     id: user.id,
     email: user.email,
-    normalized_email: user.normalizedEmail,
-    email_verified: user.emailVerified ? 1 : 0,
-    verification_token: user.verificationToken,
-    verification_token_expires: user.verificationTokenExpires?.toISOString() || null,
-    verification_code: user.verificationCode,
-    code_expires_at: user.codeExpiresAt?.toISOString() || null,
-    usage_count: user.usageCount,
-    usage_limit: user.usageLimit,
-    report_retention_days: user.reportRetentionDays,
+    normalizedEmail: user.normalizedEmail,
+    emailVerified: user.emailVerified,
+    verificationToken: user.verificationToken,
+    verificationTokenExpires: user.verificationTokenExpires?.toISOString() || null,
+    verificationCode: user.verificationCode,
+    codeExpiresAt: user.codeExpiresAt?.toISOString() || null,
+    usageCount: user.usageCount,
+    usageLimit: user.usageLimit,
+    reportRetentionDays: user.reportRetentionDays,
     tier: user.tier,
-    usage_period_start: user.usagePeriodStart?.toISOString() || null,
-    stripe_customer_id: user.stripeCustomerId,
-    promo_expires_at: user.promoExpiresAt?.toISOString() || null,
-    created_at: user.createdAt.toISOString(),
-    updated_at: user.updatedAt.toISOString(),
+    usagePeriodStart: user.usagePeriodStart?.toISOString() || null,
+    stripeCustomerId: user.stripeCustomerId,
+    promoExpiresAt: user.promoExpiresAt?.toISOString() || null,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
   };
 }
 
@@ -636,17 +636,17 @@ export async function checkRateLimit(
 
 export interface Subscription {
   id: number;
-  user_id: number;
-  stripe_customer_id: string;
-  stripe_subscription_id: string;
-  stripe_price_id: string;
+  userId: number;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  stripePriceId: string;
   tier: string;
   status: string;
-  current_period_start: string;
-  current_period_end: string;
-  cancel_at_period_end: boolean;
-  created_at: string;
-  updated_at: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -679,17 +679,17 @@ export async function createSubscription(data: {
 
   return {
     id: subscription.id,
-    user_id: subscription.userId,
-    stripe_customer_id: subscription.stripeCustomerId,
-    stripe_subscription_id: subscription.stripeSubscriptionId,
-    stripe_price_id: subscription.stripePriceId,
+    userId: subscription.userId,
+    stripeCustomerId: subscription.stripeCustomerId,
+    stripeSubscriptionId: subscription.stripeSubscriptionId,
+    stripePriceId: subscription.stripePriceId,
     tier: subscription.tier,
     status: subscription.status,
-    current_period_start: subscription.currentPeriodStart.toISOString(),
-    current_period_end: subscription.currentPeriodEnd.toISOString(),
-    cancel_at_period_end: subscription.cancelAtPeriodEnd,
-    created_at: subscription.createdAt.toISOString(),
-    updated_at: subscription.updatedAt.toISOString(),
+    currentPeriodStart: subscription.currentPeriodStart.toISOString(),
+    currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    createdAt: subscription.createdAt.toISOString(),
+    updatedAt: subscription.updatedAt.toISOString(),
   };
 }
 
@@ -719,17 +719,17 @@ export async function updateSubscription(
 
   return {
     id: subscription.id,
-    user_id: subscription.userId,
-    stripe_customer_id: subscription.stripeCustomerId,
-    stripe_subscription_id: subscription.stripeSubscriptionId,
-    stripe_price_id: subscription.stripePriceId,
+    userId: subscription.userId,
+    stripeCustomerId: subscription.stripeCustomerId,
+    stripeSubscriptionId: subscription.stripeSubscriptionId,
+    stripePriceId: subscription.stripePriceId,
     tier: subscription.tier,
     status: subscription.status,
-    current_period_start: subscription.currentPeriodStart.toISOString(),
-    current_period_end: subscription.currentPeriodEnd.toISOString(),
-    cancel_at_period_end: subscription.cancelAtPeriodEnd,
-    created_at: subscription.createdAt.toISOString(),
-    updated_at: subscription.updatedAt.toISOString(),
+    currentPeriodStart: subscription.currentPeriodStart.toISOString(),
+    currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    createdAt: subscription.createdAt.toISOString(),
+    updatedAt: subscription.updatedAt.toISOString(),
   };
 }
 
@@ -745,17 +745,17 @@ export async function getSubscriptionByUserId(userId: number): Promise<Subscript
 
   return {
     id: subscription.id,
-    user_id: subscription.userId,
-    stripe_customer_id: subscription.stripeCustomerId,
-    stripe_subscription_id: subscription.stripeSubscriptionId,
-    stripe_price_id: subscription.stripePriceId,
+    userId: subscription.userId,
+    stripeCustomerId: subscription.stripeCustomerId,
+    stripeSubscriptionId: subscription.stripeSubscriptionId,
+    stripePriceId: subscription.stripePriceId,
     tier: subscription.tier,
     status: subscription.status,
-    current_period_start: subscription.currentPeriodStart.toISOString(),
-    current_period_end: subscription.currentPeriodEnd.toISOString(),
-    cancel_at_period_end: subscription.cancelAtPeriodEnd,
-    created_at: subscription.createdAt.toISOString(),
-    updated_at: subscription.updatedAt.toISOString(),
+    currentPeriodStart: subscription.currentPeriodStart.toISOString(),
+    currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    createdAt: subscription.createdAt.toISOString(),
+    updatedAt: subscription.updatedAt.toISOString(),
   };
 }
 
@@ -771,17 +771,17 @@ export async function getSubscriptionByStripeId(stripeSubscriptionId: string): P
 
   return {
     id: subscription.id,
-    user_id: subscription.userId,
-    stripe_customer_id: subscription.stripeCustomerId,
-    stripe_subscription_id: subscription.stripeSubscriptionId,
-    stripe_price_id: subscription.stripePriceId,
+    userId: subscription.userId,
+    stripeCustomerId: subscription.stripeCustomerId,
+    stripeSubscriptionId: subscription.stripeSubscriptionId,
+    stripePriceId: subscription.stripePriceId,
     tier: subscription.tier,
     status: subscription.status,
-    current_period_start: subscription.currentPeriodStart.toISOString(),
-    current_period_end: subscription.currentPeriodEnd.toISOString(),
-    cancel_at_period_end: subscription.cancelAtPeriodEnd,
-    created_at: subscription.createdAt.toISOString(),
-    updated_at: subscription.updatedAt.toISOString(),
+    currentPeriodStart: subscription.currentPeriodStart.toISOString(),
+    currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    createdAt: subscription.createdAt.toISOString(),
+    updatedAt: subscription.updatedAt.toISOString(),
   };
 }
 
@@ -920,15 +920,15 @@ export async function getUserWithSubscription(userId: number) {
   return {
     ...toPrismaUserToLegacy(user),
     tier: user.tier,
-    usage_period_start: user.usagePeriodStart?.toISOString() || null,
-    stripe_customer_id: user.stripeCustomerId,
+    usagePeriodStart: user.usagePeriodStart?.toISOString() || null,
+    stripeCustomerId: user.stripeCustomerId,
     subscription: user.subscription ? {
       id: user.subscription.id,
-      stripe_subscription_id: user.subscription.stripeSubscriptionId,
+      stripeSubscriptionId: user.subscription.stripeSubscriptionId,
       status: user.subscription.status,
-      current_period_start: user.subscription.currentPeriodStart.toISOString(),
-      current_period_end: user.subscription.currentPeriodEnd.toISOString(),
-      cancel_at_period_end: user.subscription.cancelAtPeriodEnd,
+      currentPeriodStart: user.subscription.currentPeriodStart.toISOString(),
+      currentPeriodEnd: user.subscription.currentPeriodEnd.toISOString(),
+      cancelAtPeriodEnd: user.subscription.cancelAtPeriodEnd,
     } : null,
   };
 }

@@ -83,15 +83,26 @@ export default function Step2PropertyCondition() {
         <div className="w-full px-4 md:w-1/2">
           <div className="mb-8">
             <label className={labelClass}>Renovation Budget (Calculated)</label>
-            {formData.rehab && formData.squareFeet ? (
-              <div className="rounded-sm border border-stroke bg-gray-2 px-6 py-3 dark:border-transparent dark:bg-[#2C303B]">
-                <span className="text-base font-semibold text-dark dark:text-white">
-                  ${(formData.rehab / formData.squareFeet).toFixed(2)}/SF
-                </span>
-                <span className="ml-2 inline-block rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                  {getRenovationLevel(formData.rehab / formData.squareFeet)}
-                </span>
-              </div>
+            {formData.squareFeet ? (
+              formData.rehab && formData.rehab > 0 ? (
+                <div className="rounded-sm border border-stroke bg-gray-2 px-6 py-3 dark:border-transparent dark:bg-[#2C303B]">
+                  <span className="text-base font-semibold text-dark dark:text-white">
+                    ${(formData.rehab / formData.squareFeet).toFixed(2)}/SF
+                  </span>
+                  <span className="ml-2 inline-block rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                    {getRenovationLevel(formData.rehab / formData.squareFeet)}
+                  </span>
+                </div>
+              ) : (
+                <div className="rounded-sm border border-stroke bg-gray-2 px-6 py-3 dark:border-transparent dark:bg-[#2C303B]">
+                  <span className="text-base font-semibold text-dark dark:text-white">
+                    N/A
+                  </span>
+                  <span className="ml-2 inline-block rounded-full bg-gray-300 px-3 py-1 text-sm font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                    No Renovation
+                  </span>
+                </div>
+              )
             ) : (
               <div className="rounded-sm border border-stroke bg-gray-2 px-6 py-3 text-body-color dark:border-transparent dark:bg-[#2C303B] dark:text-body-color-dark">
                 Enter rehab budget and square feet in Step 1

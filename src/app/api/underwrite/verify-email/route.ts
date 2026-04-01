@@ -57,16 +57,16 @@ export async function POST(request: Request) {
 
     if (user) {
       // User exists - check verification status and usage
-      if (user.email_verified) {
+      if (user.emailVerified) {
         // Already verified - check usage limit
-        if (user.usage_count >= user.usage_limit) {
+        if (user.usageCount >= user.usageLimit) {
           return NextResponse.json({
             success: true,
             verified: true,
-            usageCount: user.usage_count,
-            usageLimit: user.usage_limit,
+            usageCount: user.usageCount,
+            usageLimit: user.usageLimit,
             limitReached: true,
-            message: `You've reached your limit of ${user.usage_limit} free reports. Upgrade to Pro for 100 reports per month.`,
+            message: `You've reached your limit of ${user.usageLimit} free reports. Upgrade to Pro for 100 reports per month.`,
           });
         }
 
@@ -74,8 +74,8 @@ export async function POST(request: Request) {
         return NextResponse.json({
           success: true,
           verified: true,
-          usageCount: user.usage_count,
-          usageLimit: user.usage_limit,
+          usageCount: user.usageCount,
+          usageLimit: user.usageLimit,
           limitReached: false,
         });
       } else {

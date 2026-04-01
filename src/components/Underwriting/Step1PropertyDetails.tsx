@@ -13,7 +13,7 @@ declare global {
 }
 
 const formatNumber = (value: number | undefined): string => {
-  if (!value) return "";
+  if (value === undefined || value === null) return "";
   return value.toLocaleString("en-US");
 };
 
@@ -236,6 +236,29 @@ export default function Step1PropertyDetails() {
     const cleaned = value.replace(/[^\d]/g, "");
     const numValue = cleaned ? parseInt(cleaned) : 0;
     updateFormData({ [field]: numValue });
+  };
+
+  const isFormValid = () => {
+    // Check all required fields are filled
+    return !!(
+      formData.propertyAddress &&
+      formData.propertyCity &&
+      formData.propertyState &&
+      formData.propertyZip &&
+      formData.purchasePrice &&
+      formData.purchasePrice > 0 &&
+      formData.rehab !== undefined &&
+      formData.rehab !== null &&
+      formData.squareFeet &&
+      formData.squareFeet > 0 &&
+      formData.bedrooms &&
+      formData.bedrooms > 0 &&
+      formData.bathrooms &&
+      formData.bathrooms > 0 &&
+      formData.yearBuilt &&
+      formData.yearBuilt > 0 &&
+      formData.propertyType
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -575,7 +598,8 @@ export default function Step1PropertyDetails() {
         <div className="w-full px-4">
           <button
             type="submit"
-            className="rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 dark:shadow-submit-dark"
+            disabled={!isFormValid()}
+            className="rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 dark:shadow-submit-dark disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-primary"
           >
             Next Step
           </button>

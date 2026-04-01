@@ -126,7 +126,7 @@ export async function POST(request: Request) {
       try {
         console.log("📧 [send-code] Adding user to ActiveCampaign list 11...");
         await withTimeout(
-          addFreeUser(email, user.usage_count),
+          addFreeUser(email, user.usageCount),
           5000,
           "ActiveCampaign API call"
         );
@@ -139,13 +139,13 @@ export async function POST(request: Request) {
 
     // Check usage limit for verified users BEFORE proceeding to Step 6
     // This prevents expensive API calls for users who have hit their limit
-    if (user.email_verified && user.usage_count >= user.usage_limit) {
+    if (user.emailVerified && user.usageCount >= user.usageLimit) {
       // Only set promo expiry if user doesn't already have one OR if it has expired
       let promoExpiresAt: Date;
 
-      if (user.promo_expires_at && new Date(user.promo_expires_at) > new Date()) {
+      if (user.promoExpiresAt && new Date(user.promoExpiresAt) > new Date()) {
         // User already has an active promo - don't reset the timer
-        promoExpiresAt = new Date(user.promo_expires_at);
+        promoExpiresAt = new Date(user.promoExpiresAt);
         console.log("🎁 [send-code] User already has active promo, not resetting timer");
       } else {
         // Set new promo expiry (1 hour from now)

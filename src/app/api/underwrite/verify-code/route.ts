@@ -98,9 +98,9 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        emailVerified: user.email_verified === 1,
-        usageCount: user.usage_count,
-        usageLimit: user.usage_limit,
+        emailVerified: user.emailVerified,
+        usageCount: user.usageCount,
+        usageLimit: user.usageLimit,
       },
     });
   } catch (error) {

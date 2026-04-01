@@ -127,7 +127,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.log(`✅ Created new user: ${user.id}`);
   } else {
     console.log(`✅ Found existing user: ${user.id}`);
-    console.log(`📝 User has ${user.usage_count} existing reports - these will be preserved!`);
+    console.log(`📝 User has ${user.usageCount} existing reports - these will be preserved!`);
   }
 
   // Upgrade user to Pro (updates tier, limits, retention, stripeCustomerId)
@@ -174,7 +174,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return;
   }
 
-  console.log(`📝 Updating subscription for user ${dbSubscription.user_id}`);
+  console.log(`📝 Updating subscription for user ${dbSubscription.userId}`);
   console.log(`   Status: ${dbSubscription.status} → ${subscription.status}`);
 
   // Period dates are on the subscription items, not the subscription itself
@@ -205,17 +205,17 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     return;
   }
 
-  console.log(`⬇️  Downgrading user ${dbSubscription.user_id} to free tier`);
+  console.log(`⬇️  Downgrading user ${dbSubscription.userId} to free tier`);
 
   // Downgrade user to free tier
-  await downgradeUserToFree(dbSubscription.user_id);
+  await downgradeUserToFree(dbSubscription.userId);
 
   // Update subscription status (keep for history)
   await updateSubscription(dbSubscription.id, {
     status: "canceled",
   });
 
-  console.log(`✅ User ${dbSubscription.user_id} downgraded to free tier`);
+  console.log(`✅ User ${dbSubscription.userId} downgraded to free tier`);
   console.log(`📝 Note: Existing reports are preserved (no deletion on downgrade)`);
 }
 
@@ -240,7 +240,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     return;
   }
 
-  console.log(`⚠️  Payment failed for user ${dbSubscription.user_id}`);
+  console.log(`⚠️  Payment failed for user ${dbSubscription.userId}`);
   console.log(`   Marking subscription as past_due`);
 
   await updateSubscription(dbSubscription.id, {

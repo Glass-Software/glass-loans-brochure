@@ -361,7 +361,7 @@ export async function POST(request: Request) {
         }
 
         // Step 7: Check usage limit (skip for demo mode)
-        if (!isDemoMode && user.usage_count >= user.usage_limit) {
+        if (!isDemoMode && user.usageCount >= user.usageLimit) {
           // Set promo expiry in database (1 hour from now)
           await setPromoExpiry(user.id);
 
@@ -369,7 +369,7 @@ export async function POST(request: Request) {
 
           sendError(
             controller,
-            `You've reached your limit of ${user.usage_limit} free reports. Upgrade to Pro now for a limited-time offer!`,
+            `You've reached your limit of ${user.usageLimit} free reports. Upgrade to Pro now for a limited-time offer!`,
             "USAGE_LIMIT",
             { promoExpiresAt: promoExpiresAt.toISOString() }
           );
@@ -906,7 +906,7 @@ export async function POST(request: Request) {
 
             await addFreeUser(
               user.email,
-              user.usage_count,
+              user.usageCount,
               formData.propertyState || undefined
             );
 
