@@ -72,7 +72,8 @@ export async function POST(request: NextRequest) {
     ];
 
     for (const field of requiredFields) {
-      if (!formData[field as keyof UnderwritingFormData]) {
+      const value = formData[field as keyof UnderwritingFormData];
+      if (value === undefined || value === null || value === "") {
         return NextResponse.json(
           { success: false, error: `Missing required field: ${field}` },
           { status: 400 }
