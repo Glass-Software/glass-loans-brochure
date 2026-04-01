@@ -49,7 +49,6 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
   const [sendingCode, setSendingCode] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
 
-  const isAuthenticated = !!authenticatedUser;
   const isProUser = authenticatedUser?.tier === 'pro';
   const userEmail = authenticatedUser?.email || "";
 
@@ -303,65 +302,45 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
 
           {!codeSent ? (
             <form onSubmit={handleSendCode}>
-              {isAuthenticated ? (
-                <div className="mb-4 rounded-sm border border-green-500/20 bg-green-500/10 p-4">
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    ✓ Logged in as {userEmail}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <label htmlFor="email" className={labelClass}>
-                    Email Address *
-                  </label>
-                  <div className="mb-4 flex gap-3">
-                    <input
-                      type="email"
-                      id="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      disabled={sendingCode}
-                      className={inputClass}
-                    />
-                    <button
-                      type="submit"
-                      disabled={sendingCode || !marketingConsent}
-                      className="whitespace-nowrap rounded-sm bg-primary px-6 py-3 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50"
-                    >
-                      {sendingCode ? "Sending..." : "Send Code"}
-                    </button>
-                  </div>
-                  {emailError && <p className={errorClass}>{emailError}</p>}
-
-                  <div className="mt-4 flex items-start">
-                    <input
-                      type="checkbox"
-                      id="marketingConsent"
-                      checked={marketingConsent}
-                      onChange={(e) => setMarketingConsent(e.target.checked)}
-                      required
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <label
-                      htmlFor="marketingConsent"
-                      className="ml-3 text-sm text-body-color dark:text-body-color-dark"
-                    >
-                      <span className="font-semibold text-dark dark:text-white">*</span> I agree to receive marketing emails from Glass Loans about new products, features, and special offers. You can unsubscribe at any time.
-                    </label>
-                  </div>
-                </>
-              )}
-
-              {isAuthenticated && (
+              <label htmlFor="email" className={labelClass}>
+                Email Address *
+              </label>
+              <div className="mb-4 flex gap-3">
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  disabled={sendingCode}
+                  className={inputClass}
+                />
                 <button
                   type="submit"
-                  disabled={sendingCode}
-                  className="w-full rounded-sm bg-primary px-6 py-3 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50"
+                  disabled={sendingCode || !marketingConsent}
+                  className="whitespace-nowrap rounded-sm bg-primary px-6 py-3 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {sendingCode ? "Sending..." : "Send Verification Code"}
+                  {sendingCode ? "Sending..." : "Send Code"}
                 </button>
-              )}
+              </div>
+              {emailError && <p className={errorClass}>{emailError}</p>}
+
+              <div className="mt-4 flex items-start">
+                <input
+                  type="checkbox"
+                  id="marketingConsent"
+                  checked={marketingConsent}
+                  onChange={(e) => setMarketingConsent(e.target.checked)}
+                  required
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <label
+                  htmlFor="marketingConsent"
+                  className="ml-3 text-sm text-body-color dark:text-body-color-dark"
+                >
+                  <span className="font-semibold text-dark dark:text-white">*</span> I agree to receive marketing emails from Glass Loans about new products, features, and special offers. You can unsubscribe at any time.
+                </label>
+              </div>
             </form>
           ) : (
             <div>
