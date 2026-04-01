@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { normalizeEmail } from "@/lib/email/normalization";
-import { findUserByNormalizedEmail, generateVerificationCode } from "@/lib/db/queries";
+import { findUserByNormalizedEmail, generateVerificationCode, updateMarketingConsent } from "@/lib/db/queries";
+import { prisma } from "@/lib/db/prisma";
 import sgMail from "@sendgrid/mail";
 
 // Initialize SendGrid
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { email } = body;
+    const { email, firstName, lastName, marketingConsent } = body;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -38,12 +39,30 @@ export async function POST(request: Request) {
       );
     }
 
+    // Update user information if provided
+    if (firstName && lastName) {
+      // For Pro signup, unconditionally update the name (user explicitly provided it)
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+        },
+      });
+      console.log(`✅ [send-code] Updated name for user ${user.id}: ${firstName} ${lastName}`);
+    }
+
+    if (marketingConsent !== undefined) {
+      await updateMarketingConsent(user.id, marketingConsent);
+      console.log(`✅ [send-code] Updated marketing consent for user ${user.id}: ${marketingConsent}`);
+    }
+
     // Generate verification code
     const result = await generateVerificationCode(user.id);
     const code = result.code;
 
     // Send verification email
-    await sendProSignupCodeEmail(email, code);
+    await sendProSignupCodeEmail(email, code, firstName);
 
     return NextResponse.json({
       success: true,
@@ -61,12 +80,15 @@ export async function POST(request: Request) {
 /**
  * Send Pro signup verification code via SendGrid
  */
-async function sendProSignupCodeEmail(email: string, code: string) {
+async function sendProSignupCodeEmail(email: string, code: string, firstName?: string) {
+  const greeting = firstName ? `Hi ${firstName},` : 'Welcome to Glass Loans Pro!';
+  const greetingHtml = firstName ? `Hi ${firstName},` : 'Welcome to Pro! 🎉';
+
   const msg = {
     to: email,
     from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
     subject: "Welcome to Glass Loans Pro - Verify Your Email",
-    text: `Welcome to Glass Loans Pro!
+    text: `${greeting}
 
 Your verification code is: ${code}
 
@@ -87,7 +109,7 @@ Glass Loans Team`,
     <h1 style="color: white; margin: 0;">Glass Loans Pro</h1>
   </div>
   <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
-    <h2 style="color: #333; margin-top: 0;">Welcome to Pro! 🎉</h2>
+    <h2 style="color: #333; margin-top: 0;">${greetingHtml}</h2>
     <p>Thank you for upgrading to Glass Loans Pro. Enter this code to verify your email and access your dashboard:</p>
     <div style="background-color: #fff; border: 2px solid #4A6CF7; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;">
       <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #4A6CF7;">${code}</div>

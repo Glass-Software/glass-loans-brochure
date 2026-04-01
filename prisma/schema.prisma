@@ -14,6 +14,8 @@ model User {
   id                          Int      @id @default(autoincrement())
   email                       String   @unique
   normalizedEmail             String   @unique @map("normalized_email")
+  firstName                   String?  @map("first_name") // Collected once, then reused
+  lastName                    String?  @map("last_name")  // Collected once, then reused
   emailVerified               Boolean  @default(false) @map("email_verified")
   verificationToken           String?  @map("verification_token")
   verificationTokenExpires    DateTime? @map("verification_token_expires")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -9,34 +9,72 @@ function SignupContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
 
-  const [step, setStep] = useState<"loading" | "code-entry" | "error">("loading");
+  const [step, setStep] = useState<
+    "loading" | "user-info" | "code-entry" | "error"
+  >("loading");
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [userInfoSubmitted, setUserInfoSubmitted] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
 
-  useEffect(() => {
-    if (!sessionId) {
-      setError("Invalid signup link. Please complete checkout first.");
-      setStep("error");
-      return;
-    }
+  /**
+   * Send verification code (with optional user info)
+   */
+  const sendVerificationCode = useCallback(
+    async (
+      emailToUse?: string,
+      userInfo?: {
+        firstName: string;
+        lastName: string;
+        marketingConsent: boolean;
+      },
+    ) => {
+      try {
+        const sendCodeRes = await fetch("/api/auth/send-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: emailToUse || email,
+            firstName: userInfo?.firstName,
+            lastName: userInfo?.lastName,
+            marketingConsent: userInfo?.marketingConsent,
+          }),
+        });
 
-    initializeSignup();
-  }, [sessionId]);
+        if (!sendCodeRes.ok) {
+          const errorData = await sendCodeRes.json();
+          throw new Error(errorData.error || "Failed to send verification code");
+        }
+
+        // Show code entry form
+        setCodeSent(true);
+        setStep("code-entry");
+      } catch (err: any) {
+        console.error("Send code error:", err);
+        throw err;
+      }
+    },
+    [email]
+  );
 
   /**
    * Initialize signup flow:
    * 1. Verify Stripe session and get email
    * 2. Poll for webhook completion
-   * 3. Send verification code
-   * 4. Show code entry form
+   * 3. Check if user needs to provide name/marketing consent
+   * 4. Either show user-info form OR send verification code
    */
-  async function initializeSignup() {
+  const initializeSignup = useCallback(async () => {
     try {
       // Step 1: Verify Stripe session and get email
-      const sessionRes = await fetch(`/api/stripe/verify-session?session_id=${sessionId}`);
+      const sessionRes = await fetch(
+        `/api/stripe/verify-session?session_id=${sessionId}`,
+      );
       if (!sessionRes.ok) {
         throw new Error("Failed to verify checkout session");
       }
@@ -46,7 +84,9 @@ function SignupContent() {
       // Step 2: Poll for webhook completion (up to 10 seconds)
       let webhookProcessed = false;
       for (let i = 0; i < 10; i++) {
-        const checkRes = await fetch(`/api/auth/check-subscription?email=${encodeURIComponent(sessionData.email)}`);
+        const checkRes = await fetch(
+          `/api/auth/check-subscription?email=${encodeURIComponent(sessionData.email)}`,
+        );
         const checkData = await checkRes.json();
 
         if (checkData.ready) {
@@ -55,32 +95,66 @@ function SignupContent() {
         }
 
         // Wait 1 second before next poll
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
       if (!webhookProcessed) {
         console.warn("Webhook processing timeout - continuing anyway");
       }
 
-      // Step 3: Send verification code
-      const sendCodeRes = await fetch("/api/auth/send-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: sessionData.email }),
-      });
+      // Step 3: Check if user already has name set (and hasn't just submitted it)
+      if (!userInfoSubmitted) {
+        const userCheckRes = await fetch(
+          `/api/auth/check-user-info?email=${encodeURIComponent(sessionData.email)}`,
+        );
+        const userCheckData = await userCheckRes.json();
 
-      if (!sendCodeRes.ok) {
-        const errorData = await sendCodeRes.json();
-        throw new Error(errorData.error || "Failed to send verification code");
+        if (!userCheckData.hasName) {
+          // User needs to provide their information
+          setStep("user-info");
+          return; // Wait for user to submit the form
+        }
       }
 
-      // Step 4: Show code entry form
-      setCodeSent(true);
-      setStep("code-entry");
+      // User already has name (or just submitted it), send code directly
+      await sendVerificationCode(sessionData.email);
     } catch (err: any) {
       console.error("Signup initialization error:", err);
       setError(err.message || "Failed to initialize signup");
       setStep("error");
+    }
+  }, [sessionId, userInfoSubmitted, sendVerificationCode]);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setError("Invalid signup link. Please complete checkout first.");
+      setStep("error");
+      return;
+    }
+
+    initializeSignup();
+  }, [sessionId, initializeSignup]);
+
+  /**
+   * Handle user info form submission
+   */
+  async function handleSubmitUserInfo(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      await sendVerificationCode(email, {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        marketingConsent,
+      });
+      // Mark that user has submitted their info in this session
+      setUserInfoSubmitted(true);
+      setLoading(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to send verification code");
+      setLoading(false);
     }
   }
 
@@ -143,8 +217,7 @@ function SignupContent() {
       <div className="container">
         <div className="-mx-4 flex flex-wrap">
           <div className="w-full px-4">
-            <div className="shadow-three mx-auto max-w-[500px] rounded bg-white px-6 py-10 dark:bg-dark sm:p-[60px]">
-
+            <div className="mx-auto max-w-[500px] rounded bg-white px-6 py-10 shadow-three dark:bg-dark sm:p-[60px]">
               {step === "loading" && (
                 <div className="text-center">
                   <div className="mb-6 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
@@ -155,6 +228,132 @@ function SignupContent() {
                     Processing your payment and creating your account...
                   </p>
                 </div>
+              )}
+
+              {step === "user-info" && (
+                <>
+                  <div className="mb-6 text-center">
+                    <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                      <svg
+                        className="h-8 w-8 text-primary"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="mb-3 text-2xl font-bold text-black dark:text-white sm:text-3xl">
+                      Welcome to Glass Loans Pro!
+                    </h3>
+                    <p className="mb-4 text-base text-body-color dark:text-body-color-dark">
+                      Please provide your information to complete setup
+                    </p>
+                    <p className="text-lg font-semibold text-primary">
+                      {email}
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleSubmitUserInfo}>
+                    <div className="mb-4">
+                      <label
+                        htmlFor="firstName"
+                        className="mb-3 block text-sm font-medium text-dark dark:text-white"
+                      >
+                        First Name *
+                      </label>
+                      <input
+                        type="text"
+                        id="firstName"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="John"
+                        className="border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-body-color outline-none transition-all duration-300 focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-body-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none"
+                        required
+                        autoFocus
+                        disabled={loading}
+                      />
+                    </div>
+
+                    <div className="mb-4">
+                      <label
+                        htmlFor="lastName"
+                        className="mb-3 block text-sm font-medium text-dark dark:text-white"
+                      >
+                        Last Name *
+                      </label>
+                      <input
+                        type="text"
+                        id="lastName"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Doe"
+                        className="border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-base text-body-color outline-none transition-all duration-300 focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-body-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none"
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+
+                    <div className="mb-6">
+                      <label className="flex cursor-pointer items-start">
+                        <input
+                          type="checkbox"
+                          checked={marketingConsent}
+                          onChange={(e) =>
+                            setMarketingConsent(e.target.checked)
+                          }
+                          className="mt-1 h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                          required
+                          disabled={loading}
+                        />
+                        <span className="ml-3 text-sm text-body-color dark:text-body-color-dark">
+                          I agree to receive marketing communications from Glass
+                          Loans about products, services, and special offers.
+                          You can unsubscribe at any time. *
+                        </span>
+                      </label>
+                    </div>
+
+                    {error && (
+                      <div className="mb-4 rounded bg-red-100 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                        {error}
+                      </div>
+                    )}
+
+                    <div className="mb-6">
+                      <button
+                        type="submit"
+                        disabled={
+                          loading ||
+                          !firstName.trim() ||
+                          !lastName.trim() ||
+                          !marketingConsent
+                        }
+                        className="flex w-full items-center justify-center rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-submit-dark"
+                      >
+                        {loading ? "Sending Code..." : "Continue"}
+                      </button>
+                    </div>
+
+                    <div className="rounded bg-blue-50 p-4 dark:bg-blue-900/20">
+                      <p className="text-sm text-body-color dark:text-body-color-dark">
+                        <strong className="text-primary">
+                          Your Pro Benefits:
+                        </strong>
+                      </p>
+                      <ul className="mt-2 space-y-1 text-sm text-body-color dark:text-body-color-dark">
+                        <li>✓ 100 reports per month</li>
+                        <li>✓ Unlimited report storage</li>
+                        <li>✓ Priority support</li>
+                      </ul>
+                    </div>
+                  </form>
+                </>
               )}
 
               {step === "code-entry" && (
@@ -179,9 +378,11 @@ function SignupContent() {
                       Welcome to Glass Loans Pro!
                     </h3>
                     <p className="mb-4 text-base text-body-color dark:text-body-color-dark">
-                      We've sent a verification code to:
+                      We&apos;ve sent a verification code to:
                     </p>
-                    <p className="text-lg font-semibold text-primary">{email}</p>
+                    <p className="text-lg font-semibold text-primary">
+                      {email}
+                    </p>
                   </div>
 
                   <form onSubmit={handleVerifyCode}>
@@ -199,7 +400,7 @@ function SignupContent() {
                         onChange={(e) => setVerificationCode(e.target.value)}
                         placeholder="Enter 6-digit code"
                         maxLength={6}
-                        className="border-stroke dark:text-body-color-dark dark:shadow-two w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-center text-2xl font-mono tracking-widest text-body-color outline-none transition-all duration-300 focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:focus:border-primary dark:focus:shadow-none"
+                        className="border-stroke w-full rounded-sm border bg-[#f8f8f8] px-6 py-3 text-center font-mono text-2xl tracking-widest text-body-color outline-none transition-all duration-300 focus:border-primary dark:border-transparent dark:bg-[#2C303B] dark:text-body-color-dark dark:shadow-two dark:focus:border-primary dark:focus:shadow-none"
                         required
                         autoFocus
                         disabled={loading}
@@ -216,7 +417,7 @@ function SignupContent() {
                       <button
                         type="submit"
                         disabled={loading || verificationCode.length !== 6}
-                        className="shadow-submit dark:shadow-submit-dark flex w-full items-center justify-center rounded-sm bg-primary px-9 py-4 text-base font-medium text-white duration-300 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex w-full items-center justify-center rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-submit-dark"
                       >
                         {loading ? "Verifying..." : "Verify & Access Dashboard"}
                       </button>
@@ -224,7 +425,7 @@ function SignupContent() {
 
                     <div className="text-center">
                       <p className="text-sm text-body-color dark:text-body-color-dark">
-                        Didn't receive the code?{" "}
+                        Didn&apos;t receive the code?{" "}
                         <button
                           type="button"
                           onClick={handleResendCode}
@@ -239,7 +440,9 @@ function SignupContent() {
 
                   <div className="mt-6 rounded bg-blue-50 p-4 dark:bg-blue-900/20">
                     <p className="text-sm text-body-color dark:text-body-color-dark">
-                      <strong className="text-primary">Your Pro Benefits:</strong>
+                      <strong className="text-primary">
+                        Your Pro Benefits:
+                      </strong>
                     </p>
                     <ul className="mt-2 space-y-1 text-sm text-body-color dark:text-body-color-dark">
                       <li>✓ 100 reports per month</li>
@@ -279,13 +482,13 @@ function SignupContent() {
                   <div className="space-y-3">
                     <Link
                       href="/underwrite-pro"
-                      className="shadow-submit dark:shadow-submit-dark flex w-full items-center justify-center rounded-sm bg-primary px-9 py-4 text-base font-medium text-white duration-300 hover:bg-primary/90"
+                      className="flex w-full items-center justify-center rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 dark:shadow-submit-dark"
                     >
                       Return to Pro Page
                     </Link>
                     <Link
                       href="/"
-                      className="flex w-full items-center justify-center rounded-sm border border-stroke px-9 py-4 text-base font-medium text-body-color duration-300 hover:border-primary hover:text-primary dark:border-transparent dark:bg-[#2C303B] dark:text-body-color-dark dark:hover:border-primary dark:hover:text-primary"
+                      className="border-stroke flex w-full items-center justify-center rounded-sm border px-9 py-4 text-base font-medium text-body-color duration-300 hover:border-primary hover:text-primary dark:border-transparent dark:bg-[#2C303B] dark:text-body-color-dark dark:hover:border-primary dark:hover:text-primary"
                     >
                       Go Home
                     </Link>
@@ -360,23 +563,25 @@ function SignupContent() {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={
-      <section className="relative z-10 overflow-hidden pb-16 pt-36 md:pb-20 lg:pb-28 lg:pt-[180px]">
-        <div className="container">
-          <div className="-mx-4 flex flex-wrap">
-            <div className="w-full px-4">
-              <div className="shadow-three mx-auto max-w-[500px] rounded bg-white px-6 py-10 dark:bg-dark sm:p-[60px]">
-                <div className="text-center">
-                  <h3 className="mb-4 text-2xl font-bold text-black dark:text-white">
-                    Loading...
-                  </h3>
+    <Suspense
+      fallback={
+        <section className="relative z-10 overflow-hidden pb-16 pt-36 md:pb-20 lg:pb-28 lg:pt-[180px]">
+          <div className="container">
+            <div className="-mx-4 flex flex-wrap">
+              <div className="w-full px-4">
+                <div className="mx-auto max-w-[500px] rounded bg-white px-6 py-10 shadow-three dark:bg-dark sm:p-[60px]">
+                  <div className="text-center">
+                    <h3 className="mb-4 text-2xl font-bold text-black dark:text-white">
+                      Loading...
+                    </h3>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-    }>
+        </section>
+      }
+    >
       <SignupContent />
     </Suspense>
   );

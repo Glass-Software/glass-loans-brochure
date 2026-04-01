@@ -15,6 +15,8 @@ export interface User {
   id: number;
   email: string;
   normalizedEmail: string;
+  firstName: string | null;
+  lastName: string | null;
   emailVerified: boolean;
   verificationToken: string | null;
   verificationTokenExpires: string | null;
@@ -27,6 +29,7 @@ export interface User {
   usagePeriodStart: string | null;
   stripeCustomerId: string | null;
   promoExpiresAt: string | null;
+  marketingConsent: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,6 +40,8 @@ function toPrismaUserToLegacy(user: PrismaUser): User {
     id: user.id,
     email: user.email,
     normalizedEmail: user.normalizedEmail,
+    firstName: user.firstName,
+    lastName: user.lastName,
     emailVerified: user.emailVerified,
     verificationToken: user.verificationToken,
     verificationTokenExpires: user.verificationTokenExpires?.toISOString() || null,
@@ -49,6 +54,7 @@ function toPrismaUserToLegacy(user: PrismaUser): User {
     usagePeriodStart: user.usagePeriodStart?.toISOString() || null,
     stripeCustomerId: user.stripeCustomerId,
     promoExpiresAt: user.promoExpiresAt?.toISOString() || null,
+    marketingConsent: user.marketingConsent,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };
@@ -115,7 +121,9 @@ export async function findUserByVerificationToken(token: string): Promise<User |
 export async function createUser(
   email: string,
   normalizedEmail: string,
-  marketingConsent: boolean = false
+  marketingConsent: boolean = false,
+  firstName?: string,
+  lastName?: string
 ): Promise<{ user: User; token: string }> {
   const token = crypto.randomBytes(32).toString("hex");
   const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -127,6 +135,8 @@ export async function createUser(
       verificationToken: token,
       verificationTokenExpires: tokenExpires,
       marketingConsent,
+      firstName: firstName || null,
+      lastName: lastName || null,
     },
   });
 
@@ -141,6 +151,28 @@ export async function updateMarketingConsent(userId: number, marketingConsent: b
     where: { id: userId },
     data: { marketingConsent },
   });
+}
+
+/**
+ * Update user's name (only if not already set)
+ */
+export async function updateUserName(
+  userId: number,
+  firstName: string,
+  lastName: string
+): Promise<void> {
+  // Only update if both firstName and lastName are currently null
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { firstName: true, lastName: true },
+  });
+
+  if (!user?.firstName && !user?.lastName) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { firstName, lastName },
+    });
+  }
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   createUser,
   generateVerificationCode,
   updateMarketingConsent,
+  updateUserName,
   setPromoExpiry,
 } from "@/lib/db/queries";
 import sgMail from "@sendgrid/mail";
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { email, marketingConsent = false } = body;
+    const { email, firstName, lastName, marketingConsent = false } = body;
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -99,6 +100,21 @@ export async function POST(request: Request) {
         // Non-critical, continue anyway
       }
 
+      // Update user's name if provided and not already set
+      if (firstName && lastName) {
+        try {
+          console.log("🔵 [send-code] Updating user name (if not set)...");
+          await withTimeout(
+            updateUserName(user.id, firstName.trim(), lastName.trim()),
+            2000,
+            "Database update (user name)"
+          );
+        } catch (error: any) {
+          console.error("❌ [send-code] User name update timeout:", error.message);
+          // Non-critical, continue anyway
+        }
+      }
+
       // Note: We don't block sending verification codes based on usage limit
       // The limit is enforced at report submission time, not email verification
       // This allows users to verify their email and see the promo banner after verification
@@ -106,7 +122,7 @@ export async function POST(request: Request) {
       try {
         console.log("🔵 [send-code] Creating new user...");
         const result = await withTimeout(
-          createUser(email, normalizedEmail, marketingConsent),
+          createUser(email, normalizedEmail, marketingConsent, firstName?.trim(), lastName?.trim()),
           3000,
           "Database insert (createUser)"
         );

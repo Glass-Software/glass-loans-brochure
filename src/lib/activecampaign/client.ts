@@ -7,6 +7,7 @@
 
 interface ContactMetadata {
   firstName?: string;
+  lastName?: string;
   reportCount?: number;
   lastReportDate?: string;
   propertyState?: string;
@@ -50,6 +51,7 @@ export async function addContact(
         contact: {
           email,
           firstName: metadata?.firstName || "",
+          lastName: metadata?.lastName || "",
           fieldValues: [
             {
               field: "1", // Custom field ID for report count
@@ -79,6 +81,45 @@ export async function addContact(
 }
 
 /**
+ * Create or get a tag by name
+ *
+ * @param tagName - Tag name to create/get
+ * @returns Tag ID
+ */
+async function getOrCreateTag(tagName: string): Promise<string> {
+  if (!process.env.ACTIVECAMPAIGN_API_KEY || !process.env.ACTIVECAMPAIGN_API_URL) {
+    throw new Error("ActiveCampaign API not configured");
+  }
+
+  // Create the tag (ActiveCampaign returns existing tag if name already exists)
+  const response = await fetch(
+    `${process.env.ACTIVECAMPAIGN_API_URL}/api/3/tags`,
+    {
+      method: "POST",
+      headers: {
+        "Api-Token": process.env.ACTIVECAMPAIGN_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tag: {
+          tag: tagName,
+          tagType: "contact",
+          description: `Glass Loans - ${tagName}`,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to create tag "${tagName}": ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.tag.id;
+}
+
+/**
  * Add tags to an ActiveCampaign contact
  *
  * @param contactId - ActiveCampaign contact ID
@@ -93,30 +134,36 @@ export async function addTags(contactId: string, tags: string[]): Promise<void> 
     throw new Error("ACTIVECAMPAIGN_API_URL is not configured");
   }
 
-  // Add each tag to the contact
-  const promises = tags.map((tag) =>
-    fetch(`${process.env.ACTIVECAMPAIGN_API_URL}/api/3/contactTags`, {
-      method: "POST",
-      headers: {
-        "Api-Token": process.env.ACTIVECAMPAIGN_API_KEY!,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contactTag: {
-          contact: contactId,
-          tag,
-        },
-      }),
-    })
-  );
+  // Create/get tags and add them to contact
+  for (const tagName of tags) {
+    try {
+      // Get or create the tag
+      const tagId = await getOrCreateTag(tagName);
 
-  const results = await Promise.all(promises);
+      // Add tag to contact
+      const response = await fetch(
+        `${process.env.ACTIVECAMPAIGN_API_URL}/api/3/contactTags`,
+        {
+          method: "POST",
+          headers: {
+            "Api-Token": process.env.ACTIVECAMPAIGN_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contactTag: {
+              contact: contactId,
+              tag: tagId,
+            },
+          }),
+        }
+      );
 
-  // Check if any requests failed
-  for (const result of results) {
-    if (!result.ok) {
-      const errorText = await result.text();
-      console.error(`Failed to add tag: ${result.statusText} - ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to add tag "${tagName}" to contact: ${errorText}`);
+      }
+    } catch (error: any) {
+      console.error(`Error adding tag "${tagName}":`, error.message);
     }
   }
 }
@@ -172,17 +219,23 @@ export async function addContactToList(
  * @param email - User's email
  * @param reportCount - Total number of reports user has submitted
  * @param propertyState - State of the property (e.g., "TX", "CA")
+ * @param firstName - User's first name (optional)
+ * @param lastName - User's last name (optional)
  */
 export async function addFreeUser(
   email: string,
   reportCount: number,
-  propertyState?: string
+  propertyState?: string,
+  firstName?: string,
+  lastName?: string
 ): Promise<void> {
   try {
     console.log(`📧 [ActiveCampaign] Adding free user: ${email}`);
 
     // Add contact to ActiveCampaign
     const contact = await addContact(email, {
+      firstName: firstName || "",
+      lastName: lastName || "",
       reportCount,
       lastReportDate: new Date().toISOString(),
       propertyState: propertyState || "",

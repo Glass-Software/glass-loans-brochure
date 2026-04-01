@@ -897,18 +897,20 @@ export async function POST(request: Request) {
 </html>`,
         });
 
-        // Step 14.5: Add free users to ActiveCampaign (skip for demo mode and Pro users)
-        if (!isDemoMode && user.tier === "free") {
+        // Step 14.5: Add all users to ActiveCampaign (skip for demo mode only)
+        if (!isDemoMode) {
           try {
             const { addFreeUser } = await import("@/lib/activecampaign/client");
 
             await addFreeUser(
               user.email,
               user.usageCount,
-              formData.propertyState || undefined
+              formData.propertyState || undefined,
+              user.firstName || undefined,
+              user.lastName || undefined
             );
 
-            console.log(`✅ Added free user ${user.email} to ActiveCampaign`);
+            console.log(`✅ Added user ${user.email} (${user.tier} tier) to ActiveCampaign`);
           } catch (error: any) {
             // Don't fail submission if ActiveCampaign fails
             console.error("❌ ActiveCampaign error:", error.message);

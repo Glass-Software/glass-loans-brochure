@@ -87,6 +87,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Session created for user ${user.id} (${user.email})`);
 
+    // Add user to ActiveCampaign list 11 (all users, free and Pro)
+    try {
+      const { addFreeUser } = await import("@/lib/activecampaign/client");
+      await addFreeUser(
+        user.email,
+        user.usageCount,
+        undefined, // propertyState (not available at verification time)
+        user.firstName || undefined,
+        user.lastName || undefined
+      );
+      console.log(`✅ [verify-code] User ${user.email} added to ActiveCampaign list 11`);
+    } catch (error: any) {
+      // Don't fail verification if ActiveCampaign fails - log and continue
+      console.error(`❌ [verify-code] ActiveCampaign error (non-critical):`, error.message);
+    }
+
     // Clear promo cookie (database is now source of truth)
     const cookieStore = await cookies();
     cookieStore.delete("gl_promo_expires");

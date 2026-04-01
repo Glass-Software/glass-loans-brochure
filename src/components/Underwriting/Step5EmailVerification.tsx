@@ -42,6 +42,8 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
 
   const { executeRecaptcha } = useGoogleReCaptcha();
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [emailError, setEmailError] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [verificationCode, setVerificationCode] = useState(["", "", "", "", "", ""]);
@@ -108,6 +110,18 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
     e.preventDefault();
     console.log("🔵 [Step5] handleSendCode started");
 
+    // Validate name fields (required for non-authenticated users)
+    if (!authenticatedUser) {
+      if (!firstName.trim()) {
+        setEmailError("Please enter your first name");
+        return;
+      }
+      if (!lastName.trim()) {
+        setEmailError("Please enter your last name");
+        return;
+      }
+    }
+
     // Validate email format
     try {
       EmailSchema.parse(email);
@@ -134,7 +148,12 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
       const response = await fetch("/api/underwrite/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, marketingConsent }),
+        body: JSON.stringify({
+          email,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          marketingConsent
+        }),
       });
 
       console.log("🔵 [Step5] Response received:", response.status);
@@ -302,6 +321,42 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
 
           {!codeSent ? (
             <form onSubmit={handleSendCode}>
+              {/* Name fields - only shown for non-authenticated users */}
+              {!authenticatedUser && (
+                <>
+                  <div className="mb-4">
+                    <label htmlFor="firstName" className={labelClass}>
+                      First Name *
+                    </label>
+                    <input
+                      type="text"
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                      disabled={sendingCode}
+                      required
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label htmlFor="lastName" className={labelClass}>
+                      Last Name *
+                    </label>
+                    <input
+                      type="text"
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                      disabled={sendingCode}
+                      required
+                      className={inputClass}
+                    />
+                  </div>
+                </>
+              )}
+
               <label htmlFor="email" className={labelClass}>
                 Email Address *
               </label>
