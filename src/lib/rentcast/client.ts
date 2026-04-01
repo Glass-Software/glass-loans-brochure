@@ -57,11 +57,6 @@ export class RentCastClient {
 
     const url = `${this.baseUrl}/properties?${queryParams}`;
 
-    console.log(`[RentCast] Request URL: ${url}`);
-    console.log(`[RentCast] Request params:`, params);
-
-    const startTime = Date.now();
-
     try {
       // Add timeout using AbortController
       const controller = new AbortController();
@@ -77,9 +72,6 @@ export class RentCastClient {
       });
 
       clearTimeout(timeoutId);
-
-      const elapsed = Date.now() - startTime;
-      console.log(`[RentCast] Request completed in ${elapsed}ms`);
 
       if (!response.ok) {
         const errorText = await response.text();

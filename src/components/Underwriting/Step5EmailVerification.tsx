@@ -11,7 +11,7 @@ type AuthenticatedUser = {
   id: number;
   email: string;
   tier: string;
-  stripe_customer_id: string | null;
+  stripeCustomerId: string | null;
 } | null;
 
 interface Step5EmailVerificationProps {
@@ -59,15 +59,40 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
   useEffect(() => {
     if (isAuthenticated && userEmail && !hasAutoSkipped) {
       console.log("📧 [Step5] Auto-skipping for authenticated user:", userEmail);
-      // Set email in context for submit endpoint
-      setContextEmail(userEmail);
-      setEmailVerified(true);
-      setHasAutoSkipped(true);
 
-      // Skip to next step immediately
-      goToNextStep();
+      // Check usage limit before auto-skipping (prevents expensive API calls in Step 6)
+      const checkUsageLimitAndSkip = async () => {
+        try {
+          const response = await fetch("/api/users/check-limit");
+          const data = await response.json();
+
+          if (data.limitReached) {
+            console.log("⚠️ [Step5] Usage limit reached for authenticated user");
+            openUpgradeModal(data.promoExpiresAt);
+            setHasAutoSkipped(true); // Prevent re-checking
+            return; // Don't skip to next step
+          }
+
+          // Set email in context for submit endpoint
+          setContextEmail(userEmail);
+          setEmailVerified(true);
+          setHasAutoSkipped(true);
+
+          // Skip to next step
+          goToNextStep();
+        } catch (error) {
+          console.error("❌ [Step5] Error checking usage limit:", error);
+          // On error, proceed anyway (fail open)
+          setContextEmail(userEmail);
+          setEmailVerified(true);
+          setHasAutoSkipped(true);
+          goToNextStep();
+        }
+      };
+
+      checkUsageLimitAndSkip();
     }
-  }, [isAuthenticated, userEmail, hasAutoSkipped, setContextEmail, setEmailVerified, goToNextStep]);
+  }, [isAuthenticated, userEmail, hasAutoSkipped, setContextEmail, setEmailVerified, goToNextStep, openUpgradeModal]);
 
   // Refs for code inputs
   const codeInputRefs = [

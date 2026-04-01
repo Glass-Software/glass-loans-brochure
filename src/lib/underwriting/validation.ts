@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Property Condition enum
-export const PropertyConditionSchema = z.enum(["Good", "Bad", "Really Bad"], {
+export const PropertyConditionSchema = z.enum(["Great (Like New)", "Good", "Bad", "Really Bad"], {
   errorMap: () => ({ message: "Please select a valid property condition" }),
 });
 

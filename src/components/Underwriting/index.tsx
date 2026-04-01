@@ -15,7 +15,7 @@ type AuthenticatedUser = {
   id: number;
   email: string;
   tier: string;
-  stripe_customer_id: string | null;
+  stripeCustomerId: string | null;
 } | null;
 
 interface UnderwritingContentProps {
@@ -109,7 +109,7 @@ function UnderwritingContent({ authenticatedUser }: UnderwritingContentProps) {
                 {currentStep === 1 && <Step1PropertyDetails />}
                 {currentStep === 2 && <Step2PropertyCondition />}
                 {currentStep === 3 && <Step3LoanTerms />}
-                {currentStep === 4 && <Step4MarketDetails />}
+                {currentStep === 4 && <Step4MarketDetails authenticatedUser={authenticatedUser} />}
                 {currentStep === 5 && <Step5EmailVerification authenticatedUser={authenticatedUser} />}
               </div>
 

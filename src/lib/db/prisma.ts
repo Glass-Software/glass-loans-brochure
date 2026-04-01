@@ -66,7 +66,8 @@ function createPrismaClient(): PrismaClient {
 }
 
 /**
- * Get or create Prisma Client instance
+ * Get or create Prisma Client instance (lazy-initialized)
+ * Defers DATABASE_URL check until first use to allow builds without secrets
  */
 export function getPrismaClient(): PrismaClient {
   if (!globalForPrisma.prisma) {
@@ -75,8 +76,16 @@ export function getPrismaClient(): PrismaClient {
   return globalForPrisma.prisma;
 }
 
-// Export singleton instance
-export const prisma = getPrismaClient();
+// Export lazy-initialized singleton using Proxy
+// This allows the build to succeed without DATABASE_URL,
+// while still checking for it at runtime when the client is actually used
+export const prisma = new Proxy({} as PrismaClient, {
+  get: (_, prop) => {
+    const client = getPrismaClient();
+    const value = client[prop as keyof PrismaClient];
+    return typeof value === 'function' ? value.bind(client) : value;
+  }
+});
 
 /**
  * Close Prisma connection (for graceful shutdown)

@@ -103,7 +103,7 @@ export default function Step3LoanTerms() {
         <div className="w-full px-4 md:w-1/2">
           <div className="mb-8">
             <label htmlFor="loanAtPurchase" className={labelClass}>
-              Loan at Purchase *
+              Loan Amount Towards Purchase *
             </label>
             <div className="relative">
               <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color dark:text-body-color-dark">
@@ -127,7 +127,7 @@ export default function Step3LoanTerms() {
         <div className="w-full px-4 md:w-1/2">
           <div className="mb-8">
             <label htmlFor="renovationFunds" className={labelClass}>
-              Renovation Funds
+              Loan Amount Towards Renovation
             </label>
             <div className="relative">
               <span className="absolute left-6 top-1/2 -translate-y-1/2 text-body-color dark:text-body-color-dark">

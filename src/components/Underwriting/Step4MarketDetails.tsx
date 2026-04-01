@@ -4,13 +4,27 @@ import { useState } from "react";
 import { useUnderwriting } from "@/context/UnderwritingContext";
 import { validateStep } from "@/lib/underwriting/validation";
 import type { MarketType } from "@/types/underwriting";
+import { useModal } from "@/context/ModalContext";
 
-export default function Step4MarketDetails() {
+type AuthenticatedUser = {
+  id: number;
+  email: string;
+  tier: string;
+  stripeCustomerId: string | null;
+} | null;
+
+interface Step4MarketDetailsProps {
+  authenticatedUser: AuthenticatedUser;
+}
+
+export default function Step4MarketDetails({ authenticatedUser }: Step4MarketDetailsProps) {
   const { formData, updateFormData, goToNextStep, goToPreviousStep } =
     useUnderwriting();
+  const { openUpgradeModal } = useModal();
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isChecking, setIsChecking] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const stepData = {
@@ -26,6 +40,29 @@ export default function Step4MarketDetails() {
     }
 
     setErrors({});
+
+    // Check usage limit for authenticated users before proceeding to Step 5/6
+    // This prevents users who exceeded their limit from triggering expensive API calls
+    if (authenticatedUser) {
+      setIsChecking(true);
+      try {
+        const response = await fetch("/api/users/check-limit");
+        const data = await response.json();
+
+        if (data.limitReached) {
+          console.log("⚠️ [Step4] Usage limit reached for authenticated user");
+          openUpgradeModal(data.promoExpiresAt);
+          setIsChecking(false);
+          return; // Don't proceed to next step
+        }
+      } catch (error) {
+        console.error("❌ [Step4] Error checking usage limit:", error);
+        // On error, proceed anyway (fail open)
+      } finally {
+        setIsChecking(false);
+      }
+    }
+
     goToNextStep();
   };
 
@@ -90,15 +127,17 @@ export default function Step4MarketDetails() {
             <button
               type="button"
               onClick={goToPreviousStep}
-              className="rounded-sm border border-primary px-9 py-4 text-base font-medium text-primary duration-300 hover:bg-primary hover:text-white"
+              disabled={isChecking}
+              className="rounded-sm border border-primary px-9 py-4 text-base font-medium text-primary duration-300 hover:bg-primary hover:text-white disabled:opacity-50"
             >
               Previous
             </button>
             <button
               type="submit"
-              className="rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 dark:shadow-submit-dark"
+              disabled={isChecking}
+              className="rounded-sm bg-primary px-9 py-4 text-base font-medium text-white shadow-submit duration-300 hover:bg-primary/90 disabled:opacity-50 dark:shadow-submit-dark"
             >
-              Next: Get Results
+              {isChecking ? "Checking..." : "Next: Get Results"}
             </button>
           </div>
         </div>

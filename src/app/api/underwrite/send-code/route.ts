@@ -9,6 +9,7 @@ import {
   setPromoExpiry,
 } from "@/lib/db/queries";
 import sgMail from "@sendgrid/mail";
+import { addFreeUser } from "@/lib/activecampaign/client";
 
 // Initialize SendGrid once at module level
 if (process.env.SENDGRID_API_KEY) {
@@ -117,6 +118,22 @@ export async function POST(request: Request) {
           { error: "Database timeout. Please try again." },
           { status: 503 }
         );
+      }
+    }
+
+    // Add user to ActiveCampaign list 11 if they consented to marketing
+    if (marketingConsent) {
+      try {
+        console.log("📧 [send-code] Adding user to ActiveCampaign list 11...");
+        await withTimeout(
+          addFreeUser(email, user.usage_count),
+          5000,
+          "ActiveCampaign API call"
+        );
+        console.log(`✅ [send-code] User added to ActiveCampaign list 11 in ${Date.now() - startTime}ms`);
+      } catch (error: any) {
+        // Log error but don't fail the request - ActiveCampaign is non-critical
+        console.error("❌ [send-code] ActiveCampaign error (non-critical, continuing):", error.message);
       }
     }
 

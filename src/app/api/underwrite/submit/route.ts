@@ -899,6 +899,25 @@ export async function POST(request: Request) {
 </html>`,
         });
 
+        // Step 14.5: Add free users to ActiveCampaign (skip for demo mode and Pro users)
+        if (!isDemoMode && user.tier === "free") {
+          try {
+            const { addFreeUser } = await import("@/lib/activecampaign/client");
+
+            await addFreeUser(
+              user.email,
+              user.usage_count,
+              formData.propertyState || undefined
+            );
+
+            console.log(`✅ Added free user ${user.email} to ActiveCampaign`);
+          } catch (error: any) {
+            // Don't fail submission if ActiveCampaign fails
+            console.error("❌ ActiveCampaign error:", error.message);
+            // Continue with submission anyway
+          }
+        }
+
         // Step 15: Return success with reportId for immediate redirect
         sendComplete(controller, {
           success: true,
