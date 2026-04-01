@@ -268,19 +268,37 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
   const labelClass = "mb-3 block text-sm font-medium text-dark dark:text-white";
   const errorClass = "mt-1 text-sm text-red-600 dark:text-red-400";
 
+  // Pro users should auto-skip - show loading state instead of form
+  if (isProUser) {
+    return (
+      <div className="-mx-4 flex flex-wrap">
+        <div className="w-full px-4">
+          <div className="mb-8">
+            <div className="mb-6 rounded-sm bg-green-50 p-4 dark:bg-green-900/20">
+              <p className="text-sm text-green-700 dark:text-green-300">
+                ✓ Verified as Pro user ({userEmail})
+              </p>
+              <p className="mt-2 text-sm text-green-700 dark:text-green-300">
+                Proceeding to comp selection...
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="-mx-4 flex flex-wrap">
       <div className="w-full px-4">
         <div className="mb-8">
           <div className="mb-6 rounded-sm bg-blue-50 p-4 dark:bg-blue-900/20">
             <p className="text-sm text-body-color dark:text-body-color-dark">
-              <strong>Final Step:</strong> {isAuthenticated ? "Verify your identity" : "Verify your email"} to receive your AI-powered underwriting analysis from Gary.
+              <strong>Final Step:</strong> Verify your email to receive your AI-powered underwriting analysis from Gary.
             </p>
-            {!isAuthenticated && (
-              <p className="mt-2 text-xs text-body-color dark:text-body-color-dark">
-                You get <strong>5 free reports</strong> per verified email address.
-              </p>
-            )}
+            <p className="mt-2 text-xs text-body-color dark:text-body-color-dark">
+              You get <strong>5 free reports</strong> per verified email address.
+            </p>
           </div>
 
           {!codeSent ? (
@@ -288,7 +306,7 @@ export default function Step5EmailVerification({ authenticatedUser }: Step5Email
               {isAuthenticated ? (
                 <div className="mb-4 rounded-sm border border-green-500/20 bg-green-500/10 p-4">
                   <p className="text-sm text-green-700 dark:text-green-300">
-                    ✓ Report will be saved to your Pro account ({userEmail})
+                    ✓ Logged in as {userEmail}
                   </p>
                 </div>
               ) : (

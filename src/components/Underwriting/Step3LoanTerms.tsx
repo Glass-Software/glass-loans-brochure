@@ -5,7 +5,7 @@ import { useUnderwriting } from "@/context/UnderwritingContext";
 import { validateStep } from "@/lib/underwriting/validation";
 
 const formatNumber = (value: number | undefined): string => {
-  if (!value) return "";
+  if (value == null) return ""; // Only return empty for null/undefined, not 0
   return value.toLocaleString("en-US");
 };
 
