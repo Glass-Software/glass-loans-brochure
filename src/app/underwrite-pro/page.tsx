@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import SectionTitle from "@/components/Common/SectionTitle";
 import PricingCard from "@/components/Pro/PricingCard";
 import { STRIPE_PRICES } from "@/lib/stripe/prices";
@@ -159,11 +160,15 @@ const UnderwriteProPage = () => {
             {/* Comparable Sales Map Screenshot */}
             <div className="wow fadeInUp" data-wow-delay=".15s">
               <div className="overflow-hidden rounded-lg border border-stroke bg-white shadow-testimonial dark:border-strokedark dark:bg-gray-dark">
-                <div className="w-full">
-                  <img
+                <div className="relative w-full">
+                  <Image
                     src="/images/underwrite-pro/interactive-comperable-sales-tool.png"
                     alt="Interactive comparable sales map"
+                    width={3390}
+                    height={1646}
                     className="w-full h-auto"
+                    quality={85}
+                    priority
                   />
                 </div>
                 <div className="p-8">
@@ -182,11 +187,14 @@ const UnderwriteProPage = () => {
             {/* Dashboard Screenshot */}
             <div className="wow fadeInUp" data-wow-delay=".2s">
               <div className="overflow-hidden rounded-lg border border-stroke bg-white shadow-testimonial dark:border-strokedark dark:bg-gray-dark">
-                <div className="w-full">
-                  <img
+                <div className="relative w-full">
+                  <Image
                     src="/images/underwrite-pro/pro-dashboard.png"
                     alt="Pro dashboard with saved reports"
+                    width={2826}
+                    height={1424}
                     className="w-full h-auto"
+                    quality={85}
                   />
                 </div>
                 <div className="p-8">
