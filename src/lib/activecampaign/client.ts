@@ -21,7 +21,90 @@ interface ActiveCampaignContact {
 }
 
 /**
- * Add a contact to ActiveCampaign
+ * Search for a contact by email
+ */
+async function findContactByEmail(email: string): Promise<string | null> {
+  if (!process.env.ACTIVECAMPAIGN_API_KEY || !process.env.ACTIVECAMPAIGN_API_URL) {
+    return null;
+  }
+
+  const response = await fetch(
+    `${process.env.ACTIVECAMPAIGN_API_URL}/api/3/contacts?email=${encodeURIComponent(email)}`,
+    {
+      method: "GET",
+      headers: {
+        "Api-Token": process.env.ACTIVECAMPAIGN_API_KEY,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  if (data.contacts && data.contacts.length > 0) {
+    return data.contacts[0].id;
+  }
+
+  return null;
+}
+
+/**
+ * Update an existing contact in ActiveCampaign
+ */
+async function updateContact(
+  contactId: string,
+  email: string,
+  metadata?: ContactMetadata
+): Promise<ActiveCampaignContact> {
+  if (!process.env.ACTIVECAMPAIGN_API_KEY || !process.env.ACTIVECAMPAIGN_API_URL) {
+    throw new Error("ActiveCampaign API not configured");
+  }
+
+  const response = await fetch(
+    `${process.env.ACTIVECAMPAIGN_API_URL}/api/3/contacts/${contactId}`,
+    {
+      method: "PUT",
+      headers: {
+        "Api-Token": process.env.ACTIVECAMPAIGN_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contact: {
+          email,
+          firstName: metadata?.firstName || "",
+          lastName: metadata?.lastName || "",
+          fieldValues: [
+            {
+              field: "1", // Custom field ID for report count
+              value: metadata?.reportCount?.toString() || "1",
+            },
+            {
+              field: "2", // Custom field ID for last report date
+              value: metadata?.lastReportDate || new Date().toISOString(),
+            },
+            {
+              field: "3", // Custom field ID for property state
+              value: metadata?.propertyState || "",
+            },
+          ],
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update contact: ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data;
+}
+
+/**
+ * Add a contact to ActiveCampaign (or update if exists)
  *
  * @param email - User's email address
  * @param metadata - Additional contact data (report count, last report date, property state)
@@ -39,6 +122,7 @@ export async function addContact(
     throw new Error("ACTIVECAMPAIGN_API_URL is not configured");
   }
 
+  // Try to create the contact
   const response = await fetch(
     `${process.env.ACTIVECAMPAIGN_API_URL}/api/3/contacts`,
     {
@@ -73,6 +157,25 @@ export async function addContact(
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    // Check if this is a duplicate email error
+    if (response.status === 422 && errorText.includes("duplicate")) {
+      console.log(`📧 [ActiveCampaign] Contact ${email} already exists, updating instead...`);
+
+      // Find the existing contact
+      const existingContactId = await findContactByEmail(email);
+
+      if (existingContactId) {
+        // Update the existing contact
+        return await updateContact(existingContactId, email, metadata);
+      } else {
+        // Couldn't find the contact, but got duplicate error - this is weird
+        console.warn(`⚠️ [ActiveCampaign] Got duplicate error but couldn't find contact ${email}`);
+        throw new Error(`Contact exists but couldn't be found: ${email}`);
+      }
+    }
+
+    // Not a duplicate error - throw as normal
     throw new Error(`ActiveCampaign API error: ${response.statusText} - ${errorText}`);
   }
 
@@ -160,7 +263,13 @@ export async function addTags(contactId: string, tags: string[]): Promise<void> 
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`Failed to add tag "${tagName}" to contact: ${errorText}`);
+
+        // If tag already exists on contact, that's fine
+        if (response.status === 422 && (errorText.includes("duplicate") || errorText.includes("already exists"))) {
+          console.log(`📧 [ActiveCampaign] Tag "${tagName}" already exists on contact ${contactId}`);
+        } else {
+          console.error(`Failed to add tag "${tagName}" to contact: ${errorText}`);
+        }
       }
     } catch (error: any) {
       console.error(`Error adding tag "${tagName}":`, error.message);
@@ -206,6 +315,13 @@ export async function addContactToList(
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    // If already subscribed, that's fine - just log and continue
+    if (response.status === 422 && (errorText.includes("duplicate") || errorText.includes("already subscribed"))) {
+      console.log(`📧 [ActiveCampaign] Contact ${contactId} already subscribed to list ${listId}`);
+      return; // Success - they're already on the list
+    }
+
     throw new Error(`ActiveCampaign list subscription error: ${response.statusText} - ${errorText}`);
   }
 }
@@ -264,8 +380,8 @@ export async function addFreeUser(
     console.log(`✅ [ActiveCampaign] Tags added: ${tags.join(", ")}`);
     console.log(`✅ [ActiveCampaign] Free user ${email} successfully added to marketing automation`);
   } catch (error: any) {
-    // Log error but don't throw - we don't want ActiveCampaign failures to break report submissions
+    // Log error but DON'T throw - ActiveCampaign failures should never block users from using the tool
     console.error(`❌ [ActiveCampaign] Failed to add user ${email}:`, error.message);
-    throw error; // Re-throw so caller can handle
+    // Don't re-throw - this is a non-critical marketing automation feature
   }
 }
