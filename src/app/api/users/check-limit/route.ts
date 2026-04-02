@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { setPromoExpiry } from "@/lib/db/queries";
 
+// Force dynamic behavior - no caching
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 /**
  * GET /api/users/check-limit
  *
@@ -23,6 +27,9 @@ export async function GET() {
       );
     }
 
+    // Debug logging to help diagnose limit issues
+    console.log(`🔍 [check-limit] User ${user.email}: usageCount=${user.usageCount}, usageLimit=${user.usageLimit}`);
+
     // Check if user has exceeded their usage limit
     // Note: This applies to both free and Pro users (Pro users have higher limits)
     if (user.usageCount >= user.usageLimit) {
@@ -38,20 +45,24 @@ export async function GET() {
         await setPromoExpiry(user.id);
       }
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         limitReached: true,
         usageCount: user.usageCount,
         usageLimit: user.usageLimit,
         promoExpiresAt: promoExpiresAt.toISOString(),
       });
+      response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      return response;
     }
 
     // User is within their limit
-    return NextResponse.json({
+    const response = NextResponse.json({
       limitReached: false,
       usageCount: user.usageCount,
       usageLimit: user.usageLimit,
     });
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    return response;
   } catch (error: any) {
     console.error("❌ [check-limit] Error:", error);
     return NextResponse.json(
