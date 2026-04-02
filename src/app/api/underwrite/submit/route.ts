@@ -153,33 +153,43 @@ function sendProgress(
   status: string,
   progress: number,
 ) {
-  const event: ProgressEvent = {
-    type: "progress",
-    step,
-    status,
-    progress,
-    timestamp: new Date().toISOString(),
-  };
+  try {
+    const event: ProgressEvent = {
+      type: "progress",
+      step,
+      status,
+      progress,
+      timestamp: new Date().toISOString(),
+    };
 
-  const encoder = new TextEncoder();
-  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+    const encoder = new TextEncoder();
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+  } catch (error) {
+    // Controller is closed (client disconnected) - log but don't throw
+    console.warn("[Stream] Cannot send progress - controller closed:", status);
+  }
 }
 
 /**
  * Helper to send completion event
  */
 function sendComplete(controller: ReadableStreamDefaultController, data: any) {
-  const event: ProgressEvent = {
-    type: "complete",
-    step: 6,
-    status: "Analysis complete!",
-    progress: 100,
-    timestamp: new Date().toISOString(),
-    data,
-  };
+  try {
+    const event: ProgressEvent = {
+      type: "complete",
+      step: 6,
+      status: "Analysis complete!",
+      progress: 100,
+      timestamp: new Date().toISOString(),
+      data,
+    };
 
-  const encoder = new TextEncoder();
-  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+    const encoder = new TextEncoder();
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+  } catch (error) {
+    // Controller is closed (client disconnected) - log but don't throw
+    console.warn("[Stream] Cannot send complete - controller closed");
+  }
 }
 
 /**
@@ -191,17 +201,22 @@ function sendError(
   code?: string,
   payload?: any,
 ) {
-  const event: ProgressEvent = {
-    type: "error",
-    step: 0,
-    status: error,
-    progress: 0,
-    timestamp: new Date().toISOString(),
-    data: { code, ...payload },
-  };
+  try {
+    const event: ProgressEvent = {
+      type: "error",
+      step: 0,
+      status: error,
+      progress: 0,
+      timestamp: new Date().toISOString(),
+      data: { code, ...payload },
+    };
 
-  const encoder = new TextEncoder();
-  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+    const encoder = new TextEncoder();
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+  } catch (error) {
+    // Controller is closed (client disconnected) - log but don't throw
+    console.warn("[Stream] Cannot send error - controller closed");
+  }
 }
 
 export async function POST(request: Request) {
