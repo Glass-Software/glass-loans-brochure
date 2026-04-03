@@ -1,0 +1,14 @@
+{
+  "jobs": [
+    {
+      "name": "reset-pro-usage",
+      "schedule": "0 3 * * *",
+      "comment": "Reset Pro user usage counts monthly at 3 AM UTC",
+      "url": "https://glassloans.io/api/cron/reset-usage",
+      "method": "POST",
+      "headers": {
+        "Authorization": "Bearer ${CRON_SECRET}"
+      }
+    }
+  ]
+}

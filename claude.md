@@ -132,6 +132,31 @@ primary_region = 'dfw'
 
 **Reference:** Full fly.toml documentation at https://fly.io/docs/reference/configuration/
 
+## Cron Jobs
+
+This project uses **Fly.io cron-manager** for scheduled tasks.
+
+**Current Cron Jobs:**
+- **Monthly Usage Reset**: Resets Pro users' `usageCount` to 0 every 30 days based on their `usagePeriodStart`
+  - Schedule: Daily at 3 AM UTC
+  - Endpoint: `/api/cron/reset-usage`
+  - Documentation: See [CRON_SETUP.md](CRON_SETUP.md)
+
+**Cron Manager App Name:** `glass-loans-brochure-modified-misty-thunder-1484-cron`
+
+**View cron logs:**
+```bash
+fly logs -a glass-loans-brochure-modified-misty-thunder-1484-cron
+```
+
+**Manual trigger (testing):**
+```bash
+curl -X POST https://glassloans.io/api/cron/reset-usage \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+For setup instructions, see [CRON_SETUP.md](CRON_SETUP.md).
+
 ## Database: Managed Postgres
 
 This project uses **Fly.io Managed Postgres (MPG)** with Prisma ORM.
