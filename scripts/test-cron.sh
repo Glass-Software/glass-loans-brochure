@@ -9,17 +9,26 @@ APP_NAME="glass-loans-brochure-modified-misty-thunder-1484"
 echo "🧪 Testing cron endpoint: /api/cron/reset-usage"
 echo ""
 
-# Get CRON_SECRET from Fly
-echo "📝 Fetching CRON_SECRET from Fly..."
-CRON_SECRET=$(fly secrets list -a "$APP_NAME" | grep CRON_SECRET | awk '{print $2}')
+# NOTE: fly secrets list shows a digest, NOT the actual secret value
+# You must manually set CRON_SECRET environment variable or use .env.local
 
 if [ -z "$CRON_SECRET" ]; then
-  echo "❌ CRON_SECRET not found. Set it with:"
-  echo "   fly secrets set CRON_SECRET=\$(openssl rand -hex 32) -a $APP_NAME"
-  exit 1
+  echo "⚠️  CRON_SECRET not set in environment"
+  echo ""
+  echo "Please set it manually:"
+  echo "  export CRON_SECRET='your-actual-secret-here'"
+  echo ""
+  echo "Or add it to .env.local for local testing"
+  echo ""
+  read -p "Enter CRON_SECRET now: " CRON_SECRET
+
+  if [ -z "$CRON_SECRET" ]; then
+    echo "❌ CRON_SECRET is required"
+    exit 1
+  fi
 fi
 
-echo "✅ CRON_SECRET found"
+echo "✅ Using CRON_SECRET: ${CRON_SECRET:0:10}...${CRON_SECRET: -4}"
 echo ""
 
 # Choose environment
@@ -48,6 +57,7 @@ esac
 
 echo ""
 echo "🚀 Sending POST request to: $URL"
+echo "🔑 Authorization: Bearer ${CRON_SECRET:0:10}...${CRON_SECRET: -4}"
 echo ""
 
 # Make the request

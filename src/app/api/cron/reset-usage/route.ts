@@ -19,8 +19,17 @@ export async function POST(request: Request) {
     const authHeader = request.headers.get("authorization");
     const expectedToken = process.env.CRON_SECRET;
 
+    // Debug logging (sanitized)
+    console.log("🔍 [reset-usage] Auth check:", {
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader?.substring(0, 10) + "...",
+      hasExpectedToken: !!expectedToken,
+      expectedTokenPrefix: expectedToken?.substring(0, 10) + "...",
+      match: authHeader === `Bearer ${expectedToken}`,
+    });
+
     if (!expectedToken) {
-      console.error("❌ [reset-usage] CRON_SECRET not configured");
+      console.error("❌ [reset-usage] CRON_SECRET not configured in environment");
       return NextResponse.json(
         { error: "Cron secret not configured" },
         { status: 500 }
@@ -29,6 +38,7 @@ export async function POST(request: Request) {
 
     if (authHeader !== `Bearer ${expectedToken}`) {
       console.warn("⚠️ [reset-usage] Unauthorized cron request");
+      console.warn("⚠️ [reset-usage] Expected format: 'Bearer <token>'");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

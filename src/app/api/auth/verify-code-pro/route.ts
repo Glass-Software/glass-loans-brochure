@@ -3,6 +3,7 @@ import { normalizeEmail } from "@/lib/email/normalization";
 import { verifyUserCode, findUserByNormalizedEmail } from "@/lib/db/queries";
 import { createSession } from "@/lib/auth/session";
 import { addFreeUser } from "@/lib/activecampaign/client";
+import { prisma } from "@/lib/db/prisma";
 import sgMail from "@sendgrid/mail";
 
 // Initialize SendGrid
@@ -63,10 +64,16 @@ export async function POST(request: NextRequest) {
     const ip = forwarded ? forwarded.split(",")[0] : request.headers.get("x-real-ip") || undefined;
     const userAgent = request.headers.get("user-agent") || undefined;
 
+    // Check if this is the user's first login (no previous sessions)
+    const previousSessionCount = await prisma.session.count({
+      where: { userId: user.id }
+    });
+    const isFirstLogin = previousSessionCount === 0;
+
     // Create session (sets HTTP-only cookie)
     await createSession(user.id, ip, userAgent);
 
-    console.log(`✅ Pro user ${user.id} logged in successfully`);
+    console.log(`✅ Pro user ${user.id} logged in successfully (first login: ${isFirstLogin})`);
 
     // Add to ActiveCampaign if marketing consent is true
     // Fetch the latest user data to get updated name and marketing consent
@@ -88,8 +95,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Send welcome email to Pro member
-    if (process.env.SENDGRID_API_KEY) {
+    // Only send welcome email to new Pro members (first-time login)
+    if (isFirstLogin && process.env.SENDGRID_API_KEY) {
       try {
         await sendProWelcomeEmail(
           user.email,
