@@ -53,6 +53,11 @@ ENV NEXT_PUBLIC_STRIPE_PRICE_MONTHLY_PROMO=$NEXT_PUBLIC_STRIPE_PRICE_MONTHLY_PRO
 ARG NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_PROMO
 ENV NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_PROMO=$NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_PROMO
 
+# Stable encryption key for Next.js Server Actions — keeps IDs consistent across builds
+# so in-flight requests from old clients don't break after a new deployment
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+
 # Set placeholder DATABASE_URL for build phase only
 # (Prisma client needs it to initialize, but won't actually connect during build)
 # Real DATABASE_URL is injected at runtime via Fly secrets

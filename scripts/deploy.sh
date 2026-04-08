@@ -11,6 +11,27 @@ echo ""
 
 # Step 1: Deploy
 echo "📦 Deploying to Fly.io..."
+
+# NEXT_SERVER_ACTIONS_ENCRYPTION_KEY must be set in your environment before deploying.
+# Generate once with: openssl rand -base64 32
+# Then add to your shell profile or .env.local:
+#   export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="<your-key>"
+if [ -z "$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" ]; then
+  # Try loading from .env.local if not already set
+  if [ -f "$(dirname "$0")/../.env.local" ]; then
+    export $(grep -E '^NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=' "$(dirname "$0")/../.env.local" | xargs)
+  fi
+fi
+
+if [ -z "$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" ]; then
+  echo "❌ ERROR: NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set."
+  echo "   Generate it once with: openssl rand -base64 32"
+  echo "   Then either:"
+  echo "     export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY='<key>'  (in your shell)"
+  echo "     or add it to .env.local"
+  exit 1
+fi
+
 # Pass public API keys as build args (required for client-side bundle)
 # These are public keys restricted by domain in their respective dashboards
 fly deploy \
@@ -22,7 +43,8 @@ fly deploy \
   --build-arg NEXT_PUBLIC_STRIPE_PRICE_MONTHLY_REGULAR="price_1TGoUM9pyT4ynYPlvBrseH3U" \
   --build-arg NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_REGULAR="price_1TGoUM9pyT4ynYPlaeAj3eSo" \
   --build-arg NEXT_PUBLIC_STRIPE_PRICE_MONTHLY_PROMO="price_1TGoUM9pyT4ynYPlQqS026zi" \
-  --build-arg NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_PROMO="price_1TGoUM9pyT4ynYPly2bwWGhR"
+  --build-arg NEXT_PUBLIC_STRIPE_PRICE_ANNUAL_PROMO="price_1TGoUM9pyT4ynYPly2bwWGhR" \
+  --build-arg NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY"
 
 echo ""
 echo "✅ Deployment complete!"
