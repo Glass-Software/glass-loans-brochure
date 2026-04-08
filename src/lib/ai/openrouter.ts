@@ -14,6 +14,7 @@ interface ChatCompletionRequest {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
+  response_format?: { type: "json_object" | "text" };
 }
 
 interface ChatCompletionResponse {
@@ -115,6 +116,7 @@ export class OpenRouterClient {
       temperature?: number;
       maxTokens?: number;
       systemPrompt?: string;
+      responseFormat?: { type: "json_object" | "text" };
     } = {},
   ): Promise<string> {
     const {
@@ -122,6 +124,7 @@ export class OpenRouterClient {
       temperature = 0.7,
       maxTokens = 2000,
       systemPrompt,
+      responseFormat,
     } = options;
 
     console.log(`🎯 [OpenRouter] generateText() called with model: ${model}`);
@@ -139,6 +142,7 @@ export class OpenRouterClient {
       messages,
       temperature,
       max_tokens: maxTokens,
+      ...(responseFormat && { response_format: responseFormat }),
     });
 
     return response.choices[0]?.message?.content || "";
@@ -157,20 +161,15 @@ export class OpenRouterClient {
     } = {},
   ): Promise<T> {
     console.log(`🎯 [OpenRouter] generateJSON() called with model: ${options.model || "x-ai/grok-4.1-fast"}`);
-    const text = await this.generateText(prompt, options);
-
-    // Try to extract JSON from the response
-    // Some models wrap JSON in markdown code blocks
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || [
-      null,
-      text,
-    ];
-    const jsonText = jsonMatch[1] || text;
+    const text = await this.generateText(prompt, {
+      ...options,
+      responseFormat: { type: "json_object" },
+    });
 
     try {
-      return JSON.parse(jsonText.trim());
+      return JSON.parse(text.trim());
     } catch (error) {
-      console.error("Failed to parse JSON response:", jsonText);
+      console.error("Failed to parse JSON response:", text);
       throw new Error("AI did not return valid JSON");
     }
   }

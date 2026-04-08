@@ -66,6 +66,9 @@ export default function CalculationBreakdown({
               label="Square Feet"
               value={formatNumber(formData.squareFeet)}
             />
+            {formData.yearBuilt && (
+              <Row label="Year Built" value={String(formData.yearBuilt)} />
+            )}
             <Row label="Condition" value={formData.propertyCondition} />
             <Row
               label="Renovation Budget"

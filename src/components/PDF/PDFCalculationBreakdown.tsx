@@ -31,6 +31,7 @@ export default function PDFCalculationBreakdown({
         <Row label="Purchase Price" value={formatCurrency(formData.purchasePrice)} />
         <Row label="Rehab Budget" value={formatCurrency(formData.rehab)} />
         <Row label="Square Feet" value={formatNumber(formData.squareFeet)} />
+        {formData.yearBuilt ? <Row label="Year Built" value={String(formData.yearBuilt)} /> : null}
         <Row label="Condition" value={formData.propertyCondition} />
         <Row
           label="Renovation Budget"
