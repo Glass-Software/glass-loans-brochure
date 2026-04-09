@@ -1,4 +1,4 @@
-import { useModal } from "@/context/ModalContext";
+import Link from "next/link";
 
 const PricingBox = (props: {
   monthlyPrice: string;
@@ -9,10 +9,10 @@ const PricingBox = (props: {
   children?: React.ReactNode;
 }) => {
   const { monthlyPrice, annualPrice, isMonthly, packageName, subtitle, children } = props;
-  const { openContactModal } = useModal();
 
   const displayPrice = isMonthly ? monthlyPrice : annualPrice;
   const duration = isMonthly ? "mo" : "yr";
+  const signupUrl = `https://app.glassloans.io/signup?tier=${packageName.toLowerCase()}&billing=${isMonthly ? "monthly" : "yearly"}`;
 
   return (
     <div className="w-full">
@@ -30,12 +30,14 @@ const PricingBox = (props: {
         </div>
         <p className="mb-7 text-base text-body-color dark:text-body-color-dark">{subtitle}</p>
         <div className="mb-8 border-b border-body-color border-opacity-10 pb-8 dark:border-white dark:border-opacity-10">
-          <button
-            onClick={() => openContactModal(packageName)}
+          <Link
+            href={signupUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex w-full items-center justify-center rounded-sm bg-primary p-3 text-base font-semibold text-white transition duration-300 ease-in-out hover:bg-opacity-80 hover:shadow-signUp"
           >
             Get Started
-          </button>
+          </Link>
         </div>
         {children && <div>{children}</div>}
         <div className="absolute bottom-0 right-0 z-[-1]">
