@@ -2,18 +2,14 @@ import { NextResponse } from "next/server";
 import { normalizeEmail } from "@/lib/email/normalization";
 import { findUserByNormalizedEmail, generateVerificationCode, updateMarketingConsent } from "@/lib/db/queries";
 import { prisma } from "@/lib/db/prisma";
-import sgMail from "@sendgrid/mail";
-
-// Initialize SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+import { sendWithFallback, isEmailServiceConfigured } from "@/lib/email/service";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  if (!process.env.SENDGRID_API_KEY) {
+  if (!isEmailServiceConfigured()) {
     return NextResponse.json(
       { error: "Email service not configured" },
       { status: 500 }
@@ -21,6 +17,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Rate limit: 5 requests per IP per 10 minutes
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`auth-send-code:${ip}`, 5, 10 * 60 * 1000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, firstName, lastName, marketingConsent } = body;
 
@@ -78,15 +84,14 @@ export async function POST(request: Request) {
 }
 
 /**
- * Send Pro signup verification code via SendGrid
+ * Send Pro signup verification code (SendGrid with Resend fallback)
  */
 async function sendProSignupCodeEmail(email: string, code: string, firstName?: string) {
   const greeting = firstName ? `Hi ${firstName},` : 'Welcome to Glass Loans Pro!';
-  const greetingHtml = firstName ? `Hi ${firstName},` : 'Welcome to Pro! 🎉';
+  const greetingHtml = firstName ? `Hi ${firstName},` : 'Welcome to Pro!';
 
-  const msg = {
+  await sendWithFallback({
     to: email,
-    from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
     subject: "Welcome to Glass Loans Pro - Verify Your Email",
     text: `${greeting}
 
@@ -132,7 +137,5 @@ Glass Loans Team`,
   </div>
 </body>
 </html>`,
-  };
-
-  await sgMail.send(msg);
+  });
 }

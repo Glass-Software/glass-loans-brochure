@@ -4,12 +4,7 @@ import { verifyUserCode, findUserByNormalizedEmail } from "@/lib/db/queries";
 import { createSession } from "@/lib/auth/session";
 import { addFreeUser } from "@/lib/activecampaign/client";
 import { prisma } from "@/lib/db/prisma";
-import sgMail from "@sendgrid/mail";
-
-// Initialize SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+import { sendWithFallback, isEmailServiceConfigured } from "@/lib/email/service";
 
 /**
  * POST /api/auth/verify-code-pro
@@ -96,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Only send welcome email to new Pro members (first-time login)
-    if (isFirstLogin && process.env.SENDGRID_API_KEY) {
+    if (isFirstLogin && isEmailServiceConfigured()) {
       try {
         await sendProWelcomeEmail(
           user.email,
@@ -129,15 +124,14 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Send Pro welcome email via SendGrid
+ * Send Pro welcome email (SendGrid with Resend fallback)
  */
 async function sendProWelcomeEmail(email: string, firstName?: string) {
   const greeting = firstName ? `Hi ${firstName},` : 'Welcome!';
-  const greetingHtml = firstName ? `Hi ${firstName},` : 'Welcome! 🎉';
+  const greetingHtml = firstName ? `Hi ${firstName},` : 'Welcome!';
 
-  const msg = {
+  await sendWithFallback({
     to: email,
-    from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
     subject: "Welcome to Glass Underwrite Pro - You're All Set!",
     text: `${greeting}
 
@@ -245,7 +239,5 @@ Glass Loans Team`,
   </div>
 </body>
 </html>`,
-  };
-
-  await sgMail.send(msg);
+  });
 }

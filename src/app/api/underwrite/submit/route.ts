@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendWithFallback } from "@/lib/email/service";
 import { normalizeEmail } from "@/lib/email/normalization";
 import {
   incrementUsageCount,
@@ -875,19 +876,10 @@ export async function POST(request: Request) {
         // Step 14: Send email with report link (90-95%)
         sendProgress(controller, 6, "Sending report link to your email...", 95);
 
-        const sgMail = (await import("@sendgrid/mail")).default;
-
-        if (!process.env.SENDGRID_API_KEY) {
-          throw new Error("SENDGRID_API_KEY is not set");
-        }
-
-        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
         const reportUrl = `${process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || "https://glassloans.io"}/underwrite/results/${reportId}`;
 
-        await sgMail.send({
+        await sendWithFallback({
           to: email,
-          from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
           subject: "Your Underwriting Report Link - Glass Loans",
           text: `Your underwriting report is ready!\n\nView your report: ${reportUrl}\n\nThis link will be valid for ${retentionDays} days.\n\nBest,\nGlass Loans Team`,
           html: `

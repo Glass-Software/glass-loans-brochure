@@ -6,17 +6,15 @@ import {
   createUser,
   regenerateVerificationToken,
 } from "@/lib/db/queries";
-import sgMail from "@sendgrid/mail";
+import { sendWithFallback, isEmailServiceConfigured } from "@/lib/email/service";
 
 export async function POST(request: Request) {
-  // Initialize SendGrid at runtime (not build time)
-  if (!process.env.SENDGRID_API_KEY) {
+  if (!isEmailServiceConfigured()) {
     return NextResponse.json(
       { error: "Email service not configured" },
       { status: 500 }
     );
   }
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
   try {
     const body = await request.json();
     const { email } = body;
@@ -116,14 +114,13 @@ export async function POST(request: Request) {
 }
 
 /**
- * Send verification email via SendGrid
+ * Send verification email (SendGrid with Resend fallback)
  */
 async function sendVerificationEmail(email: string, token: string) {
   const verificationUrl = `${process.env.NEXT_PUBLIC_BASE_URL || process.env.BASE_URL || "https://glassloans.io"}/underwrite/verify?token=${token}`;
 
-  const msg = {
+  await sendWithFallback({
     to: email,
-    from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
     subject: "Verify Your Email - Glass Loans Underwriting Tool",
     text: `
 Hi there,
@@ -179,7 +176,5 @@ Glass Loans Team
 </body>
 </html>
     `,
-  };
-
-  await sgMail.send(msg);
+  });
 }

@@ -9,13 +9,9 @@ import {
   updateUserName,
   setPromoExpiry,
 } from "@/lib/db/queries";
-import sgMail from "@sendgrid/mail";
+import { sendWithFallback, isEmailServiceConfigured } from "@/lib/email/service";
 import { addFreeUser } from "@/lib/activecampaign/client";
-
-// Initialize SendGrid once at module level
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 // Timeout utility to prevent indefinite hangs
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> {
@@ -37,7 +33,7 @@ export async function POST(request: Request) {
   console.log("🔵 [send-code] DATABASE_URL exists:", !!process.env.DATABASE_URL);
   console.log("🔵 [send-code] DATABASE_URL starts with:", process.env.DATABASE_URL?.substring(0, 20));
 
-  if (!process.env.SENDGRID_API_KEY) {
+  if (!isEmailServiceConfigured()) {
     return NextResponse.json(
       { error: "Email service not configured" },
       { status: 500 }
@@ -45,6 +41,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Rate limit: 5 codes per IP per 10 minutes, and 3 per email per 10 minutes
+    const ip = getClientIp(request);
+    const ipRl = checkRateLimit(`send-code-ip:${ip}`, 5, 10 * 60 * 1000);
+    if (!ipRl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, firstName, lastName, marketingConsent = false } = body;
 
@@ -59,6 +65,15 @@ export async function POST(request: Request) {
 
     if (isDisposableEmail(email)) {
       return NextResponse.json({ error: "Disposable email addresses are not allowed" }, { status: 400 });
+    }
+
+    // Rate limit: 3 codes per unique email per 10 minutes
+    const emailRl = checkRateLimit(`send-code-email:${email.toLowerCase()}`, 3, 10 * 60 * 1000);
+    if (!emailRl.allowed) {
+      return NextResponse.json(
+        { error: "Too many verification attempts for this email. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     // Normalize email
@@ -245,12 +260,11 @@ export async function POST(request: Request) {
 }
 
 /**
- * Send 6-digit verification code via SendGrid
+ * Send 6-digit verification code via email (SendGrid with Resend fallback)
  */
 async function sendVerificationCodeEmail(email: string, code: string) {
-  const msg = {
+  await sendWithFallback({
     to: email,
-    from: process.env.SENDGRID_FROM_EMAIL || "info@glassloans.io",
     subject: "Your Verification Code - Glass Loans",
     text: `Your verification code is: ${code}
 
@@ -286,7 +300,5 @@ Glass Loans Team`,
   </div>
 </body>
 </html>`,
-  };
-
-  await sgMail.send(msg);
+  });
 }
