@@ -80,10 +80,11 @@ const Hero = () => {
         <ModalVideo
           channel="youtube"
           isOpen={isOpen}
-          videoId="MCrkFKhXVIM"
+          videoId="Wz6q7wH08Zg"
           onClose={() => setOpen(false)}
           youtube={{
             autoplay: 1,
+            start: 1,
             vq: "hd1080",
             quality: "hd1080",
             rel: 0,
