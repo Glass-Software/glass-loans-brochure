@@ -12,6 +12,7 @@ import {
   clearPromoExpiry,
 } from "@/lib/db/queries";
 import { normalizeEmail } from "@/lib/email/normalization";
+import { sendWithFallback } from "@/lib/email/service";
 import Stripe from "stripe";
 
 export async function POST(req: Request) {
@@ -158,6 +159,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   console.log(`✅ Pro subscription created for user ${user.id}`);
   console.log(`🎉 User now has Pro access with existing reports preserved!`);
+
+  // Send admin alert (fire-and-forget — don't block webhook response)
+  sendWithFallback({
+    to: ["willcoleman202@gmail.com", "hervey711@gmail.com"],
+    subject: "New Underwrite Pro Signup",
+    text: `New Pro signup: ${email}`,
+    html: `<p>A new user just signed up for Underwrite Pro:</p>
+           <p><strong>Email:</strong> ${email}</p>
+           <p><strong>Stripe Customer:</strong> ${stripeCustomerId}</p>
+           <p><strong>Subscription:</strong> ${subscriptionId}</p>
+           <p><strong>User ID:</strong> ${user.id}</p>`,
+  }).catch((err) => console.error("⚠️ Failed to send Pro signup alert:", err));
 }
 
 /**
